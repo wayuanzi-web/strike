@@ -1,0 +1,215 @@
+<title>破曉突擊</title>
+<!--FONTS-->
+<style>
+/* 版面：3D 畫面佔滿整個螢幕，資訊列與觸控按鈕蓋在上面。尺寸一律用 --u（橫拿時螢幕高度的 1%）來算，大小手機都一樣比例。
+   色彩：破曉的天色。深石板藍當底、曙光琥珀當重點色，紅色只用在受傷與敵人。 */
+:root {
+  color-scheme: dark;
+  --ink: #0e141d; --ink-2: #16202c; --panel: rgba(14, 20, 29, .86); --line: rgba(255, 228, 190, .22);
+  --bone: #f3ece0; --mute: #a9b0ba;
+  --dawn: #ffb347; --dawn-lt: #ffd9a0; --dawn-ink: #2a1600;
+  --hurt: #ff4a3d; --head: #ff6b3d; --ok: #8fe3b0;
+  --f-title: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --f-num: "Saira Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --f-body: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --u: 3.9px;
+  --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px);
+  --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--ink); color: var(--bone); }
+body { font-family: var(--f-body); touch-action: none; -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; touch-action: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outline-offset: 2px; }
+#app { position: fixed; inset: 0; overflow: hidden; background: var(--ink); }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ---------- 準星、命中、受傷 ---------- */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#xh { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --g: 8px; }
+#xh i { position: absolute; background: var(--bone); box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
+#xh .t, #xh .b { width: 2px; height: calc(var(--u) * 2.2); left: -1px; }
+#xh .l, #xh .r { height: 2px; width: calc(var(--u) * 2.2); top: -1px; }
+#xh .t { bottom: var(--g); } #xh .b { top: var(--g); } #xh .l { right: var(--g); } #xh .r { left: var(--g); }
+#xh .d { width: 2px; height: 2px; left: -1px; top: -1px; }
+#xh.ads i:not(.d) { opacity: .35; }
+#xh.lock i { background: var(--hurt); }
+#hm { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 7); height: calc(var(--u) * 7); margin: calc(var(--u) * -3.5) 0 0 calc(var(--u) * -3.5); opacity: 0; }
+#hm i { position: absolute; width: 2px; height: calc(var(--u) * 2); background: #fff; left: 50%; top: 50%; }
+#hm i:nth-child(1) { transform: translate(-50%, -50%) rotate(45deg) translateY(calc(var(--u) * -2.3)); }
+#hm i:nth-child(2) { transform: translate(-50%, -50%) rotate(135deg) translateY(calc(var(--u) * -2.3)); }
+#hm i:nth-child(3) { transform: translate(-50%, -50%) rotate(225deg) translateY(calc(var(--u) * -2.3)); }
+#hm i:nth-child(4) { transform: translate(-50%, -50%) rotate(315deg) translateY(calc(var(--u) * -2.3)); }
+#hm.head i { background: var(--head); height: calc(var(--u) * 2.6); }
+#hm.kill i { background: var(--hurt); height: calc(var(--u) * 3); width: 3px; }
+#vig { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, rgba(255, 40, 30, 0) 45%, rgba(190, 20, 10, .55) 100%); }
+#dirs { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#dirs b { position: absolute; left: calc(var(--u) * -9); top: calc(var(--u) * -9); width: calc(var(--u) * 18); height: calc(var(--u) * 18); border-radius: 50%;
+  border: calc(var(--u) * 1.2) solid transparent; border-top-color: rgba(255, 70, 50, .9); opacity: 0; }
+
+/* ---------- 上方：戰績、擊殺訊息、幀數 ---------- */
+.top { position: absolute; top: calc(var(--st) + var(--u) * 2); left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 2px; font-family: var(--f-num); }
+.top div { background: var(--panel); padding: calc(var(--u) * .6) calc(var(--u) * 2.4); display: grid; justify-items: center; line-height: 1.05; }
+.top div:first-child { border-radius: 4px 0 0 4px; } .top div:last-child { border-radius: 0 4px 4px 0; }
+.top small { font-family: var(--f-body); font-size: calc(var(--u) * 2.4); color: var(--mute); letter-spacing: .08em; }
+.top strong { font-size: calc(var(--u) * 5); font-weight: 800; font-variant-numeric: tabular-nums; }
+.top .k strong { color: var(--dawn); }
+#feed { position: absolute; top: calc(var(--st) + var(--u) * 2); right: calc(var(--sr) + var(--u) * 3); display: grid; gap: 3px; justify-items: end; font-size: calc(var(--u) * 3); }
+#feed p { margin: 0; background: var(--panel); padding: calc(var(--u) * .5) calc(var(--u) * 1.6); border-radius: 3px; transition: opacity .4s; }
+#feed .you { color: var(--dawn); } #feed .bot { color: #ff8f80; } #feed .hs { color: var(--head); font-family: var(--f-num); font-weight: 800; margin: 0 .3em; }
+#fps { position: absolute; top: calc(var(--st) + var(--u) * 13); left: calc(var(--sl) + var(--u) * 3); font: 600 calc(var(--u) * 2.8) var(--f-num); color: var(--ok); background: var(--panel); padding: 1px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; }
+
+/* ---------- 下方：血量、彈藥 ---------- */
+#hp { position: absolute; left: calc(var(--sl) + var(--u) * 3); bottom: calc(var(--sb) + var(--u) * 3); display: flex; align-items: center; gap: calc(var(--u) * 1.4);
+  background: var(--panel); padding: calc(var(--u) * .8) calc(var(--u) * 2) calc(var(--u) * .8) calc(var(--u) * 1.4); border-radius: 4px; font-family: var(--f-num); }
+#hp svg { width: calc(var(--u) * 4); height: calc(var(--u) * 4); fill: var(--bone); }
+#hpN { font-size: calc(var(--u) * 6); font-weight: 800; min-width: 2.2ch; font-variant-numeric: tabular-nums; line-height: 1; }
+#hpBar { width: calc(var(--u) * 16); height: calc(var(--u) * 1.2); background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; }
+#hpBar i { display: block; height: 100%; width: 100%; background: var(--bone); transition: width .15s; }
+#hp.low #hpN { color: var(--hurt); } #hp.low #hpBar i { background: var(--hurt); }
+#ammo { position: absolute; left: 50%; bottom: calc(var(--sb) + var(--u) * 3); transform: translateX(-50%); font-family: var(--f-num); background: var(--panel);
+  padding: calc(var(--u) * .5) calc(var(--u) * 2.4); border-radius: 4px; display: flex; align-items: baseline; gap: calc(var(--u) * 1); }
+#ammoN { font-size: calc(var(--u) * 6.4); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+#ammo small { font-size: calc(var(--u) * 3.4); color: var(--mute); }
+#ammo .w { font-family: var(--f-body); font-size: calc(var(--u) * 2.6); color: var(--mute); margin-left: calc(var(--u) * 1); }
+#ammo.low #ammoN { color: var(--hurt); }
+#rl { position: absolute; left: 50%; top: calc(50% + var(--u) * 8); transform: translateX(-50%); width: calc(var(--u) * 24); text-align: center; font-size: calc(var(--u) * 2.8); color: var(--dawn-lt); }
+#rl i { display: block; height: 3px; background: rgba(255,255,255,.18); margin-top: 4px; border-radius: 2px; overflow: hidden; }
+#rl i b { display: block; height: 100%; width: 0; background: var(--dawn); }
+#tip { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 15); transform: translateX(-50%); background: var(--panel); padding: calc(var(--u) * 1) calc(var(--u) * 3);
+  border-radius: 4px; font-size: calc(var(--u) * 3.2); white-space: nowrap; transition: opacity .5s; }
+
+/* ---------- 觸控按鈕 ---------- */
+#touch { position: absolute; inset: 0; }
+#touch[hidden] { display: none; }
+#joy { position: absolute; width: calc(var(--u) * 26); height: calc(var(--u) * 26); margin: calc(var(--u) * -13) 0 0 calc(var(--u) * -13); border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.28); background: rgba(10,14,20,.22); pointer-events: none; opacity: .0; transition: opacity .15s; }
+#joy.on { opacity: 1; }
+#joy.idle { opacity: .45; }
+#joyK { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 11); height: calc(var(--u) * 11); margin: calc(var(--u) * -5.5) 0 0 calc(var(--u) * -5.5);
+  border-radius: 50%; background: rgba(243,236,224,.55); box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+#joy.run { border-color: var(--dawn); } #joy.run #joyK { background: rgba(255,179,71,.8); }
+.tb { position: absolute; border-radius: 50%; display: grid; place-items: center; background: rgba(12,18,26,.42); border: 2px solid rgba(243,236,224,.38);
+  color: var(--bone); font-size: calc(var(--u) * 3); font-weight: 700; letter-spacing: .04em; }
+.tb svg { width: 46%; height: 46%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.tb.on, .tb.down { background: rgba(255,179,71,.32); border-color: var(--dawn); color: var(--dawn-lt); }
+#bFire { width: calc(var(--u) * 22); height: calc(var(--u) * 22); right: calc(var(--sr) + var(--u) * 21); bottom: calc(var(--sb) + var(--u) * 20); border-width: 3px; }
+#bFire svg { width: 50%; height: 50%; }
+#bFire.down { background: rgba(255,74,61,.35); border-color: var(--hurt); color: #fff; }
+#bAds { width: calc(var(--u) * 14); height: calc(var(--u) * 14); right: calc(var(--sr) + var(--u) * 25); bottom: calc(var(--sb) + var(--u) * 46); }
+#bCrouch { width: calc(var(--u) * 14); height: calc(var(--u) * 14); right: calc(var(--sr) + var(--u) * 4); bottom: calc(var(--sb) + var(--u) * 26); }
+#bJump { width: calc(var(--u) * 15); height: calc(var(--u) * 15); right: calc(var(--sr) + var(--u) * 4); bottom: calc(var(--sb) + var(--u) * 6); }
+#bReload { width: calc(var(--u) * 12); height: calc(var(--u) * 12); right: calc(var(--sr) + var(--u) * 46); bottom: calc(var(--sb) + var(--u) * 5); }
+#bAuto { width: calc(var(--u) * 11); height: calc(var(--u) * 11); right: calc(var(--sr) + var(--u) * 6); bottom: calc(var(--sb) + var(--u) * 47); font-size: calc(var(--u) * 2.5); line-height: 1.1; text-align: center; }
+#bPause { position: absolute; left: calc(var(--sl) + var(--u) * 3); top: calc(var(--st) + var(--u) * 2.4); width: calc(var(--u) * 10); height: calc(var(--u) * 10); border-radius: 6px;
+  background: var(--panel); display: grid; place-items: center; pointer-events: auto; }
+#bPause svg { width: 50%; height: 50%; fill: var(--bone); }
+
+/* ---------- 選單、設定、陣亡、轉向提示 ---------- */
+.ov { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8,12,18,.72); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  padding: calc(var(--st) + 12px) max(16px, var(--sr)) calc(var(--sb) + 12px) max(16px, var(--sl)); overflow-y: auto; touch-action: pan-y; }
+.card { width: min(100%, 680px); background: linear-gradient(180deg, rgba(26,34,46,.96), rgba(16,22,31,.96)); border: 1px solid var(--line); border-radius: 10px;
+  padding: calc(var(--u) * 4) calc(var(--u) * 5); display: grid; gap: calc(var(--u) * 3); }
+#menu { background: linear-gradient(180deg, rgba(8,12,18,.35), rgba(8,12,18,.82) 70%); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.brand { display: grid; gap: calc(var(--u) * 1); }
+.brand h1 { margin: 0; font-family: var(--f-title); font-weight: 900; font-size: calc(var(--u) * 13); line-height: 1; letter-spacing: .12em; text-wrap: balance;
+  background: linear-gradient(180deg, #fff3dc 10%, var(--dawn) 60%, #e0703a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand p { margin: 0; color: var(--mute); font-size: calc(var(--u) * 3.2); letter-spacing: .06em; }
+.brand .tag { font-family: var(--f-num); font-weight: 600; color: var(--dawn); letter-spacing: .2em; font-size: calc(var(--u) * 2.8); text-transform: uppercase; }
+.row { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2); align-items: center; }
+.btn { min-height: 44px; padding: calc(var(--u) * 2) calc(var(--u) * 5); border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid var(--line);
+  font-size: calc(var(--u) * 3.6); font-weight: 700; letter-spacing: .08em; touch-action: manipulation; }
+.btn.go { background: var(--dawn); color: var(--dawn-ink); border-color: var(--dawn); }
+.help { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: calc(var(--u) * 1.4) calc(var(--u) * 4); margin: 0; padding: 0; list-style: none;
+  font-size: calc(var(--u) * 2.9); color: var(--mute); }
+.help b { color: var(--bone); font-weight: 600; margin-right: .4em; }
+.help-k { display: none; } body.kb .help-k { display: grid; } body.kb .help-t { display: none; }
+h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); letter-spacing: .1em; }
+.set { display: grid; gap: calc(var(--u) * 2.2); }
+.set label, .set .opt { display: grid; grid-template-columns: minmax(7em, 1fr) minmax(0, 2fr) 3.5em; align-items: center; gap: calc(var(--u) * 2); font-size: calc(var(--u) * 3.2); }
+.set output { font-family: var(--f-num); font-size: calc(var(--u) * 3.6); text-align: right; color: var(--dawn-lt); font-variant-numeric: tabular-nums; }
+.set input[type=range] { width: 100%; accent-color: var(--dawn); height: 32px; touch-action: none; }
+.seg { display: flex; gap: 4px; flex-wrap: wrap; grid-column: 2 / 4; }
+.seg button { flex: 1; min-height: 38px; border-radius: 5px; background: rgba(255,255,255,.07); border: 1px solid var(--line); font-size: calc(var(--u) * 3); touch-action: manipulation; }
+.seg button[aria-pressed="true"] { background: var(--dawn); color: var(--dawn-ink); border-color: var(--dawn); font-weight: 700; }
+.set .note { font-size: calc(var(--u) * 2.6); color: var(--mute); margin: calc(var(--u) * -1) 0 0; }
+#dead h2 { color: var(--hurt); font-size: calc(var(--u) * 9); text-align: center; }
+#dead p { margin: 0; text-align: center; color: var(--mute); font-size: calc(var(--u) * 3.4); }
+#dead .card { width: auto; justify-items: center; }
+#dead { background: rgba(40,6,4,.45); }
+#rotate { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; align-content: center; gap: 18px; background: var(--ink); text-align: center; padding: 24px; }
+#rotate svg { width: 96px; height: 96px; stroke: var(--dawn); fill: none; stroke-width: 2; animation: tilt 2.4s ease-in-out infinite; }
+#rotate p { margin: 0; font-size: 18px; line-height: 1.6; }
+#rotate small { color: var(--mute); font-size: 14px; }
+@keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; transform: rotate(-90deg); } }
+#boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); font-size: 15px; background: var(--ink); }
+</style>
+<div id="app">
+  <canvas id="cv"></canvas>
+  <div id="hud" hidden>
+    <div id="vig"></div>
+    <div id="dirs"></div>
+    <div id="xh"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="d"></i></div>
+    <div id="hm"><i></i><i></i><i></i><i></i></div>
+    <div class="top"><div class="k"><small>擊殺</small><strong id="sK">0</strong></div><div><small>陣亡</small><strong id="sD">0</strong></div><div><small>爆頭</small><strong id="sH">0</strong></div></div>
+    <div id="feed"></div>
+    <div id="fps" hidden>-- fps</div>
+    <div id="tip" hidden></div>
+    <div id="rl" hidden>換彈中<i><b id="rlB"></b></i></div>
+    <div id="hp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><span id="hpN">100</span><span id="hpBar"><i id="hpI"></i></span></div>
+    <div id="ammo"><span id="ammoN">30</span><small>/ ∞</small><span class="w">步槍</span></div>
+  </div>
+  <div id="touch" hidden>
+    <div id="joy"><div id="joyK"></div></div>
+    <button class="tb" id="bAds" aria-label="開鏡"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></button>
+    <button class="tb" id="bFire" aria-label="開火"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/></svg></button>
+    <button class="tb" id="bCrouch" aria-label="蹲下"><svg viewBox="0 0 24 24"><path d="M5 20h14M8 20l2-6h4l2 6M12 14v-3M9 8.5a3 3 0 1 0 6 0 3 3 0 1 0-6 0"/></svg></button>
+    <button class="tb" id="bJump" aria-label="跳"><svg viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></svg></button>
+    <button class="tb" id="bReload" aria-label="換彈"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+    <button class="tb" id="bAuto" aria-label="自動開火開關">自動<br>開火</button>
+  </div>
+  <button id="bPause" aria-label="暫停與設定" hidden><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+
+  <div id="menu" class="ov" hidden>
+    <div class="card">
+      <div class="brand"><span class="tag">M0 · Feel Prototype</span><h1>破曉突擊</h1><p>灰盒靶場「曙光倉區」：一把步槍，對上四個會巡邏、會還手的機器人。</p></div>
+      <ul class="help help-t">
+        <li><b>左半邊</b>按住拖：移動，推到底是跑</li>
+        <li><b>右半邊</b>拖曳：轉視角</li>
+        <li><b>開火鍵</b>按住也能拖著瞄</li>
+        <li><b>準星</b>移動、跳躍時會張開</li>
+      </ul>
+      <ul class="help help-k">
+        <li><b>WASD</b>移動　<b>空白</b>跳</li>
+        <li><b>滑鼠</b>轉視角（點畫面鎖定）</li>
+        <li><b>左鍵</b>開火　<b>右鍵</b>開鏡</li>
+        <li><b>C／Ctrl</b>蹲　<b>R</b>換彈　<b>Esc</b>暫停</li>
+      </ul>
+      <div class="row"><button class="btn go" id="bStart">開始</button><button class="btn" id="bSet1">設定</button></div>
+    </div>
+  </div>
+
+  <div id="pause" class="ov" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>設定</h2><div class="row"><button class="btn" id="bRespawn">重來</button><button class="btn go" id="bResume">繼續</button></div></div>
+      <div class="set">
+        <label for="sSens"><span>視角靈敏度</span><input type="range" id="sSens" min="0.3" max="3" step="0.05"><output id="oSens"></output></label>
+        <label for="sAds"><span>開鏡靈敏度</span><input type="range" id="sAds" min="0.2" max="1.2" step="0.05"><output id="oAds"></output></label>
+        <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
+        <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
+        <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>顯示幀數</span><div class="seg" data-k="showFps"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadT"></p></div></div>
+  <div id="rotate" hidden><svg viewBox="0 0 48 48"><rect x="15" y="5" width="18" height="38" rx="3"/><path d="M21 38h6"/></svg><p>請把手機轉成橫向</p><small>破曉突擊只支援橫向畫面</small></div>
+  <div id="boot">載入中…</div>
+</div>
