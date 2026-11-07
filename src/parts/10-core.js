@@ -14,7 +14,7 @@ const _v1 = new V3(), _v2 = new V3(), _v3 = new V3();
 function angDiff(a, b) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
 
 // ---------- 設定（存在這台手機的瀏覽器裡，讀不到就用預設） ----------
-const DEFAULTS = { sens: 1.0, adsSens: 0.6, autoFire: true, aimAssist: true, difficulty: 'normal', quality: 'high', sound: true, showFps: false };
+const DEFAULTS = { sens: 1.0, adsSens: 0.6, autoFire: true, aimAssist: true, followRecoil: true, difficulty: 'normal', quality: 'high', sound: true, showFps: false };
 const S = Object.assign({}, DEFAULTS);
 try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assign(S, JSON.parse(raw)); } catch (e) { /* 私密瀏覽或被擋，就用預設 */ }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }

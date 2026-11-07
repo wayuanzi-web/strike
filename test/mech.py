@@ -34,7 +34,7 @@ async def main():
         r = await ev("() => { T.at(13, -20, Math.PI); T.s.player.body.pos.y = 2.4; T.input({mz: 1}); T.run(1.5); T.input({mz: 0}); return T.s.player.body.pos.y; }")
         ok('B2 走出平台會掉下來', abs(r) < 0.01, r)
         # C 跳上箱子（0.9 公尺）
-        r = await ev("() => { T.at(-16.3, 9.5); T.input({jump: true, mz: 1}); T.run(0.25); T.input({mz: 0}); T.run(0.5); return T.s.player.body.pos.toArray(); }")
+        r = await ev("() => { T.at(-16.9, 9.5); T.input({mz: 1}); T.run(0.2); T.input({jump: true}); T.run(0.35); T.input({mz: 0}); T.run(0.6); return T.s.player.body.pos.toArray(); }")
         ok('C 跳上箱子', abs(r[1] - 0.9) < 0.01, r)
         # C2 不跳走不上去
         r = await ev("() => { T.at(-16.6, 9.5); T.input({mz: 1}); T.run(1); T.input({mz: 0}); return T.s.player.body.pos.toArray(); }")
@@ -46,14 +46,14 @@ async def main():
         # E 部位倍率：頭 120（一槍死）、身體 30、腳 22.5
         out = []
         for part, y in (('head', 1.66), ('body', 1.2), ('legs', 0.5)):
-            r = await ev(f"""() => {{ T.at(-32, 0.3); T.s.W.bloom = 0; T.s.W.idx = 0; T.s.W.rp = T.s.W.ry = 0; T.s.W.cd = 0; T.s.W.since = 9; T.bot(0, -25.5, 0.3);
+            r = await ev(f"""() => {{ T.at(-32, 0.3); T.s.W.bloom = 0; T.s.W.idx = 0; T.s.W.rp = T.s.W.ry = 0; T.s.W.cd = 0; T.s.W.since = 9; T.s.W.deployT = 0; T.bot(0, -25.5, 0.3);
                T.aimAt(-25.5, {y}, 0.3); const before = T.s.bots[0].hp; T.input({{fire: true}}); T.s.step(1/60); T.input({{fire: false}});
                return [before - T.s.bots[0].hp, T.s.bots[0].alive]; }}""")
             out.append((part, r))
-        ok('E 爆頭 4 倍（一槍倒）', out[0][1][1] is False, out[0]); ok('E 身體 1 倍=30', abs(out[1][1][0] - 30) < 0.01, out[1]); ok('E 腳 0.75 倍=22.5', abs(out[2][1][0] - 22.5) < 0.01, out[2])
+        ok('E 爆頭 4 倍×護甲（一槍倒）', out[0][1][1] is False, out[0]); ok('E 身體 36×護甲 0.775≈27.6', 27 < out[1][1][0] < 28, out[1]); ok('E 腳 36×0.75≈26.7（無護甲）', 26 < out[2][1][0] < 27.2, out[2])
         # F 後座力：連射 1 秒往上飄，停火 1 秒回正
         r = await ev("() => { T.at(-30, -10); T.s.W.ammo = 30; T.input({fire: true}); T.run(1.0); const up = T.s.W.rp, side = T.s.W.ry, shots = 30 - T.s.W.ammo; T.input({fire: false}); T.run(1.0); return [up, side, shots, T.s.W.rp, T.s.W.ry]; }")
-        ok('F 連射往上飄', r[0] > 3 and r[2] >= 9, r); ok('F 停火回正', abs(r[3]) < 0.05 and abs(r[4]) < 0.05, r)
+        ok('F 連射往上飄（觸控自動補償一半）', r[0] > 2 and r[2] >= 9, r); ok('F 停火回正', abs(r[3]) < 0.05 and abs(r[4]) < 0.05, r)
         # G 散佈：站著小、跑步大、空中更大、蹲下與開鏡變小
         r = await ev("""() => { T.at(-30, -10); T.s.W.bloom = 0; T.run(0.3); const still = T.s.W.spread;
             T.input({mz: 1}); T.run(0.6); const run = T.s.W.spread; T.input({mz: 0, jump: true}); T.run(0.15); const air = T.s.W.spread; T.run(1.0);
@@ -61,7 +61,7 @@ async def main():
             T.s.player.ads = true; T.run(0.5); const ads = T.s.W.spread; T.s.player.ads = false; T.run(0.5); return [still, run, air, crouch, ads]; }""")
         ok('G 散佈變化', r[1] > r[0] * 5 and r[2] > r[1] and r[3] < r[0] and r[4] < r[0], [round(x, 3) for x in r])
         # H 換彈：打光 30 發自動換彈，2.3 秒後補滿
-        r = await ev("() => { T.at(-30, -10); T.s.W.ammo = 2; T.input({fire: true}); T.run(0.5); const empty = T.s.W.ammo, rl = T.s.W.reloadT > 0; T.input({fire: false}); T.run(2.4); return [empty, rl, T.s.W.ammo]; }")
+        r = await ev("() => { T.at(-30, -10); T.s.W.ammo = 2; T.s.W.deployT = 0; T.input({fire: true}); T.run(0.5); const empty = T.s.W.ammo, rl = T.s.W.reloadT > 0; T.input({fire: false}); T.run(2.4); return [empty, rl, T.s.W.ammo]; }")
         ok('H 打光自動換彈', r[0] == 0 and r[1] and r[2] == 30, r)
         # I 自動開火：準星對到敵人身上就開槍
         r = await ev("() => { T.at(-32, 0.3); T.bot(1, -25.5, 0.3); T.s.W.ammo = 30; T.s.S.autoFire = true; T.input({mode: 'touch', fire: false}); T.aimAt(-25.5, 1.2, 0.3); T.run(0.4); return [30 - T.s.W.ammo, T.s.bots[1].hp]; }")

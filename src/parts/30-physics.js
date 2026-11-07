@@ -1,5 +1,5 @@
 /* ===== 30-physics：圓柱對方塊的碰撞與滑牆、射線判定 ===== */
-const GRAVITY = 16, STEP_UP = 0.45;
+const GRAVITY = 20.3, STEP_UP = 0.45;
 
 // 射線打方塊（slab 法）。回傳距離與打到的面法向量，打不到回 null
 const RAY_HIT = { t: 0, n: [0, 0, 0] };

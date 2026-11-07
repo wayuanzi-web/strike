@@ -1,32 +1,50 @@
 /* ===== 60-bots：四個敵方機器人——巡邏、視線、反應時間、依距離決定準度、左右閃避 ===== */
 const BOT_NAMES = ['鐵狼', '赤隼', '灰熊', '夜梟'];
 const bots = [];
-const BOT_MAT = {
-  vest: new THREE.MeshLambertMaterial({ color: '#b5402c' }), pants: new THREE.MeshLambertMaterial({ color: '#3b3a40' }),
-  skin: new THREE.MeshLambertMaterial({ color: '#c99a72' }), helmet: new THREE.MeshLambertMaterial({ color: '#3f3b36' }),
-  gun: new THREE.MeshLambertMaterial({ color: '#202328' }), boot: new THREE.MeshLambertMaterial({ color: '#2a2622' }),
-};
-const BOT_MUZZLE = new V3(0.16, 1.36, -0.78);
+// 敵方「赤狼」：沙褐背心、橄欖色褲子、深灰頭盔，頭盔和左臂有鏽橘布條方便遠處辨識（原創配色）
+const BOT_MAT = new THREE.MeshLambertMaterial({ vertexColors: true });
+const BOT_FLASH_MAT = new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+const BOT_MUZZLE = new V3(0.16, 1.37, -0.84);
+const BC = { vest: '#8a7556', plate: '#7b6849', shirt: '#6d6a52', pants: '#4e5240', helmet: '#3e3f3a', skin: '#c08f6a', glove: '#2b2b2b',
+  band: '#ff6a2a', boot: '#2a2622', gun: '#1f2226', pack: '#5b5442', goggle: '#16191d', pouch: '#6f5f45', belt: '#2f2b25' };
 function makeBotModel() {
-  const g = new THREE.Group(), m = BOT_MAT;
+  const g = new THREE.Group();
   const body = new THREE.Group(); g.add(body);           // 蹲下時整個身體壓扁成蹲姿的高度
-  const leg = (x) => { const L = new THREE.Group(); L.position.set(x, 0.85, 0); body.add(L);
-    boxMesh(0.17, 0.75, 0.2, 0, 0, -0.38, 0, L, m.pants); boxMesh(0.18, 0.1, 0.27, 0, 0, -0.8, -0.03, L, m.boot); return L; };
+  const leg = (x) => {
+    const L = new THREE.Group(); L.position.set(x, 0.85, 0); body.add(L);
+    L.add(new THREE.Mesh(mergeParts([
+      partBox(0.17, 0.44, 0.19, 0, -0.22, 0, BC.pants), partBox(0.15, 0.36, 0.17, 0, -0.62, 0.01, BC.pants),
+      partBox(0.16, 0.11, 0.06, 0, -0.44, -0.1, BC.helmet), partBox(0.17, 0.1, 0.28, 0, -0.8, -0.04, BC.boot), partBox(0.18, 0.06, 0.08, 0, -0.08, -0.1, BC.pouch),
+    ]), BOT_MAT));
+    return L;
+  };
   const legL = leg(-0.11), legR = leg(0.11);
-  boxMesh(0.48, 0.66, 0.28, 0, 0, 1.18, 0, body, m.vest);
-  boxMesh(0.25, 0.27, 0.25, 0, 0, 1.64, 0, body, m.skin);
-  boxMesh(0.3, 0.12, 0.3, 0, 0, 1.79, 0.01, body, m.helmet);
-  boxMesh(0.2, 0.05, 0.03, 0, 0, 1.68, -0.13, body, m.helmet);   // 護目鏡，讓人看得出臉朝哪
-  const armR = boxMesh(0.11, 0.11, 0.42, 0, 0.21, 1.33, -0.18, body, m.vest); armR.rotation.y = 0.15;
-  const armL = boxMesh(0.11, 0.11, 0.46, 0, -0.14, 1.33, -0.26, body, m.vest); armL.rotation.y = -0.45;
-  boxMesh(0.06, 0.09, 0.64, 0, 0.16, 1.36, -0.45, body, m.gun);
-  return { g, body, legL, legR };
+  const parts = [
+    partBox(0.42, 0.62, 0.24, 0, 1.18, 0, BC.shirt), partBox(0.45, 0.38, 0.29, 0, 1.24, 0, BC.vest), partBox(0.4, 0.3, 0.02, 0, 1.25, -0.15, BC.plate),
+    partBox(0.09, 0.11, 0.05, -0.11, 1.13, -0.17, BC.pouch), partBox(0.09, 0.11, 0.05, 0, 1.13, -0.17, BC.pouch), partBox(0.09, 0.11, 0.05, 0.11, 1.13, -0.17, BC.pouch),
+    partBox(0.43, 0.06, 0.26, 0, 0.9, 0, BC.belt), partBox(0.28, 0.32, 0.12, 0, 1.22, 0.18, BC.pack), partBox(0.04, 0.2, 0.04, 0.09, 1.45, 0.2, BC.gun),
+    partBox(0.22, 0.24, 0.23, 0, 1.63, 0, BC.skin),                                                    // 頭
+    partBox(0.29, 0.13, 0.31, 0, 1.76, 0.01, BC.helmet), partBox(0.31, 0.03, 0.33, 0, 1.7, 0.01, BC.helmet),
+    partBox(0.295, 0.035, 0.315, 0, 1.745, 0.01, BC.band),                                              // 頭盔布條
+    partBox(0.05, 0.09, 0.09, -0.14, 1.64, 0, BC.helmet), partBox(0.05, 0.09, 0.09, 0.14, 1.64, 0, BC.helmet),
+    partBox(0.2, 0.06, 0.03, 0, 1.66, -0.12, BC.goggle),
+    // 手臂持槍：右手握握把、左手托護木
+    partBox(0.11, 0.26, 0.11, 0.25, 1.36, -0.02, BC.shirt, 0.5), partBox(0.1, 0.1, 0.28, 0.2, 1.3, -0.2, BC.shirt, 0, 0.2), partBox(0.09, 0.08, 0.09, 0.16, 1.32, -0.34, BC.glove),
+    partBox(0.11, 0.26, 0.11, -0.25, 1.36, -0.04, BC.shirt, 0.6), partBox(0.115, 0.06, 0.115, -0.25, 1.42, -0.03, BC.band, 0.6),
+    partBox(0.1, 0.1, 0.32, -0.12, 1.32, -0.3, BC.shirt, 0, -0.45), partBox(0.09, 0.08, 0.09, -0.02, 1.35, -0.48, BC.glove),
+    // 槍
+    partBox(0.06, 0.09, 0.42, 0.16, 1.37, -0.38, BC.gun), partBox(0.035, 0.035, 0.26, 0.16, 1.39, -0.7, BC.gun), partBox(0.045, 0.16, 0.06, 0.16, 1.26, -0.42, BC.gun, 0.25),
+    partBox(0.05, 0.08, 0.2, 0.16, 1.36, -0.08, '#3a342b'),
+  ];
+  body.add(new THREE.Mesh(mergeParts(parts), BOT_MAT));
+  const fl = new THREE.Sprite(BOT_FLASH_MAT); fl.position.copy(BOT_MUZZLE); fl.scale.set(0.5, 0.5, 1); fl.visible = false; body.add(fl);
+  return { g, body, legL, legR, fl };
 }
 
 function makeBot(i) {
   const mdl = makeBotModel(); scene.add(mdl.g);
   const b = {
-    name: BOT_NAMES[i], i, g: mdl.g, bodyGroup: mdl.body, legL: mdl.legL, legR: mdl.legR,
+    name: BOT_NAMES[i], i, g: mdl.g, bodyGroup: mdl.body, legL: mdl.legL, legR: mdl.legR, fl: mdl.fl, tagT: 0, flinchT: 0, stepT: 0, lit: 1, dealt: 0,
     phys: { pos: new V3(), vel: new V3(), r: 0.35, h: STAND_H, onGround: true, jumped: false },
     yaw: 0, hp: 100, alive: true, state: 'patrol', path: null, pi: 0, waitT: 0,
     react: 0, settle: 0, lastSeen: new V3(), lostT: 0, visible: false, seeT: Math.random() * 0.1,
@@ -133,14 +151,14 @@ function damageBot(b, dmg, part, dir) {
   b.hp -= dmg;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.respawnT = 4.5; b.fallDir = Math.sign(Math.random() - 0.5);
-    player.kills++; player.deathStreak = 0; if (part === 'head') player.heads++; SHOOT_TOKENS.delete(b);
+    player.kills++; player.deathStreak = 0; W.reserve = Math.min(RIFLE.reserve, W.reserve + 30); if (part === 'head') player.heads++; SHOOT_TOKENS.delete(b);
     hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head');
     hudFeed('你', b.name, part === 'head', true);
     return;
   }
   hudHit(part === 'head' ? 'head' : 'hit'); sfx(part === 'head' ? 'head' : 'hit');
   // 中彈硬直：準度變差、連發中斷，先打中的人佔優勢
-  b.flinchT = part === 'head' ? 0.6 : 0.35; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
+  b.flinchT = part === 'head' ? 0.6 : 0.35; b.tagT = 1.5; b.hitAnim = part === 'head' ? 0.2 : 0.15; b.hitHead = part === 'head'; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
   // 被打到：轉頭面向槍聲，馬上進入交戰（反應時間縮短）
   if (b.state !== 'combat') {
     b.lastSeen.copy(player.body.pos); b.state = 'search'; b.searchT = 8; setPath(b, b.lastSeen.x, b.lastSeen.z);
@@ -157,6 +175,7 @@ function updateBot(b, dt) {
     b.g.rotation.set(0, b.yaw, 0); b.g.rotateX(k * k * 1.5 * (b.fallDir > 0 ? 1 : -1) * 0.9 + 0.0); b.g.rotateZ(k * 0.3 * b.fallDir);
     if (b.deadT > 2.5) b.g.position.y = p.y - (b.deadT - 2.5) * 0.8;
     if (b.deadT > 3.6) b.g.visible = false;
+    b.fl.visible = false;
     if (b.respawnT <= 0) respawnBot(b);
     return;
   }
@@ -245,6 +264,8 @@ function updateBot(b, dt) {
       b.stuckT = 0; b.lastP.copy(p);
     }
   }
+  // 被打中會變慢（CS 的 tagging），1.5 秒慢慢恢復
+  if (b.tagT > 0) { b.tagT -= dt; const k2 = 0.35 + 0.65 * (1 - b.tagT / 1.5); _wish.x *= k2; _wish.z *= k2; }
   // 蹲
   if (b.crouchWant && !b.phys.crouched) { b.phys.h = CROUCH_H; b.phys.crouched = true; }
   else if (!b.crouchWant && b.phys.crouched && headroom(p.x, p.z, 0.3, p.y + CROUCH_H, p.y + STAND_H)) { b.phys.h = STAND_H; b.phys.crouched = false; }
@@ -264,6 +285,16 @@ function updateBot(b, dt) {
   b.walk += dt * sp * 2.6;
   const sw = Math.sin(b.walk) * Math.min(1, sp / 3) * 0.6;
   b.legL.rotation.x = sw; b.legR.rotation.x = -sw;
+  // 中彈後仰、左右閃避時身體往移動方向傾
+  if (b.hitAnim > 0) b.hitAnim -= dt;
+  const lean = clamp((b.phys.vel.x * Math.cos(b.yaw) - b.phys.vel.z * Math.sin(b.yaw)) * -0.03, -0.12, 0.12);
+  b.bodyGroup.rotation.set(Math.max(0, b.hitAnim || 0) * (b.hitHead ? 1.6 : 1.0), 0, lean);
+  // 腳步聲（30 公尺內聽得到，有方位）
+  if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(player.body.pos) < 30) sfx('step', 0.9, { pos: p, surface: surfaceAt(p) }); } }
+  // 槍口火光
+  if (b.flashT > 0) { b.flashT -= dt; b.fl.visible = true; b.fl.material.rotation = Math.random() * 6; } else b.fl.visible = false;
+  // 是否在陽光下（影子長短用），每 0.25 秒算一次
+  if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
   b.bodyGroup.scale.y = lerp(b.bodyGroup.scale.y, b.phys.h / STAND_H, 1 - Math.exp(-15 * dt));
   hitBoxes(p, b.phys.h, b.boxes);
 }
@@ -306,6 +337,7 @@ function botShoot(b, dist, D) {
     damagePlayer(dmg, b, h.part);
   }
   else if (w) addDecal(end, w.n);
-  sfx('botshot', 1 / (1 + dist / 14));
-  b.flashT = 0.05;
+  sfx('botshot', 1, { pos: b.phys.pos });
+  muzzleLight(mz, 1.0);
+  b.flashT = 0.05; b.firedAt = game.t;
 }

@@ -11,7 +11,7 @@ function updateAim(dt) {
   // 準星正中央的射線有沒有打到看得到的敵人（命中框稍微放大一點，手機上比較好觸發）
   const w = rayWorld(_ae, _ad, RIFLE.range); const wallT = w ? w.t : RIFLE.range;
   let on = false;
-  for (const b of bots) { if (b.alive && rayBody(_ae, _ad, b.boxes, wallT, 0.06)) { on = true; break; } }
+  for (const b of bots) { const h = b.alive && rayBody(_ae, _ad, b.boxes, wallT, 0.06); if (h) { on = true; AIM.dist = h.t; break; } }
   if (on) { AIM.onT += dt; AIM.offT = 0; } else { AIM.offT += dt; AIM.onT = 0; }
   // 對到 0.06 秒才開火、離開 0.12 秒才停，避免一閃一閃
   if (on && AIM.onT > 0.06) AIM.onTarget = true; else if (!on && AIM.offT > 0.12) AIM.onTarget = false;
@@ -95,13 +95,14 @@ function step(dt) {
     camera.position.set(Math.sin(game.menuT) * 30, 12, Math.cos(game.menuT) * 30);
     camera.lookAt(0, 1, 0);
     for (const b of bots) updateBot(b, dt);
-    updateTracers(dt); updatePuffs(dt);
+    updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
     return;
   }
   if (game.state === 'pause') return;
   keyboardMove();
   // 視角：開鏡時乘上開鏡靈敏度與視野比例；瞄準輔助在敵人身上時轉得慢一點
   let ldx = INPUT.lookDX, ldy = INPUT.lookDY; INPUT.lookDX = INPUT.lookDY = 0;
+  W.dragging = Math.abs(ldx) + Math.abs(ldy) > 0.02;
   const adsScale = lerp(1, S.adsSens * (ADS_FOV / BASE_FOV) * 1.6, player.adsT);
   updateAim(dt);
   const assist = S.aimAssist && INPUT.mode === 'touch' && AIM.bot && player.alive;
@@ -118,16 +119,17 @@ function step(dt) {
   }
   player.adsT = clamp(player.adsT + (player.ads && player.alive ? 1 : -1) * dt * 7, 0, 1);
   updatePlayer(dt);
-  const wantFire = INPUT.fire || (S.autoFire && INPUT.mode === 'touch' && AIM.onTarget);
-  updateWeapon(dt, wantFire && player.alive);
+  const auto = !INPUT.fire && S.autoFire && INPUT.mode === 'touch' && AIM.onTarget;
+  updateWeapon(dt, (INPUT.fire || auto) && player.alive, auto, AIM.dist || 0);
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);
-  updateTracers(dt); updatePuffs(dt);
-  // 攝影機：眼睛位置＋後座力
+  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
+  // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
   camera.position.set(p.x, p.y + player.eye, p.z);
-  camera.rotation.set(player.pitch + W.rp * DEG + (player.alive ? 0 : -0.5), player.yaw + W.ry * DEG, player.alive ? 0 : 0.35);
+  camera.rotation.set(player.pitch + (W.rp * VIEW_TRACK + W.vp + player.punchP) * DEG + (player.alive ? 0 : -0.5),
+    player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? 0 : 0.35);
   camera.fov = lerp(BASE_FOV, ADS_FOV, player.adsT); camera.updateProjectionMatrix();
-  updateViewmodel(dt, ldx, ldy);
+  updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt);
   if (!player.alive) {
     player.respawnT -= dt;
     $('deadT').textContent = Math.max(0, player.respawnT).toFixed(1) + ' 秒後重生';
@@ -147,9 +149,11 @@ initBots();
 syncSettingsUI();
 document.body.classList.toggle('kb', !isTouch);
 applySize();
+// 先把所有材質編譯好，開局時不會卡一下
+try { renderer.compile(scene, camera); renderer.compile(vmScene, vmCam); } catch (e) { /* 舊瀏覽器略過 */ }
 $('boot').hidden = true; $('menu').hidden = false;
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
-  setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL };
+  setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR };

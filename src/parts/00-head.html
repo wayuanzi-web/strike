@@ -28,7 +28,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 
 /* ---------- 準星、命中、受傷 ---------- */
 #hud { position: absolute; inset: 0; pointer-events: none; }
-#xh { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --g: 8px; }
+#xh { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --g: 8px; transition: scale .12s; }
+#xh.pulse { scale: 1.3; transition: none; }
 #xh i { position: absolute; background: var(--bone); box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
 #xh .t, #xh .b { width: 2px; height: calc(var(--u) * 2.2); left: -1px; }
 #xh .l, #xh .r { height: 2px; width: calc(var(--u) * 2.2); top: -1px; }
@@ -36,8 +37,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 #xh .d { width: 2px; height: 2px; left: -1px; top: -1px; }
 #xh.ads i:not(.d) { opacity: .35; }
 #xh.lock i { background: var(--hurt); }
-#hm { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 7); height: calc(var(--u) * 7); margin: calc(var(--u) * -3.5) 0 0 calc(var(--u) * -3.5); opacity: 0; }
-#hm i { position: absolute; width: 2px; height: calc(var(--u) * 2); background: #fff; left: 50%; top: 50%; }
+#hm { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 6); height: calc(var(--u) * 6); margin: calc(var(--u) * -3) 0 0 calc(var(--u) * -3); opacity: 0; }
+#hm i { position: absolute; width: 1.5px; height: calc(var(--u) * 1.5); background: #fff; left: 50%; top: 50%; }
 #hm i:nth-child(1) { transform: translate(-50%, -50%) rotate(45deg) translateY(calc(var(--u) * -2.3)); }
 #hm i:nth-child(2) { transform: translate(-50%, -50%) rotate(135deg) translateY(calc(var(--u) * -2.3)); }
 #hm i:nth-child(3) { transform: translate(-50%, -50%) rotate(225deg) translateY(calc(var(--u) * -2.3)); }
@@ -58,8 +59,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 .top .k strong { color: var(--dawn); }
 #feed { position: absolute; top: calc(var(--st) + var(--u) * 2); right: calc(var(--sr) + var(--u) * 3); display: grid; gap: 3px; justify-items: end; font-size: calc(var(--u) * 3); }
 #feed p { margin: 0; background: var(--panel); padding: calc(var(--u) * .5) calc(var(--u) * 1.6); border-radius: 3px; transition: opacity .4s; }
+#feed p.mine { box-shadow: inset 0 0 0 1px var(--dawn); }
 #feed .you { color: var(--dawn); } #feed .bot { color: #ff8f80; } #feed .hs { color: var(--head); font-family: var(--f-num); font-weight: 800; margin: 0 .3em; }
-#fps { position: absolute; top: calc(var(--st) + var(--u) * 13); left: calc(var(--sl) + var(--u) * 3); font: 600 calc(var(--u) * 2.8) var(--f-num); color: var(--ok); background: var(--panel); padding: 1px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; }
+#radar { position: absolute; left: calc(var(--sl) + var(--u) * 3); top: calc(var(--st) + var(--u) * 14); width: calc(var(--u) * 26); height: calc(var(--u) * 26);
+  border-radius: 50%; background: rgba(10,16,24,.55); box-shadow: 0 0 0 1px rgba(255,228,190,.25); }
+#fps { position: absolute; top: calc(var(--st) + var(--u) * 42); left: calc(var(--sl) + var(--u) * 3); font: 600 calc(var(--u) * 2.8) var(--f-num); color: var(--ok); background: var(--panel); padding: 1px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; }
 
 /* ---------- 下方：血量、彈藥 ---------- */
 #hp { position: absolute; left: calc(var(--sl) + var(--u) * 3); bottom: calc(var(--sb) + var(--u) * 3); display: flex; align-items: center; gap: calc(var(--u) * 1.4);
@@ -156,11 +160,12 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
     <div id="hm"><i></i><i></i><i></i><i></i></div>
     <div class="top"><div class="k"><small>擊殺</small><strong id="sK">0</strong></div><div><small>陣亡</small><strong id="sD">0</strong></div><div><small>爆頭</small><strong id="sH">0</strong></div></div>
     <div id="feed"></div>
+    <canvas id="radar" width="128" height="128" aria-label="雷達"></canvas>
     <div id="fps" hidden>-- fps</div>
     <div id="tip" hidden></div>
     <div id="rl" hidden>換彈中<i><b id="rlB"></b></i></div>
     <div id="hp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><span id="hpN">100</span><span id="hpBar"><i id="hpI"></i></span></div>
-    <div id="ammo"><span id="ammoN">30</span><small>/ ∞</small><span class="w">步槍</span></div>
+    <div id="ammo"><span id="ammoN">30</span><small id="ammoR">/ 90</small><span class="w">曙七步槍</span></div>
   </div>
   <div id="touch" hidden>
     <div id="joy"><div id="joyK"></div></div>
@@ -199,17 +204,18 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
         <label for="sSens"><span>視角靈敏度</span><input type="range" id="sSens" min="0.3" max="3" step="0.05"><output id="oSens"></output></label>
         <label for="sAds"><span>開鏡靈敏度</span><input type="range" id="sAds" min="0.2" max="1.2" step="0.05"><output id="oAds"></output></label>
         <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>準星跟著後座</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>顯示幀數</span><div class="seg" data-k="showFps"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。</p>
+        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質切到或切出「省電」要重新整理才完全生效（抗鋸齒）。</p>
       </div>
     </div>
   </div>
 
-  <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadT"></p></div></div>
+  <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadRep"></p><p id="deadT"></p></div></div>
   <div id="rotate" hidden><svg viewBox="0 0 48 48"><rect x="15" y="5" width="18" height="38" rx="3"/><path d="M21 38h6"/></svg><p>請把手機轉成橫向</p><small>破曉突擊只支援橫向畫面</small></div>
   <div id="boot">載入中…</div>
 </div>
