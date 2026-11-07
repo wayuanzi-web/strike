@@ -5,7 +5,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
-// 常態分布的亂數（兩個均勻亂數平均，夠用）
+// 近似標準常態的亂數（三個均勻亂數相加再標準化，標準差 1）
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 0.5;
 const V3 = THREE.Vector3;
 const _v1 = new V3(), _v2 = new V3(), _v3 = new V3();
@@ -24,9 +24,12 @@ const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 觸控裝置判斷：有觸控就顯示觸控按鈕；電腦上的鍵盤滑鼠是測試用的備用操作
 const isTouch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
 
-// 難度：反應時間（秒）、基本誤差（度）、距離誤差（每公尺幾度）、傷害倍數
+// 難度（依子代理的蒙地卡羅模擬調過：普通難度站著不動在 15 公尺被一隻打死約 4.8 秒、兩隻約 2.8 秒，跑動時約 2.3 倍）
+// react 反應秒數、base 基本誤差（度）、distK 每公尺加幾度、dmg 傷害倍數、burst 連發數、pause 連發間停頓、
+// pMoveK 你在跑時加幾度、headMul 打你頭的倍數、warn 剛發現時前幾發必定打偏、turn 交戰轉身速度（弧度／秒）、
+// maxShooters 同時開火的機器人上限、settleK 剛發現時手不穩加幾度
 const DIFF = {
-  easy:   { react: 0.8, base: 2.2, distK: 0.06, dmg: 0.45, burst: [2, 4] },
-  normal: { react: 0.55, base: 1.6, distK: 0.05, dmg: 0.62, burst: [3, 5] },
-  hard:   { react: 0.32, base: 0.8, distK: 0.035, dmg: 0.9, burst: [3, 6] },
+  easy:   { react: 0.9,  base: 2.0,  distK: 0.055, dmg: 0.45, burst: [2, 4], pause: [0.5, 0.9],  pMoveK: 3.0, headMul: 2,   warn: 2, turn: 3.5, maxShooters: 1, settleK: 3.0 },
+  normal: { react: 0.7,  base: 1.55, distK: 0.045, dmg: 0.52, burst: [3, 4], pause: [0.4, 0.75], pMoveK: 2.8, headMul: 2.5, warn: 1, turn: 4.5, maxShooters: 2, settleK: 2.8 },
+  hard:   { react: 0.42, base: 1.1,  distK: 0.035, dmg: 0.72, burst: [3, 5], pause: [0.3, 0.55], pMoveK: 2.2, headMul: 3,   warn: 1, turn: 6.5, maxShooters: 3, settleK: 2.4 },
 };

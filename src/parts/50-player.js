@@ -62,7 +62,7 @@ function damagePlayer(dmg, bot, part) {
   const dx = bot.body.pos.x - player.body.pos.x, dz = bot.body.pos.z - player.body.pos.z;
   hudHurt(angDiff(player.yaw, Math.atan2(-dx, -dz)), dmg);
   if (player.hp <= 0) {
-    player.alive = false; player.deaths++; player.killer = bot.name; player.respawnT = 3;
+    player.alive = false; player.deaths++; player.deathStreak = (player.deathStreak || 0) + 1; player.killer = bot.name; player.respawnT = 3;
     player.ads = false; INPUT.fire = false;
     hudFeed(bot.name, '你', part === 'head', false);
     showDead(bot.name, part === 'head');

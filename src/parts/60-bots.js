@@ -71,17 +71,14 @@ function respawnBot(b) {
 
 const _be = new V3(), _pt = new V3(), _bd = new V3(), _end = new V3();
 function botEye(b, out) { const p = b.phys.pos; return out.set(p.x, p.y + b.phys.h - 0.14, p.z); }
-// 看不看得到玩家：距離、視野角度（警戒中是全方位）、視線有沒有被牆擋住
+// 看不看得到玩家：距離、視野角度（巡邏 124 度、搜索 220 度、交戰中全方位）、視線有沒有被牆擋住
 function botCanSee(b) {
   if (!player.alive) return false;
   const pp = player.body.pos, bp = b.phys.pos;
   const dx = pp.x - bp.x, dz = pp.z - bp.z, dist = Math.hypot(dx, dz);
   if (dist > 85) return false;
-  const aware = b.state !== 'patrol';
-  if (!aware && dist > 3) {
-    const fwdYaw = b.yaw, toYaw = Math.atan2(-dx, -dz);
-    if (Math.abs(angDiff(fwdYaw, toYaw)) > 62 * DEG) return false;
-  }
+  const fov = b.state === 'patrol' ? 62 : b.state === 'search' ? 110 : 180;
+  if (fov < 180 && dist > 3 && Math.abs(angDiff(b.yaw, Math.atan2(-dx, -dz))) > fov * DEG) return false;
   botEye(b, _be);
   if (lineClear(_be, _pt.set(pp.x, pp.y + player.body.h - 0.12, pp.z))) return true;
   if (lineClear(_be, _pt.set(pp.x, pp.y + player.body.h * 0.62, pp.z))) return true;
@@ -108,6 +105,18 @@ function followPath(b, speed, out) {
   out.set(dx / d * speed, 0, dz / d * speed);
   return true;
 }
+// 攻擊令牌：同一時間最多 D.maxShooters 隻在開火，畫面內、比較近的優先
+const SHOOT_TOKENS = new Set();
+function inPlayerView(b) { const pp = player.body.pos; return Math.abs(angDiff(player.yaw, Math.atan2(-(b.phys.pos.x - pp.x), -(b.phys.pos.z - pp.z)))) < 75 * DEG; }
+function tokenScore(b) { return Math.hypot(b.phys.pos.x - player.body.pos.x, b.phys.pos.z - player.body.pos.z) + (inPlayerView(b) ? 0 : 20); }
+function wantToken(b, D) {
+  for (const o of SHOOT_TOKENS) if (!o.alive || o.state !== 'combat' || !o.visible) SHOOT_TOKENS.delete(o);
+  if (SHOOT_TOKENS.has(b)) return true;
+  if (SHOOT_TOKENS.size < D.maxShooters) { SHOOT_TOKENS.add(b); return true; }
+  let worst = null; for (const o of SHOOT_TOKENS) if (!worst || tokenScore(o) > tokenScore(worst)) worst = o;
+  if (worst && tokenScore(b) < tokenScore(worst) - 3) { SHOOT_TOKENS.delete(worst); worst.pauseT = Math.max(worst.pauseT, 0.4); SHOOT_TOKENS.add(b); return true; }
+  return false;
+}
 function turnTo(b, yaw, rate, dt) { const d = angDiff(b.yaw, yaw); b.yaw += clamp(d, -rate * dt, rate * dt); }
 
 function botsHearShot(pos) {
@@ -124,12 +133,14 @@ function damageBot(b, dmg, part, dir) {
   b.hp -= dmg;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.respawnT = 4.5; b.fallDir = Math.sign(Math.random() - 0.5);
-    player.kills++; if (part === 'head') player.heads++;
+    player.kills++; player.deathStreak = 0; if (part === 'head') player.heads++; SHOOT_TOKENS.delete(b);
     hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head');
     hudFeed('你', b.name, part === 'head', true);
     return;
   }
   hudHit(part === 'head' ? 'head' : 'hit'); sfx(part === 'head' ? 'head' : 'hit');
+  // 中彈硬直：準度變差、連發中斷，先打中的人佔優勢
+  b.flinchT = part === 'head' ? 0.6 : 0.35; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
   // 被打到：轉頭面向槍聲，馬上進入交戰（反應時間縮短）
   if (b.state !== 'combat') {
     b.lastSeen.copy(player.body.pos); b.state = 'search'; b.searchT = 8; setPath(b, b.lastSeen.x, b.lastSeen.z);
@@ -149,6 +160,8 @@ function updateBot(b, dt) {
     if (b.respawnT <= 0) respawnBot(b);
     return;
   }
+  if (b.flinchT > 0) b.flinchT -= dt;
+  b.offT = inPlayerView(b) ? 0 : (b.offT || 0) + dt;
   // 感知：每 0.1 秒看一次
   b.seeT -= dt;
   if (b.seeT <= 0) {
@@ -157,10 +170,16 @@ function updateBot(b, dt) {
     if (b.visible) {
       b.lastSeen.copy(player.body.pos); b.lostT = 0;
       if (b.state !== 'combat') {
-        // 剛發現：反應時間，原本就在找你的反應快一點
-        b.react = D.react * rand(0.8, 1.25) * (b.state === 'search' ? 0.7 : 1); b.settle = 1;
-        b.state = 'combat'; b.strafeT = 0; b.burst = 0; b.pauseT = 0;
-      } else if (!was) { b.react = Math.max(b.react, D.react * 0.45); b.settle = Math.max(b.settle, 0.6); }
+        // 剛發現：反應時間；背對你的要多花轉身的時間
+        const need = Math.abs(angDiff(b.yaw, Math.atan2(-(player.body.pos.x - b.phys.pos.x), -(player.body.pos.z - b.phys.pos.z))));
+        b.react = D.react * rand(0.8, 1.25) * (b.state === 'search' ? 0.85 : 1) + need / Math.PI * 0.45; b.settle = 1;
+        b.state = 'combat'; b.strafeT = 0; b.burst = 0; b.pauseT = 0; b.warnLeft = D.warn;
+      } else if (!was) {
+        // 你躲起來再出來：要重新瞄準，躲得久還會再給一次警告射擊
+        const hid = b.lostT;
+        b.react = Math.max(b.react, D.react * (hid > 0.4 ? 0.8 : 0.45)); b.settle = Math.max(b.settle, hid > 0.4 ? 1 : 0.6);
+        if (hid > 1.5) b.warnLeft = D.warn;
+      }
     }
   }
   let speed = 0; _wish.set(0, 0, 0);
@@ -173,7 +192,7 @@ function updateBot(b, dt) {
       b.lostT += dt;
       if (b.lostT > 0.9 || !player.alive) { b.state = player.alive ? 'search' : 'patrol'; b.searchT = 7; if (player.alive) setPath(b, b.lastSeen.x, b.lastSeen.z); else b.path = null; }
     }
-    turnTo(b, Math.atan2(-(b.lastSeen.x - p.x), -(b.lastSeen.z - p.z)), 9, dt);
+    turnTo(b, Math.atan2(-(b.lastSeen.x - p.x), -(b.lastSeen.z - p.z)), D.turn, dt);
     // 左右閃避：每隔一小段時間換方向，偶爾站定、蹲下打
     b.strafeT -= dt;
     if (b.strafeT <= 0) {
@@ -182,26 +201,27 @@ function updateBot(b, dt) {
     }
     const rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
     let adv = 0; if (dist > 30) adv = 0.7; else if (dist < 5) adv = -0.6;
-    if (!b.visible) adv = 0.8;
+    if (!b.visible) adv = b.lostT > 1.5 ? 0.8 : 0;   // 你剛躲起來：先守著掩體邊緣，過一會兒才追
     const sv = b.crouch ? 0 : 3.3;
     _wish.set(rx * b.strafe * sv + fx * adv * 3.5, 0, rz * b.strafe * sv + fz * adv * 3.5);
     if (!b.visible && b.lostT > 0.3) { b.crouch = false; }
     b.crouchWant = b.crouch && b.visible;
     // 開火
     if (b.visible && player.alive) {
-      b.react -= dt; b.settle = Math.max(0, b.settle - dt * 1.3);
-      if (b.react <= 0) {
+      b.react -= dt; b.settle = Math.max(0, b.settle - dt * 0.7);
+      if (playerSpeed() > RUN_SPEED * 0.6) b.settle = Math.min(1, b.settle + dt * 0.5);   // 你一直跑，它就一直瞄不穩
+      if (b.react <= 0 && wantToken(b, D)) {
         if (b.pauseT > 0) b.pauseT -= dt;
         else {
           if (b.burst <= 0) b.burst = Math.round(rand(D.burst[0], D.burst[1]));
           b.fireCd -= dt;
-          if (b.fireCd <= 0 && Math.abs(angDiff(b.yaw, toYaw)) < 0.25) {
+          if (b.fireCd <= 0 && Math.abs(angDiff(b.yaw, toYaw)) < 0.12) {
             botShoot(b, dist, D); b.burst--; b.fireCd = 0.11;
-            if (b.burst <= 0) b.pauseT = rand(0.25, 0.65);
+            if (b.burst <= 0) { b.pauseT = rand(D.pause[0], D.pause[1]); if (Math.random() < 0.3) SHOOT_TOKENS.delete(b); }
           }
         }
       }
-    }
+    } else SHOOT_TOKENS.delete(b);
   } else if (b.state === 'search') {
     b.searchT -= dt;
     if (b.alertYaw !== undefined) { turnTo(b, b.alertYaw, 8, dt); if (Math.abs(angDiff(b.yaw, b.alertYaw)) < 0.1) b.alertYaw = undefined; }
@@ -253,21 +273,38 @@ function botShoot(b, dist, D) {
   const pp = player.body.pos;
   botEye(b, _be);
   _pt.set(pp.x, pp.y + player.body.h * 0.7, pp.z);
+  // 警告射擊：剛發現你、或你在它背後畫面外的前 1 秒，子彈從你頭邊飛過
+  let forceMiss = false;
+  if (b.warnLeft > 0) { b.warnLeft--; forceMiss = true; }
+  if (b.offT > 0 && b.offT < 1.0) forceMiss = true;
+  if (forceMiss) {
+    const side = Math.random() < 0.5 ? -1 : 1, rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), off = rand(0.6, 0.95);
+    _pt.x += rx * side * off; _pt.z += rz * side * off; _pt.y = pp.y + player.body.h + rand(0.15, 0.45);
+  }
   _bd.subVectors(_pt, _be).normalize();
   const moving = Math.hypot(b.phys.vel.x, b.phys.vel.z) > 1 ? 1 : 0;
-  const errDeg = D.base + dist * D.distK + moving * 1.0 + (playerSpeed() / RUN_SPEED) * 1.3 + b.settle * 2.4 + (b.phys.crouched ? -0.2 : 0);
+  let errDeg = D.base + dist * D.distK + moving * 1.0 + (playerSpeed() / RUN_SPEED) * D.pMoveK + b.settle * D.settleK + (b.phys.crouched ? -0.2 : 0) + (b.flinchT > 0 ? 3.5 : 0);
+  if (b.offT > 0) errDeg *= 1.6;
+  // 你血少、連死時，機器人手會抖一點（動態難度）
+  const hpK = player.hp < 40 ? 1 + (40 - player.hp) / 40 * 0.5 : 1, streakK = 1 + Math.min(player.deathStreak || 0, 3) * 0.12;
+  errDeg *= hpK * streakK;
+  if (forceMiss) errDeg = Math.min(errDeg, 1.2);
   const yaw = Math.atan2(-_bd.x, -_bd.z) + gauss() * errDeg * 0.5 * DEG;
   const pitch = Math.asin(clamp(_bd.y, -1, 1)) + gauss() * errDeg * 0.5 * DEG;
   _bd.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
   const w = rayWorld(_be, _bd, 160);
   let t = w ? w.t : 160;
-  const h = player.alive ? rayBody(_be, _bd, player.boxes, t) : null;
+  const h = player.alive && !forceMiss ? rayBody(_be, _bd, player.boxes, t) : null;
   if (h) t = h.t;
   const end = _end.copy(_be).addScaledVector(_bd, t);
   b.g.updateMatrixWorld();
   const mz = b.g.localToWorld(_v3.copy(BOT_MUZZLE).multiply(_v1.set(1, b.bodyGroup.scale.y, 1)));
   spawnTracer(mz, end, '#ff9a6a', 0.018, true);
-  if (h) damagePlayer(25 * PART_MUL[h.part] * D.dmg, b, h.part);
+  if (h) {
+    let dmg = 25 * (h.part === 'head' ? D.headMul : PART_MUL[h.part]) * D.dmg;
+    if (player.hp > 50 && player.hp - dmg <= 0) dmg = player.hp - 1;   // 血量一半以上時不會被一發打死
+    damagePlayer(dmg, b, h.part);
+  }
   else if (w) addDecal(end, w.n);
   sfx('botshot', 1 / (1 + dist / 14));
   b.flashT = 0.05;
