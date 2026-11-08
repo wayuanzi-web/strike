@@ -168,7 +168,7 @@ body.match #dead { background: none; }
 #bBoard svg { width: 52%; height: 52%; stroke: var(--bone); stroke-width: 2.2; fill: none; stroke-linecap: round; }
 #bBoard.on { background: rgba(255,179,71,.3); }
 #board { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 13); transform: translateX(-50%); width: min(92vw, 640px); background: rgba(10,15,22,.9); border: 1px solid var(--line);
-  border-radius: 8px; padding: calc(var(--u) * 2) calc(var(--u) * 3); pointer-events: none; z-index: 4; }
+  border-radius: 8px; padding: calc(var(--u) * 2) calc(var(--u) * 3); pointer-events: none; z-index: 6; }
 #board table { width: 100%; border-collapse: collapse; font-size: max(12px, calc(var(--u) * 3)); font-variant-numeric: tabular-nums; }
 #board th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 6px; font-size: max(11px, calc(var(--u) * 2.5)); }
 #board td { padding: 3px 6px; border-top: 1px solid rgba(255,255,255,.06); } #board td.n { text-align: right; }
@@ -247,6 +247,13 @@ body.match #dead { background: none; }
 #stats th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 4px; } #stats td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.06); }
 #stats tr.w td:nth-child(3) { color: #7fe9f0; } #stats tr.l td:nth-child(3) { color: #ff8f80; }
 #touch .tb { scale: var(--bs, 1); }
+#bRadio { position: absolute; left: calc(var(--sl) + var(--u) * 3 + (max(44px, calc(var(--u) * 11)) + 8px) * 2); top: calc(var(--st) + var(--u) * 15); height: max(40px, calc(var(--u) * 10)); padding: 0 calc(var(--u) * 2.4);
+  border-radius: 6px; background: rgba(40,90,140,.85); color: #fff; font-weight: 800; font-size: max(13px, calc(var(--u) * 3)); z-index: 5; }
+#radio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 7; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: min(90vw, 520px); }
+#radio button { min-height: max(48px, calc(var(--u) * 13)); border-radius: 8px; background: rgba(12,20,30,.9); border: 1px solid var(--line); font-size: max(14px, calc(var(--u) * 3.6)); font-weight: 700; }
+#radio button:active { background: rgba(95,216,238,.3); } #rX { color: var(--mute); }
+#board small.tr { color: var(--mute); font-size: .78em; margin-left: .4em; font-weight: 500; }
+body.lefty #bRadio { left: auto; right: calc(var(--sr) + var(--u) * 3); }
 #perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
 #bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
 #glLost { z-index: 20; }
@@ -311,6 +318,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <li><b>左鍵</b>開火　<b>右鍵</b>開鏡</li>
         <li><b>C／Ctrl</b>蹲　<b>R</b>換彈　<b>Esc</b>暫停</li>
         <li><b>1／2／Q</b>換槍　<b>G</b>投擲物　<b>B</b>購買　<b>E</b>按住裝彈／拆彈</li>
+        <li><b>Z</b>指令輪盤　<b>5–9</b>跟我／A 點／B 點／守這裡／自由行動</li>
       </ul>
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
@@ -344,6 +352,8 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   </div>
 
   <button id="bBuy" hidden>購買</button>
+  <button id="bRadio" hidden>指令</button>
+  <div id="radio" hidden><button id="rFollow">跟我來</button><button id="rA">打 A 點</button><button id="rB">打 B 點</button><button id="rHold">守這裡</button><button id="rFree">自由行動</button><button id="rX">取消</button></div>
   <div id="buy" hidden><div class="card"><header><h2>購買</h2><span id="buyMoney">$ 0</span><div class="row"><button class="btn" id="buyAuto">一鍵購買</button><button class="btn go" id="buyX">好了</button></div></header>
     <div id="buyGrid"></div><p class="mnote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p></div></div>
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>

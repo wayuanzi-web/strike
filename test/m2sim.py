@@ -50,7 +50,9 @@ async def main():
             print('match', i, r['state'], r['score'], 'rounds', len(r['log']))
             for x in r['log']:
                 side = 'atk' if x['w'] == x['atk'] else 'def'; tot[side] += 1; tot['kinds'][x['kind']] = tot['kinds'].get(x['kind'], 0) + 1; tot['plants'] += x['planted']
-            print('  ', ' '.join(f"{x['n']}:{x['w']}{'攻' if x['w']==x['atk'] else '守'}/{x['kind']}{'@'+x['site'] if x['planted'] else ''}({x['t']})" for x in r['log']))
+            print('  ', ' '.join(f"{x['n']}:{x['w']}{'攻' if x['w']==x['atk'] else '守'}/{x['kind']}{'@'+x['site'] if x['planted'] else ''}({x['t']})[{x.get('tactic','')},{x.get('eco',{}).get(x['atk'],'')}v{x.get('eco',{}).get('A' if x['atk']=='B' else 'B','')}]" for x in r['log']))
+            for x in r['log']:
+                tot.setdefault('tactics', {}); k = x.get('tactic'); t = tot['tactics'].setdefault(k, [0, 0]); t[0 if x['w'] == x['atk'] else 1] += 1
             print('   nades', r['nades'], 'buys', r['buys'])
             errs = [e for e in errors if '404' not in e]
             if errs: print('   ERRORS', errs[:6])

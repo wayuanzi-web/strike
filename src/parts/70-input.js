@@ -155,6 +155,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Digit1') equip('primary'); if (e.code === 'Digit2') equip('secondary');
   if (e.code === 'KeyQ') swapWeapon(); if (e.code === 'KeyG' || e.code === 'Digit3' || e.code === 'Digit4') cycleNade();
   if (e.code === 'KeyE') INPUT.use = true;
+  if (e.code === 'KeyZ') { if ($('radio').hidden) openRadio(); else closeRadio(); }
+  const ord = { Digit5: 'follow', Digit6: 'A', Digit7: 'B', Digit8: 'hold', Digit9: 'free' }[e.code]; if (ord) giveOrder(ord);
   if (e.code === 'KeyB') { if ($('buy').hidden) { openBuy(); if (!$('buy').hidden && pointerLocked()) document.exitPointerLock(); } else closeBuy(); }
 });
 window.addEventListener('keyup', (e) => {

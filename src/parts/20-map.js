@@ -76,13 +76,13 @@ const MAPS = {
         holds: [[24.6, 23.2, 10, 20], [27.2, 16.6, 22, 6], [18.2, 24.6, 10, 20], [22.4, 12.2, 16, 4], [25.2, 20.4, 10, 20]],
         smokes: [[28.8, 13.5], [22, 11.5]], post: [[12, 22], [16, 17.5], [21, 18], [24, 21]] },
       B: { x0: 11, x1: 27, z0: -19, z1: -14.2, cx: 19, cz: -16.6, mark: [15.8, -16], stage: [-5, -10], plants: [[18.6, -17.6], [23.6, -17.4], [13, -17]],
-        holds: [[23.4, -15.2, 6, -16.5], [25.6, -18, 6, -16.5], [16.2, -16.4, 6, -16.5], [18.4, -11, 16, -6], [27.5, -12.5, 16, -6]],
+        holds: [[23.4, -15.2, 6, -16.5], [19, -21, 6, -16.5], [16.2, -16.4, 6, -16.5], [18.4, -11, 16, -6], [27.5, -12.5, 16, -6]],   // 第二個在卸貨平台上（俯瞰包點 B）
         smokes: [[26.5, -11.5], [17, -10.2]], post: [[12, -15.5], [17, -18], [22, -18.2], [20, -14.8]] },
     },
   },
   // ---------- 2. 正午舊城：石板路的老市集、鐘樓廣場 ----------
   market: {
-    id: 'market', name: '正午舊城', sub: '正午・石板街、鐘樓、市集', floor: 'cobble',
+    id: 'market', name: '正午舊城', sub: '正午・石板街、鐘樓、市集', floor: 'cobble', defEdge: 0.85,
     theme: { sun: [0.38, 0.82, 0.42], sunColor: '#fff1d6', sunI: 2.3, hemi: ['#cfe0f5', '#9c8466', 1.35], fog: ['#dfe6ee', 60, 220], exposure: 0.95,
       sky: { zen: '#2f6fc0', mid: '#8fb7e6', hor: '#d9e6f2', low: '#8a8478', warm: '#fff4dc' }, skyline: 'town', skyTop: '#b9b2a6', skyBot: '#8b8378', amb: 'town' },
     build() {
@@ -126,7 +126,7 @@ const MAPS = {
   },
   // ---------- 3. 黃昏鐵道：調車場、月台、吊車 ----------
   rail: {
-    id: 'rail', name: '黃昏鐵道', sub: '黃昏・調車場與月台', floor: 'gravel',
+    id: 'rail', name: '黃昏鐵道', sub: '黃昏・調車場與月台', floor: 'gravel', defEdge: 0.68,
     theme: { sun: [-0.84, 0.3, -0.34], sunColor: '#ffa468', sunI: 2.9, hemi: ['#a99fd0', '#8a6a56', 1.75], fog: ['#b98f8a', 55, 230], exposure: 1.12,
       sky: { zen: '#2b2f6a', mid: '#8a6fa8', hor: '#ff9a6a', low: '#4a3a44', warm: '#ffb070' }, skyline: 'rail', skyTop: '#5d5068', skyBot: '#3a3142', amb: 'rail' },
     build() {
@@ -192,58 +192,116 @@ function cylinderFree(x, z, r, y0, y1) {
   }
   return true;
 }
-function sweepFree(ax, az, bx, bz, r) {
+function sweepFree(ax, az, bx, bz, r, y = 0) {
   const d = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(d / 0.4));
-  for (let i = 0; i <= n; i++) { const t = i / n; if (!cylinderFree(ax + (bx - ax) * t, az + (bz - az) * t, r, 0.05, 1.8)) return false; }
+  for (let i = 0; i <= n; i++) { const t = i / n; if (!cylinderFree(ax + (bx - ax) * t, az + (bz - az) * t, r, y + 0.05, y + 1.8)) return false; }
   return true;
 }
+// 路點分層：地面一層，再加上「站得上去的平台」（例如卸貨平台：頂面夠大、頭上有空間）。
+// 同一層相鄰的點照舊連；不同層之間（樓梯）用真正的物理走一次，走得上去／下來才連（有方向）。
+function surfaceLevels(x, z) {
+  const out = [0];
+  for (let i = 1; i < BOXES.length; i++) {
+    const b = BOXES[i], y = b.max[1];
+    if (y < 0.3 || y > 4) continue;
+    if (x < b.min[0] + 0.45 || x > b.max[0] - 0.45 || z < b.min[2] + 0.45 || z > b.max[2] - 0.45) continue;
+    if (!out.some((v) => Math.abs(v - y) < 0.05)) out.push(y);
+  }
+  return out;
+}
+const _walkBody = { pos: null, vel: null, r: 0.35, h: 1.8, onGround: true, jumped: false };
+function walkable(a, b) {
+  // 從 a 直直走向 b（每秒 4 公尺、最多 3 秒），走得到就算
+  const body = _walkBody; body.pos = new V3(a.x, a.y, a.z); body.vel = new V3(); body.onGround = true; body.jumped = false; body.h = 1.8;
+  for (let t = 0; t < 3; t += 1 / 30) {
+    const dx = b.x - body.pos.x, dz = b.z - body.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.5 && Math.abs(body.pos.y - b.y) < 0.25) return true;
+    body.vel.x = dx / Math.max(d, 1e-3) * 4; body.vel.z = dz / Math.max(d, 1e-3) * 4;
+    moveBody(body, 1 / 30);
+  }
+  return false;
+}
 function buildNav() {
-  const { cols, rows, x0, z0, step } = NAV; NAV.nodes.length = 0;
+  const { cols, rows, x0, z0, step } = NAV; NAV.nodes.length = 0; NAV.cells = [];
+  // 地面層：id ＝ j*cols+i（跟以前一樣）
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const x = x0 + i * step, z = z0 + j * step, n = { id: j * cols + i, x, z, y: 0, i, j, ok: cylinderFree(x, z, 0.55, 0.05, 1.8), nb: [] };
+    NAV.nodes.push(n); NAV.cells[n.id] = [n];
+  }
+  // 平台層
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     const x = x0 + i * step, z = z0 + j * step;
-    NAV.nodes.push({ id: j * cols + i, x, z, ok: cylinderFree(x, z, 0.55, 0.05, 1.8), nb: [] });
-  }
-  for (const n of NAV.nodes) {
-    if (!n.ok) continue;
-    const i = n.id % cols, j = (n.id / cols) | 0;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      if (!di && !dj) continue;
-      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= cols || jj >= rows) continue;
-      const m = NAV.nodes[jj * cols + ii]; if (!m.ok) continue;
-      if (di && dj && (!NAV.nodes[j * cols + ii].ok || !NAV.nodes[jj * cols + i].ok)) continue;
-      if (sweepFree(n.x, n.z, m.x, m.z, 0.45)) n.nb.push(m.id);
+    for (const y of surfaceLevels(x, z)) {
+      if (y === 0 || !cylinderFree(x, z, 0.45, y + 0.05, y + 1.8)) continue;
+      const n = { id: NAV.nodes.length, x, z, y, i, j, ok: true, nb: [], up: true };
+      NAV.nodes.push(n); NAV.cells[j * cols + i].push(n);
     }
   }
+  const at = (i, j) => (i < 0 || j < 0 || i >= cols || j >= rows ? [] : NAV.cells[j * cols + i]);
+  for (const n of NAV.nodes) {
+    if (!n.ok) continue;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue;
+      for (const m of at(n.i + di, n.j + dj)) {
+        if (!m.ok || Math.abs(m.y - n.y) > 0.05) continue;
+        if (di && dj && !(at(n.i + di, n.j).some((q) => q.ok && Math.abs(q.y - n.y) < 0.05) && at(n.i, n.j + dj).some((q) => q.ok && Math.abs(q.y - n.y) < 0.05))) continue;
+        if (sweepFree(n.x, n.z, m.x, m.z, 0.45, n.y)) n.nb.push(m.id);
+      }
+    }
+  }
+  // 層和層之間：平台邊緣的點，跟 3 格內不同高度的點試走
+  for (const n of NAV.nodes) {
+    if (!n.up || !n.ok) continue;
+    if (n.nb.length >= 8) continue;                       // 不在邊緣
+    for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) {
+      for (const m of at(n.i + di, n.j + dj)) {
+        if (!m.ok || Math.abs(m.y - n.y) < 0.05 || Math.abs(m.y - n.y) > 3) continue;
+        if (walkable(m, n) && !m.nb.includes(n.id)) m.nb.push(n.id);
+        if (walkable(n, m) && !n.nb.includes(m.id)) n.nb.push(m.id);
+      }
+    }
+  }
+  // 只留跟出生點走得通的那一大群（上不去的貨櫃頂、噴水池頂之類自己成一群的丟掉）
+  const sp = MAP.spawn.atk[0], start = NAV.cells[Math.round((sp[1] - z0) / step) * cols + Math.round((sp[0] - x0) / step)][0];
+  // 去得了、也回得來（只能跳下去、爬不回來的點不要）
+  const back = new Map(); for (const n of NAV.nodes) for (const m of n.nb) { if (!back.has(m)) back.set(m, []); back.get(m).push(n.id); }
+  const reach = (next) => { const seen = new Set([start.id]), q = [start.id]; while (q.length) { const c = q.pop(); for (const m of next(c)) if (!seen.has(m)) { seen.add(m); q.push(m); } } return seen; };
+  const fwd = reach((c) => NAV.nodes[c].nb), bwd = reach((c) => back.get(c) || []);
+  for (const n of NAV.nodes) if (!(fwd.has(n.id) && bwd.has(n.id))) { n.ok = false; n.nb = []; }
+  for (const n of NAV.nodes) n.nb = n.nb.filter((m) => NAV.nodes[m].ok);
+  NAV.upCount = NAV.nodes.filter((n) => n.up && n.ok).length;
 }
-// 最近的路點，而且要能直接走過去（貼著牆時，牆另一邊的點不算）
-function nearestNode(x, z) {
+// 最近的路點，而且要能直接走過去（貼著牆時，牆另一邊的點不算）；y：所在高度（優先同一層）
+function nearestNode(x, z, y) {
   let best = null, bd = 1e9, fall = null, fd = 1e9;
   for (const n of NAV.nodes) {
     if (!n.ok || !n.nb.length) continue;
-    const d = (n.x - x) ** 2 + (n.z - z) ** 2;
+    const dy = y === undefined ? 0 : Math.abs(n.y - y);
+    if (y !== undefined && dy > 1.2) continue;
+    const d = (n.x - x) ** 2 + (n.z - z) ** 2 + dy * dy * 4;
     if (d < fd) { fd = d; fall = n; }
-    if (d < bd && d < 64 && sweepFree(x, z, n.x, n.z, 0.3)) { bd = d; best = n; }
+    if (d < bd && d < 64 && sweepFree(x, z, n.x, n.z, 0.3, n.y)) { bd = d; best = n; }
   }
-  return best || fall;
+  return best || fall || (y !== undefined ? nearestNode(x, z) : null);
 }
-// A*：回傳一串 [x,z]，再把走得直通的中間點拉掉
-function findPath(sx, sz, tx, tz) {
-  const s = nearestNode(sx, sz), t = nearestNode(tx, tz);
+// A*：回傳一串 [x, z, y]，再把同一層走得直通的中間點拉掉
+function findPath(sx, sz, tx, tz, sy = 0, ty) {
+  const s = nearestNode(sx, sz, sy), t = nearestNode(tx, tz, ty);
   if (!s || !t) return null;
   const open = [s.id], g = new Map([[s.id, 0]]), came = new Map(), f = new Map([[s.id, Math.hypot(s.x - t.x, s.z - t.z)]]), closed = new Set();
   while (open.length) {
     let bi = 0; for (let i = 1; i < open.length; i++) if (f.get(open[i]) < f.get(open[bi])) bi = i;
     const cur = open.splice(bi, 1)[0];
     if (cur === t.id) {
-      const out = []; let c = cur; while (c !== undefined) { const n = NAV.nodes[c]; out.unshift([n.x, n.z]); c = came.get(c); }
-      out.push([tx, tz]);
-      return smoothPath(sx, sz, out);
+      const out = []; let c = cur; while (c !== undefined) { const n = NAV.nodes[c]; out.unshift([n.x, n.z, n.y]); c = came.get(c); }
+      out.push([tx, tz, t.y]);
+      return smoothPath(sx, sz, out, s.y);
     }
     closed.add(cur);
     const cn = NAV.nodes[cur];
     for (const nb of cn.nb) {
       if (closed.has(nb)) continue;
-      const m = NAV.nodes[nb], ng = g.get(cur) + Math.hypot(m.x - cn.x, m.z - cn.z);
+      const m = NAV.nodes[nb], ng = g.get(cur) + Math.hypot(m.x - cn.x, m.z - cn.z) + Math.abs(m.y - cn.y) * 1.5;
       if (ng < (g.has(nb) ? g.get(nb) : 1e9)) {
         came.set(nb, cur); g.set(nb, ng); f.set(nb, ng + Math.hypot(m.x - t.x, m.z - t.z));
         if (!open.includes(nb)) open.push(nb);
@@ -252,14 +310,17 @@ function findPath(sx, sz, tx, tz) {
   }
   return null;
 }
-function smoothPath(sx, sz, pts) {
+function smoothPath(sx, sz, pts, sy = 0) {
   // 終點如果站不下（例如貼著牆）就丟掉，停在最後一個路點
-  const last = pts[pts.length - 1]; if (!cylinderFree(last[0], last[1], 0.4, 0.05, 1.8)) pts.pop();
-  const out = []; let ax = sx, az = sz, i = 0;
+  const last = pts[pts.length - 1]; if (!cylinderFree(last[0], last[1], 0.4, (last[2] || 0) + 0.05, (last[2] || 0) + 1.8)) pts.pop();
+  const out = []; let ax = sx, az = sz, ay = sy, i = 0;
   while (i < pts.length) {
+    // 只在同一層裡拉直；要換層（樓梯）的地方保留路點
     let j = pts.length - 1;
-    while (j > i && !sweepFree(ax, az, pts[j][0], pts[j][1], 0.42)) j--;
-    out.push(pts[j]); ax = pts[j][0]; az = pts[j][1]; i = j + 1;
+    while (j > i && !(sameLevelRun(pts, i, j, ay) && sweepFree(ax, az, pts[j][0], pts[j][1], 0.42, ay))) j--;
+    out.push(pts[j]); ax = pts[j][0]; az = pts[j][1]; ay = pts[j][2] || 0; i = j + 1;
   }
   return out;
 }
+function sameLevelRun(pts, i, j, y) { for (let k = i; k <= j; k++) if (Math.abs((pts[k][2] || 0) - y) > 0.05) return false; return true; }
+

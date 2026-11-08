@@ -41,7 +41,7 @@ function pips(el, team) {
 // 計分板：兩隊每個人的擊殺、陣亡、爆頭
 function drawBoard() {
   const gear = (u) => u === player ? (INV.primary ? INV.primary.def.short : '手槍') : (u.primary ? u.primary.short : '手槍');
-  const row = (u, team) => `<tr class="${team}${u === player ? ' me' : ''}${u.alive ? '' : ' dead'}"><td>${u.name}${isCarrier(u) && team === 'A' ? ' ◆' : ''}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td><td class="n">${u.heads || 0}</td><td class="n">${u.alive ? Math.ceil(u.hp) : '—'}</td><td class="n">${team === 'A' ? '$' + (u.money || 0) : ''}</td><td>${team === 'A' && u.alive ? gear(u) : ''}</td></tr>`;
+  const row = (u, team) => `<tr class="${team}${u === player ? ' me' : ''}${u.alive ? '' : ' dead'}"><td>${u.name}${u.trait ? `<small class="tr">${TRAITS[u.trait]}</small>` : ''}${isCarrier(u) && team === 'A' ? ' ◆' : ''}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td><td class="n">${u.heads || 0}</td><td class="n">${u.alive ? Math.ceil(u.hp) : '—'}</td><td class="n">${team === 'A' ? '$' + (u.money || 0) : ''}</td><td>${team === 'A' && u.alive ? gear(u) : ''}</td></tr>`;
   const A = [player].concat(bots.filter((b) => b.active && b.team === 'A')).sort((a, b) => b.kills - a.kills);
   const B = bots.filter((b) => b.active && b.team === 'B').sort((a, b) => b.kills - a.kills);
   const side = (t) => (t === ROUND.atk ? '攻' : '守');
@@ -126,6 +126,7 @@ function hudGear(dt) {
   if (pr > 0) { $('useT').textContent = (act === 'plant' ? '裝彈中' : '拆彈中') + '…'; $('useB').style.width = (pr * 100).toFixed(0) + '%'; }
   else if (act && !isTouch && player.alive) { $('useBox').hidden = false; $('useT').textContent = act === 'plant' ? '按住 E 裝彈' : '按住 E 拆彈'; $('useB').style.width = '0%'; }
   $('bBuy').hidden = !buyOpen() || !$('buy').hidden;
+  $('bRadio').hidden = !(m && player.alive && game.state === 'play') || !$('radio').hidden;
   $('bNade').classList.toggle('on', W.isNade); $('bNade').style.opacity = NADE_ORDER.some((k) => INV[k] > 0) ? '' : '.4';
   $('scope').hidden = !(WP.scope && !W.isNade && player.alive && player.adsT > 0.85);
   const fl = player.flashT > 0 ? clamp(player.flashT / 1.2, 0, 1) : 0; $('flashOv').style.opacity = fl.toFixed(3);

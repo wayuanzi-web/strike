@@ -89,13 +89,14 @@ function syncMenuHints() {
 }
 function backToMenu() {
   clearNades(); resetBomb(); closeBuy(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints();
+  closeRadio(); $('bRadio').hidden = true; $('bBuy').hidden = true;
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   player.alive = false; $('menu').hidden = false;
 }
 function pauseGame() {
   if (game.state !== 'play') return;
-  closeBuy();
+  closeBuy(); closeRadio();
   game.state = 'pause'; resetTouchState();
   syncSettingsUI(); $('pause').hidden = false;
   if (pointerLocked()) document.exitPointerLock();
@@ -116,6 +117,7 @@ onTap($('bRespawn'), () => {
   $('pause').hidden = true; $('dead').hidden = true; resetTouchState(); startGame(game.mode);   // 重來：從頭開始這個模式
 });
 $('bBuy').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); openBuy(); });
+$('bRadio').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); openRadio(); });
 onTap($('buyX'), closeBuy);
 onTap($('buyAuto'), autoBuy);
 $('bPause').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); pauseGame(); });
@@ -250,4 +252,4 @@ requestAnimationFrame(frame);
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
-  INV, WEAPONS, NADES, BOMB, TUT, applyHand, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };
+  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };

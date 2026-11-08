@@ -84,7 +84,7 @@ function makeBot(name, team) {
     stuckT: 0, lastP: new V3(), deadT: 0, respawnT: 0, boxes: newBoxes(), walk: 0, searchT: 0, spottedT: 0,
   };
   b.body = b.phys;   // 物理身體：玩家程式用 bot.body，機器人程式用 bot.phys，是同一個
-  b.gunM = mdl.gunM; b.money = 0; b.nades = { he: 0, flash: 0, smoke: 0 }; b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.kit = false;
+  b.gunM = mdl.gunM; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0 }; b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.kit = false;
   b.wpn = WEAPONS.rifle; b.mag = 30; b.reloadT = 0; b.blindT = 0; b.useT = 0;
   if (team === 'A') { b.tag = nameTag(name); b.g.add(b.tag); }
   b.g.visible = false;
@@ -184,12 +184,12 @@ function botCanSee(b) { return !!findTarget(b); }   // 舊介面（測試用）
 // 對戰時不要追太遠：守方（還沒裝彈）只在自己包點 20 公尺內追；攻方衝之前只追 14 公尺內的
 function leashOK(b, pos) {
   if (game.mode !== 'match' || ROUND.phase !== 'live' || BOMB.planted) return true;
-  if (b.team !== ROUND.atk) { const s = SITES[b.post || 'A']; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < 14; }
+  if (b.team !== ROUND.atk) { const s = SITES[b.post || 'A']; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < (hasTrait(b, 'entry') ? 18 : 14); }
   if (ROUND.plan && ROUND.plan.exec) { const s = SITES[ROUND.plan.site]; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < 18 || Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z) < 12; }
   return Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z) < 14;
 }
-function setPath(b, x, z) {
-  b.path = findPath(b.phys.pos.x, b.phys.pos.z, x, z); b.pi = 0; b.stuckT = 0; b.lastP.copy(b.phys.pos);
+function setPath(b, x, z, y) {
+  b.path = findPath(b.phys.pos.x, b.phys.pos.z, x, z, b.phys.pos.y, y); b.pi = 0; b.stuckT = 0; b.lastP.copy(b.phys.pos);
 }
 // 巡邏目的地：練習模式隨機；對戰時往敵方半場推進（A 隊往東、B 隊往西），偶爾往隊友回報的敵人位置去
 const TEAM_INTEL = { A: { t: -99, pos: new V3() }, B: { t: -99, pos: new V3() } };
@@ -355,7 +355,7 @@ function updateBot(b, dt) {
         const need = Math.abs(angDiff(b.yaw, Math.atan2(-(tgt.body.pos.x - p.x), -(tgt.body.pos.z - p.z))));
         b.react = D.react * rand(0.8, 1.25) * (b.state === 'search' ? 0.85 : 1) + need / Math.PI * 0.45; b.settle = 1;
         // 守點中（槍已經對著入口）：反應快、手比較穩
-        if (b.state === 'hold' && b.holdObj) { b.react *= 0.6; b.settle = 0.45; }
+        if (b.state === 'hold' && b.holdObj) { b.react *= (hasTrait(b, 'anchor') ? 0.5 : 0.6) * (b.team !== ROUND.atk && MAP.defEdge || 1); b.settle = 0.45; }
         b.state = 'combat'; b.strafeT = 0; b.burst = 0; b.pauseT = 0; b.warnLeft = tgt.isPlayer ? D.warn : 0;
         b.flankCheck = rand(1.0, 2.0);
       } else if (!was || prev !== tgt) {
@@ -392,7 +392,8 @@ function updateBot(b, dt) {
     }
     const rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
     const pref = b.wpn.bot.pref; let adv = 0; if (dist > Math.max(pref[1], 12)) adv = 0.7; else if (dist < pref[0]) adv = -0.6;
-    if (b.wpn.scope && b.visible) { b.strafe = 0; }
+    if ((b.wpn.scope || hasTrait(b, 'sniper')) && b.visible) { b.strafe = 0; }
+    if (hasTrait(b, 'entry') && adv === 0 && dist > 9 && leashOK(b, p)) adv = 0.35;
     if (adv > 0 && (!leashOK(b, p) || (game.mode === 'match' && b.team !== ROUND.atk && !BOMB.planted))) adv = 0;
     if (!b.visible) adv = b.lostT > 1.5 ? 0.8 : 0;   // 對方剛躲起來：先守著掩體邊緣，過一會兒才追
     const sv = b.crouch ? 0 : 3.3;

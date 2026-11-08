@@ -37,8 +37,9 @@ function dropBomb(u) {
   BOMB.state = 'dropped'; BOMB.carrier = null; if (u === player) INV.bomb = false;
   BOMB.pos.set(u.body.pos.x, 0, u.body.pos.z);
   // 掉在平台上就往下放到地面（機器人到不了高處）
-  const n = nearestNode(u.body.pos.x, u.body.pos.z);
-  if (n && (u.body.pos.y > 0.5 || Math.hypot(n.x - BOMB.pos.x, n.z - BOMB.pos.z) > 2.5)) BOMB.pos.set(n.x, 0, n.z);
+  const n = nearestNode(u.body.pos.x, u.body.pos.z, u.body.pos.y);
+  BOMB.pos.y = u.body.pos.y > 0.5 && n ? n.y : 0;
+  if (n && Math.hypot(n.x - BOMB.pos.x, n.z - BOMB.pos.z) > 2.5) BOMB.pos.set(n.x, n.y, n.z);
   bombMesh.position.copy(BOMB.pos); bombMesh.rotation.set(0, Math.random() * 6, 0.3); bombMesh.visible = true;
 }
 function plantBomb(u) {

@@ -96,28 +96,4 @@ function openBuy() {
 }
 function closeBuy() { buyEl.hidden = true; }
 
-// ---------- 機器人買東西：錢夠就步槍＋頭盔＋投擲物；全隊錢少就存錢（只買手槍局的防彈衣） ----------
-function botBuy(b, teamAvg, pistolRound) {
-  const m = () => b.money;
-  const pay = (n) => { b.money -= n; };
-  const role = b.team === ROUND.atk ? 'atk' : 'def';
-  if (pistolRound) {
-    if (Math.random() < 0.5 && m() >= 650) { pay(650); b.vest = true; }
-    else { if (m() >= 200) { pay(200); b.nades.flash++; } if (m() >= 300 && Math.random() < 0.5) { pay(300); b.nades.he++; } }
-    return;
-  }
-  const eco = !b.primary && teamAvg < 2600 && m() < 3700;
-  if (!b.primary && !eco) {
-    const sniperOk = !bots.some((o) => o !== b && o.active && o.team === b.team && o.primary === WEAPONS.sniper);
-    if (m() >= 6200 && sniperOk && Math.random() < 0.3) { pay(4750); b.primary = WEAPONS.sniper; }
-    else if (m() >= 3900) { pay(2900); b.primary = WEAPONS.rifle; }
-    else if (m() >= 1900) { const w = Math.random() < 0.3 ? WEAPONS.shotgun : WEAPONS.smg; pay(w.price); b.primary = w; }
-  }
-  if (eco) return;
-  if (!b.helmet && m() >= 1000) { pay(b.vest ? 350 : 1000); b.vest = b.helmet = true; }
-  else if (!b.vest && m() >= 650) { pay(650); b.vest = true; }
-  if (m() >= 300 && !b.nades.smoke && Math.random() < 0.7) { pay(300); b.nades.smoke = 1; }
-  if (m() >= 200 && b.nades.flash < 2 && Math.random() < 0.7) { pay(200); b.nades.flash++; }
-  if (m() >= 300 && !b.nades.he && Math.random() < 0.6) { pay(300); b.nades.he = 1; }
-  if (role === 'def' && !b.kit && m() >= 400 && Math.random() < 0.6) { pay(400); b.kit = true; }
-}
+// 機器人買東西：見 62-botobj 的 teamEcoMode／botBuy（全隊一起決定全買、強起、半起或存錢）

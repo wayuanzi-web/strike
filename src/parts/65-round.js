@@ -42,13 +42,14 @@ function startRound() {
   const sideOf = (team) => (team === ROUND.atk ? TEAM_SPAWN.atk : TEAM_SPAWN.def);
   const face = (team) => (team === ROUND.atk ? 30 : -30);
   const pistolRound = ROUND.num === 1 || ROUND.num === ROUND.half + 1;
+  ROUND.eco = {};
   for (const team of ['A', 'B']) {
     const list = bots.filter((b) => b.active && b.team === team), sp = sideOf(team), off = team === 'A' ? 1 : 0;
-    const avg = list.reduce((a, b) => a + b.money, 0) / Math.max(1, list.length);   // 機器人自己的平均錢（不算你）
+    list.forEach((b) => { if (!b.keep) resetBotGear(b); });
+    const mode = ROUND.eco[team] = teamEcoMode(team, pistolRound);     // 全隊一起決定：全買、強起、半起、存錢
     list.forEach((b, i) => {
       const s = sp[i + off]; botSpawn(b, s[0], s[1], face(team), s[1]);
-      if (!b.keep) resetBotGear(b);
-      botBuy(b, avg, pistolRound);
+      botBuy(b, mode);
       botArm(b);
     });
   }
@@ -58,8 +59,11 @@ function startRound() {
   game.spec = 0; $('dead').hidden = true;
   // 炸彈：隨機給一個攻方
   ROUND.plan = { site: Math.random() < 0.5 ? 'A' : 'B', exec: false, execAt: rand(22, 34) };
+  ROUND.tipPlan = '';
   giveBomb(pick(matchUnits().filter((u) => u.team === ROUND.atk)));
   assignPosts();
+  // 開打時告訴你隊友這回合怎麼買、怎麼打
+  ROUND.tip = `隊友這回合：${ECO_NAME[ROUND.eco[player.team]] || ''}` + (ROUND.tipPlan ? `・${ROUND.tipPlan.replace('隊友打算：', '')}` : '');
   const last = ROUND.score.A + ROUND.score.B + 1 === ROUND.winTo * 2 - 1;
   const role = ROUND.atk === player.team ? '你們是攻方：把炸彈裝在 A 或 B 點' : '你們是守方：守住 A、B 兩個包點';
   hudBanner(halftime ? '換邊' : `第 ${ROUND.num} 回合`, (ROUND.num === 1 ? `「${MAP.name}」　` : '') + (last ? '決勝回合　' + role : role), 3);
@@ -80,7 +84,8 @@ function endRound(winner, reason, kind = 'elim') {
   const loser = otherTeam(winner);
   ROUND.score[winner]++;
   ROUND.history.push(winner);
-  ROUND.log.push({ n: ROUND.num, w: winner, kind, atk: ROUND.atk, site: BOMB.site, planted: BOMB.planted, t: +ROUND.liveT.toFixed(1) });
+  ROUND.log.push({ n: ROUND.num, w: winner, kind, atk: ROUND.atk, site: BOMB.site, planted: BOMB.planted, t: +ROUND.liveT.toFixed(1), tactic: ROUND.plan && ROUND.plan.type, eco: Object.assign({}, ROUND.eco) });
+  closeRadio();
   ROUND.over = ROUND.score.A >= ROUND.winTo || ROUND.score.B >= ROUND.winTo;
   // 經濟：勝方每人 3250（炸掉、拆掉 3500）；敗方連敗補助；攻方裝了彈但輸了每人 +800
   const winPay = kind === 'bomb' || kind === 'defuse' ? ECON.winBomb : ECON.win;
@@ -97,7 +102,7 @@ function updateRound(dt) {
   if (game.mode !== 'match') return;
   if (ROUND.phase === 'freeze') {
     ROUND.t -= dt;
-    if (ROUND.t <= 0) { ROUND.phase = 'live'; ROUND.t = ROUND.length; hudBanner('開始！', '', 1.2); sfx('go'); closeBuy(); }
+    if (ROUND.t <= 0) { ROUND.phase = 'live'; ROUND.t = ROUND.length; hudBanner('開始！', '', 1.2); sfx('go'); closeBuy(); if (ROUND.tip && player.alive) hudTip(ROUND.tip, 3.5); if (ROUND.plan && ROUND.plan.type === 'rush') ROUND.plan.exec = true; }
   } else if (ROUND.phase === 'live') {
     ROUND.liveT += dt;
     if (!BOMB.planted) {
