@@ -22,14 +22,25 @@ const WEAPONS = {
     dmg: 115, rate: 1.45, mag: 5, reserve: 20, reload: 3.6, deploy: 0.8, range: 200, armorPen: 0.97, falloff: 0.99,
     base: 6.5, scopedBase: 0.05, scope: true, move: 8, air: 12, land: 3, bloomAdd: 0, bloomMax: 0, crouch: 0.8, ads: 1, adsFov: 20, recoilK: 2.2, speed: 0.86,
     kick: 5, vkick: 40, snd: { rate: 0.68, vol: 1.15 }, bot: { rate: 1.5, burst: [1, 1], err: 0.35, pause: [1.0, 1.6], pref: [14, 80] } },
+  // 第二把步槍：射速快、傷害低、比較準、後座小（像 CS 的 M4，守方愛用）
+  carbine: { id: 'carbine', vm: 'carbine', slot: 'primary', name: '嵐式卡賓槍', short: '卡賓槍', price: 2700, reward: 300,
+    dmg: 31, rate: 0.088, mag: 25, reserve: 75, reload: 2.2, deploy: 0.55, range: 160, armorPen: 0.7, falloff: 0.97,
+    base: 0.2, move: 4.2, air: 7, land: 1.4, bloomAdd: 0.36, bloomMax: 3.4, crouch: 0.75, ads: 0.4, adsFov: 50, recoilK: 0.8, speed: 1.02,
+    kick: 1.8, vkick: 9, snd: { rate: 1.14, vol: 0.82 }, bot: { rate: 0.095, burst: null, err: 0.92, pause: null, pref: [6, 36] } },
+  // 重手槍：一發很痛、爆頭戴頭盔也一發倒，射速慢、跳得兇
+  deagle: { id: 'deagle', vm: 'deagle', slot: 'secondary', name: '雷式重手槍', short: '重手槍', price: 700, reward: 300,
+    dmg: 63, rate: 0.3, semi: true, mag: 7, reserve: 35, reload: 2.2, deploy: 0.55, range: 140, armorPen: 0.93, falloff: 0.81,
+    base: 0.35, move: 3.2, air: 8, land: 1.4, bloomAdd: 2.2, bloomMax: 5, crouch: 0.8, ads: 0.7, adsFov: 60, recoilK: 0.9, speed: 1.0,
+    kick: 4.2, vkick: 22, snd: { rate: 0.82, vol: 1.0 }, bot: { rate: 0.5, burst: [1, 2], err: 1.0, pause: [0.35, 0.6], pref: [5, 25] } },
 };
 // 投擲物（price 價錢、max 最多帶幾個）
 const NADES = {
   he: { id: 'he', vm: 'he', name: '手榴彈', short: '手榴彈', price: 300, max: 1, reward: 300 },
   flash: { id: 'flash', vm: 'flash', name: '閃光彈', short: '閃光彈', price: 200, max: 2 },
   smoke: { id: 'smoke', vm: 'smoke', name: '煙霧彈', short: '煙霧彈', price: 300, max: 1 },
+  molotov: { id: 'molotov', vm: 'molotov', name: '燃燒彈', short: '燃燒彈', price: 500, max: 1, reward: 300 },
 };
-const NADE_ORDER = ['he', 'flash', 'smoke'];
+const NADE_ORDER = ['he', 'flash', 'smoke', 'molotov'];
 const RIFLE = WEAPONS.rifle;
 let WP = WEAPONS.rifle;      // 手上這把
 
@@ -40,9 +51,26 @@ function weaponDamage(w, part, dist, vest, helmet) {
   else if (part === 'body' && vest) d *= w.armorPen;
   return d;
 }
+// 護甲耐久：每件 100 點，擋掉的傷害扣在護甲上，扣完就沒有保護（頭盔跟著沒了）
+const ARMOR_WEAR = 1;
+const armorOf = (u) => (u === player ? INV : u);
+function wearArmor(u, absorbed) {
+  const A = armorOf(u); if (!(absorbed > 0)) return;
+  if (A.armor == null) A.armor = 100;
+  A.armor = Math.max(0, A.armor - absorbed * ARMOR_WEAR);
+  if (A.armor <= 0) { A.vest = false; A.helmet = false; }
+}
+function giveArmor(u, helmet) { const A = armorOf(u); A.vest = true; if (helmet) A.helmet = true; A.armor = 100; }
+// 子彈打到人：算傷害（含護甲），並扣護甲耐久
+function hitDamage(w, part, dist, u) {
+  const A = armorOf(u), vest = u === player ? INV.vest : A.vest !== false, helm = u === player ? INV.helmet : A.helmet !== false;
+  const raw = weaponDamage(w, part, dist, false, false), d = weaponDamage(w, part, dist, vest, helm);
+  if (d < raw) wearArmor(u, raw - d);
+  return d;
+}
 
 // ---------- 你的裝備：主武器、手槍、投擲物、防彈衣、頭盔、拆彈器、炸彈 ----------
-const INV = { primary: null, secondary: null, cur: 'secondary', last: 'primary', he: 0, flash: 0, smoke: 0, nade: 'he', vest: false, helmet: false, kit: false, bomb: false };
+const INV = { primary: null, secondary: null, cur: 'secondary', last: 'primary', he: 0, flash: 0, smoke: 0, molotov: 0, nade: 'he', vest: false, helmet: false, armor: 0, kit: false, bomb: false };
 function newItem(def) { return { def, ammo: def.mag, reserve: def.reserve }; }
 function stashCur() { const it = INV.cur !== 'nade' && INV[INV.cur]; if (it) { it.ammo = W.ammo; it.reserve = W.reserve; } }
 function equip(slot, quiet) {
@@ -80,8 +108,8 @@ function bestSlot() { return INV.primary ? 'primary' : 'secondary'; }
 // 陣亡或換邊：只剩一把手槍
 function resetLoadout(keep) {
   if (!keep) {
-    INV.primary = null; INV.secondary = newItem(WEAPONS.pistol); INV.he = INV.flash = INV.smoke = 0;
-    INV.vest = INV.helmet = INV.kit = false;
+    INV.primary = null; INV.secondary = newItem(WEAPONS.pistol); INV.he = INV.flash = INV.smoke = INV.molotov = 0;
+    INV.vest = INV.helmet = INV.kit = false; INV.armor = 0;
   } else {
     // 活下來：保留裝備，彈藥補滿（CS 的彈藥不補，這裡為了手機上好玩，回合開始補滿）
     for (const k of ['primary', 'secondary']) { const it = INV[k]; if (it) { it.ammo = it.def.mag; it.reserve = it.def.reserve; } }
@@ -117,7 +145,7 @@ function resetWeapon(keep) {
   if (game.mode !== 'match') {
     if (!INV.secondary) INV.secondary = newItem(WEAPONS.pistol);
     if (!INV.primary) INV.primary = newItem(WEAPONS.rifle);
-    resetLoadout(true); INV.vest = INV.helmet = true;
+    resetLoadout(true); giveArmor(player, true);
   } else resetLoadout(keep);
   W.deployT = 0.6;
 }
@@ -217,7 +245,7 @@ function shoot() {
     _hit.copy(_o).addScaledVector(_d, res.t);
     if (res.bot) {
       anyHit = true;
-      const dmg = weaponDamage(WP, res.part, res.t, res.bot.vest !== false, res.bot.helmet !== false);
+      const dmg = hitDamage(WP, res.part, res.t, res.bot);
       const e = _pel.get(res.bot) || { dmg: 0, part: 'legs', dir: _d.clone() }; e.dmg += dmg;
       if (res.part === 'head' || (res.part === 'body' && e.part === 'legs')) e.part = res.part;
       _pel.set(res.bot, e);
@@ -294,7 +322,7 @@ const VM_POS = {
   sniper: [new V3(0.2, -0.21, -0.46), new V3(0, -0.11, -0.2)], pistol: [new V3(0.12, -0.13, -0.5), new V3(0, -0.085, -0.44)],
   he: [new V3(0.17, -0.13, -0.44), new V3(0.17, -0.13, -0.44)],
 };
-VM_POS.flash = VM_POS.smoke = VM_POS.he;
+VM_POS.flash = VM_POS.smoke = VM_POS.molotov = VM_POS.he; VM_POS.carbine = VM_POS.rifle; VM_POS.deagle = VM_POS.pistol;
 function viewmodelLand(v) { VM.landV -= Math.min(0.5, v * 0.04); }
 function updateViewmodel(dt, lookDX, lookDY) {
   const sp = playerSpeed(), moving = player.body.onGround ? Math.min(1, sp / RUN_SPEED) : 0;

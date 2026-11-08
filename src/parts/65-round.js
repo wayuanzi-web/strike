@@ -18,7 +18,7 @@ function teamHp(team) {
   return h;
 }
 const matchUnits = () => [player].concat(bots.filter((b) => b.active));
-function resetBotGear(b) { b.primary = null; b.vest = b.helmet = b.kit = false; b.nades = { he: 0, flash: 0, smoke: 0 }; }
+function resetBotGear(b) { b.primary = null; b.secondary = null; b.vest = b.helmet = b.kit = false; b.armor = 0; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; }
 function startMatch() {
   game.mode = 'match'; setupBots('match');
   ROUND.score = { A: 0, B: 0 }; ROUND.num = 0; ROUND.over = false; ROUND.history = []; ROUND.atk = 'A'; ROUND.loss = { A: 0, B: 0 }; ROUND.swapped = false; ROUND.log = [];
@@ -71,6 +71,7 @@ function startRound() {
 }
 // 有人陣亡：掉炸彈、檢查勝負（炸彈裝好之後，攻方全滅也要等守方拆掉才算贏）
 function onUnitDied(u) {
+  if (game.mode !== 'tutorial') dropGunsOf(u);
   if (game.mode !== 'match') return;
   dropBomb(u);
   if (ROUND.phase !== 'live') return;

@@ -22,7 +22,7 @@ function tutSpot(minD, maxD, needLos) {
 }
 function tutDummy(at) {
   const b = bots.find((x) => x.team === 'B' && !x.alive) || bots[0];
-  b.active = true; botSpawn(b, at.x, at.z, player.body.pos.x, player.body.pos.z); b.dummy = true; b.vest = b.helmet = false;
+  b.active = true; botSpawn(b, at.x, at.z, player.body.pos.x, player.body.pos.z); b.dummy = true; b.vest = b.helmet = false; b.armor = 0;
   TUT.dummy = b; return b;
 }
 const TUT_STEPS = [

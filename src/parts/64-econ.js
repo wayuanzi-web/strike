@@ -5,12 +5,13 @@ const ECON = { start: 800, max: 16000, win: 3250, winBomb: 3500, loss: [1400, 19
 // 可以買的東西（armor：防彈衣 650；防彈衣＋頭盔 1000，已有防彈衣只要 350；kit：拆彈器只有守方能買）
 const SHOP = [
   { id: 'smg', cat: '主武器', w: WEAPONS.smg }, { id: 'shotgun', cat: '主武器', w: WEAPONS.shotgun },
-  { id: 'rifle', cat: '主武器', w: WEAPONS.rifle }, { id: 'sniper', cat: '主武器', w: WEAPONS.sniper },
+  { id: 'rifle', cat: '主武器', w: WEAPONS.rifle }, { id: 'carbine', cat: '主武器', w: WEAPONS.carbine }, { id: 'sniper', cat: '主武器', w: WEAPONS.sniper },
+  { id: 'deagle', cat: '手槍', w: WEAPONS.deagle },
   { id: 'vest', cat: '裝備', name: '防彈衣', price: 650 }, { id: 'helm', cat: '裝備', name: '防彈衣＋頭盔', price: 1000 },
   { id: 'kit', cat: '裝備', name: '拆彈器', price: 400, def: true },
-  { id: 'he', cat: '投擲物', n: NADES.he }, { id: 'flash', cat: '投擲物', n: NADES.flash }, { id: 'smoke', cat: '投擲物', n: NADES.smoke },
+  { id: 'he', cat: '投擲物', n: NADES.he }, { id: 'flash', cat: '投擲物', n: NADES.flash }, { id: 'smoke', cat: '投擲物', n: NADES.smoke }, { id: 'molotov', cat: '投擲物', n: NADES.molotov },
 ];
-const shopPrice = (it, u) => it.w ? it.w.price : it.n ? it.n.price : it.id === 'helm' && (u === player ? INV.vest : u.vest) ? 350 : it.price;
+const shopPrice = (it, u) => it.w ? it.w.price : it.n ? it.n.price : it.id === 'helm' && armorOf(u).vest && armorOf(u).armor >= 100 ? 350 : it.price;
 const freeBuy = () => game.mode !== 'match';
 function addMoney(u, n, why) {
   if (game.mode !== 'match' || !n) return;
@@ -33,10 +34,10 @@ function buyOpen() {
 // 這件買不買得到：回傳空字串＝可以，否則是原因
 function cantBuy(it) {
   if (it.id === 'kit' && (game.mode !== 'match' || ROUND.atk === player.team)) return '只有守方能買';
-  if (it.w && INV.primary && INV.primary.def === it.w) return '已經有了';
+  if (it.w && INV[it.w.slot] && INV[it.w.slot].def === it.w) return '已經有了';
   if (it.n && INV[it.id] >= it.n.max) return '帶滿了';
-  if (it.id === 'vest' && INV.vest) return '已經有了';
-  if (it.id === 'helm' && INV.helmet) return '已經有了';
+  if (it.id === 'vest' && INV.vest && INV.armor >= 100) return '已經有了';
+  if (it.id === 'helm' && INV.helmet && INV.armor >= 100) return '已經有了';
   if (it.id === 'kit' && INV.kit) return '已經有了';
   if (!freeBuy() && (player.money || 0) < shopPrice(it, player)) return '錢不夠';
   return '';
@@ -45,10 +46,10 @@ function buyItem(id) {
   const it = SHOP.find((x) => x.id === id); if (!it || !buyOpen()) return false;
   const why = cantBuy(it); if (why) { hudTip(why, 1); return false; }
   if (!freeBuy()) player.money -= shopPrice(it, player);
-  if (it.w) giveWeapon(it.w, true);
+  if (it.w) { const old = INV[it.w.slot]; if (old && old.def !== WEAPONS.pistol && game.mode === 'match') { stashCur(); const p = player.body.pos; spawnDrop(old.def, old.ammo, old.reserve, p.x, p.y, p.z); } giveWeapon(it.w, true); }
   else if (it.n) { INV[it.id]++; }
-  else if (it.id === 'vest') INV.vest = true;
-  else if (it.id === 'helm') { INV.vest = true; INV.helmet = true; }
+  else if (it.id === 'vest') giveArmor(player, false);
+  else if (it.id === 'helm') giveArmor(player, true);
   else if (it.id === 'kit') INV.kit = true;
   sfx('cash'); renderBuy();
   return true;
@@ -84,7 +85,7 @@ function buildBuyMenu() {
     const b = document.createElement('button'); b.className = 'bi'; b.dataset.buy = it.id;
     const nm = it.w ? it.w.name : it.n ? it.n.name : it.name;
     const info = it.w ? `傷害 ${it.w.pellets ? it.w.dmg + '×' + it.w.pellets : it.w.dmg}・${it.w.semi || it.w.scope || it.w.pellets ? '單發' : '連發'}・殺敵 +$${it.w.reward}` :
-      it.id === 'he' ? '範圍傷害' : it.id === 'flash' ? '讓人暫時看不見' : it.id === 'smoke' ? '擋住視線 17 秒' : it.id === 'vest' ? '身體受傷打折' : it.id === 'helm' ? '頭也有保護' : '拆彈 10→5 秒';
+      it.id === 'he' ? '範圍傷害' : it.id === 'flash' ? '讓人暫時看不見' : it.id === 'smoke' ? '擋住視線 17 秒' : it.id === 'molotov' ? '燒一片地 7 秒、擋路' : it.id === 'vest' ? '身體受傷打折' : it.id === 'helm' ? '頭也有保護' : '拆彈 10→5 秒';
     b.innerHTML = `<small>${it.cat}</small><b>${nm}</b><span>${info}</span><em></em>`;
     onTap(b, () => buyItem(it.id));
     g.appendChild(b);

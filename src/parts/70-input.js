@@ -129,7 +129,7 @@ function tapBtn(id, fn, drag = false, upFn = null) {
   const el = $(id); let pid = null, px = 0, py = 0;
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation(); audioInit(); fn(el);
-    if ((drag || upFn) && e.pointerType !== 'mouse') { pid = e.pointerId; px = e.clientX; py = e.clientY; try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ } }
+    if ((drag && e.pointerType !== 'mouse') || upFn) { pid = e.pointerId; px = e.clientX; py = e.clientY; try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ } }
   });
   if (drag || upFn) {
     el.addEventListener('pointermove', (e) => { if (e.pointerId !== pid || !drag) return; lookBy(e.clientX - px, e.clientY - py); px = e.clientX; py = e.clientY; });
@@ -144,7 +144,14 @@ const HOLD = { ads: false, crouch: false };
 function releaseHolds() { if (HOLD.crouch) { HOLD.crouch = false; INPUT.crouch = false; } if (HOLD.ads) { HOLD.ads = false; player.ads = false; INPUT.adsQueued = false; } }
 tapBtn('bCrouch', () => { if (S.crouchMode === 'hold') { INPUT.crouch = true; HOLD.crouch = true; } else INPUT.crouch = !INPUT.crouch; }, true,
   () => { if (S.crouchMode === 'hold' && HOLD.crouch) { HOLD.crouch = false; INPUT.crouch = false; } });
-tapBtn('bSwap', (el) => { swapWeapon(); el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 150); });
+// 換槍鍵：點一下換槍；按住半秒丟掉手上的槍（拿著炸彈又只有手槍時：丟炸彈）
+(function () {
+  let tm = null, longDone = false;
+  tapBtn('bSwap', (el) => {
+    el.classList.add('down'); longDone = false; clearTimeout(tm);
+    tm = setTimeout(() => { longDone = true; el.classList.remove('down'); buzz(20); if (!playerDropGun() && INV.bomb) playerDropBomb(); }, 550);
+  }, false, (el) => { clearTimeout(tm); el.classList.remove('down'); if (!longDone) swapWeapon(); });
+})();
 tapBtn('bNade', () => cycleNade());
 // 裝彈／拆彈：按住
 (function () {
@@ -184,6 +191,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Digit1') equip('primary'); if (e.code === 'Digit2') equip('secondary');
   if (e.code === 'KeyQ') swapWeapon(); if (e.code === 'KeyG' || e.code === 'Digit3' || e.code === 'Digit4') cycleNade();
   if (e.code === 'KeyE') INPUT.use = true;
+  if (e.code === 'KeyF') { if (!playerDropGun() && INV.bomb) playerDropBomb(); }
+  if (e.code === 'KeyX') playerDropBomb();
   if (e.code === 'KeyZ') { if ($('radio').hidden) openRadio(); else closeRadio(); }
   const ord = { Digit5: 'follow', Digit6: 'A', Digit7: 'B', Digit8: 'hold', Digit9: 'free' }[e.code]; if (ord) giveOrder(ord);
   if (e.code === 'KeyB') { if ($('buy').hidden) { openBuy(); if (!$('buy').hidden && pointerLocked()) document.exitPointerLock(); } else closeBuy(); }

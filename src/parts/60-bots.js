@@ -26,7 +26,9 @@ const BOT_GUNS = (function () {
   out.sniper = mk([partBox(0.06, 0.09, 0.5, 0.16, 1.37, -0.4, G), partBox(0.03, 0.03, 0.42, 0.16, 1.39, -0.86, G), partBox(0.055, 0.055, 0.26, 0.16, 1.46, -0.38, '#2c3036'), partBox(0.06, 0.1, 0.24, 0.16, 1.35, -0.06, '#4a4436')], -1.08);
   out.shotgun = mk([partBox(0.06, 0.09, 0.3, 0.16, 1.37, -0.32, G), partBox(0.045, 0.045, 0.42, 0.16, 1.4, -0.68, G), partBox(0.035, 0.035, 0.32, 0.16, 1.355, -0.62, W), partBox(0.05, 0.08, 0.22, 0.16, 1.35, -0.08, W)], -0.9);
   out.pistol = mk([partBox(0.04, 0.06, 0.18, 0.06, 1.37, -0.5, G), partBox(0.035, 0.1, 0.045, 0.06, 1.3, -0.44, G, 0.2)], -0.6);
-  out.pistol.muzzle.x = 0.06;
+  out.carbine = mk([partBox(0.055, 0.085, 0.38, 0.16, 1.37, -0.36, G), partBox(0.032, 0.032, 0.22, 0.16, 1.39, -0.64, G), partBox(0.04, 0.14, 0.05, 0.16, 1.27, -0.38, G, 0.15), partBox(0.045, 0.07, 0.2, 0.16, 1.36, -0.07, '#2a2e33'), partBox(0.03, 0.04, 0.1, 0.16, 1.44, -0.34, '#2c3036')], -0.76);
+  out.deagle = mk([partBox(0.05, 0.075, 0.24, 0.06, 1.37, -0.52, '#5c6066'), partBox(0.042, 0.11, 0.05, 0.06, 1.29, -0.44, G, 0.2)], -0.65);
+  out.pistol.muzzle.x = out.deagle.muzzle.x = 0.06;
   return out;
 })();
 const BC0 = { skin: '#c08f6a', glove: '#2b2b2b', boot: '#2a2622', gun: '#1f2226', goggle: '#16191d', belt: '#2f2b25' };
@@ -84,7 +86,7 @@ function makeBot(name, team) {
     stuckT: 0, lastP: new V3(), deadT: 0, respawnT: 0, boxes: newBoxes(), walk: 0, searchT: 0, spottedT: 0,
   };
   b.body = b.phys;   // 物理身體：玩家程式用 bot.body，機器人程式用 bot.phys，是同一個
-  b.gunM = mdl.gunM; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0 }; b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.kit = false;
+  b.gunM = mdl.gunM; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.kit = false;
   b.wpn = WEAPONS.rifle; b.mag = 30; b.reloadT = 0; b.blindT = 0; b.useT = 0;
   if (team === 'A') { b.tag = nameTag(name); b.g.add(b.tag); }
   b.g.visible = false;
@@ -97,6 +99,7 @@ function botSpawn(b, sx, sz, faceX = 0, faceZ = 0) {
   b.deadT = 0; b.crouch = false; b.burst = 0; b.pauseT = 0; b.react = 0; b.coverUsed = 0; b.flinchT = 0; b.tagT = 0; b.holdT = 0;
   b.blindT = 0; b.useT = 0; b.goalTag = null; b.holdObj = false; b.guard = null; b.objT = 0; b.reloadT = 0; b.mag = b.wpn.mag; b.nadeTry = 0; b.smoked = b.flashed = false;
   b.yaw = Math.atan2(-(faceX - sx), -(faceZ - sz)) + rand(-0.3, 0.3);
+  if (game.mode !== 'match' && !b.dummy) { b.vest = b.helmet = true; b.armor = 100; }   // 對戰以外每次重生都是滿護甲
   b.g.visible = true; b.g.rotation.set(0, b.yaw, 0); b.g.position.copy(p);
   b.bodyGroup.scale.set(1, 1, 1); b.bodyGroup.rotation.set(0, 0, 0); b.ck = 0; b.upper.position.y = 0;
   b.lastP.copy(p); b.stuckT = 0;
@@ -112,14 +115,14 @@ function setupBots(mode) {
   for (const b of bots) {
     b.active = mode === 'match' ? true : mode === 'tutorial' ? false : (b.team === 'B' && b.i < 4); b.dummy = false;
     b.kills = b.deaths = b.heads = 0;
-    if (mode !== 'match') { b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.nades = { he: 0, flash: 0, smoke: 0 }; botArm(b); }
+    if (mode !== 'match') { b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b); }
     if (!b.active) { b.alive = false; b.g.visible = false; }
   }
 }
 const activeBots = () => bots.filter((b) => b.active);
 // 拿槍：有主武器拿主武器，沒有拿手槍；彈匣裝滿
 function botArm(b) {
-  b.wpn = b.primary || WEAPONS.pistol; b.mag = b.wpn.mag; b.reloadT = 0;
+  b.wpn = b.primary || b.secondary || WEAPONS.pistol; b.mag = b.wpn.mag; b.reloadT = 0;
   const g = BOT_GUNS[b.wpn.id] || BOT_GUNS.rifle; b.gunM.geometry = g.geo; b.fl.position.copy(g.muzzle);
 }
 
@@ -217,6 +220,13 @@ function followPath(b, speed, out) {
   out.set(0, 0, 0);
   if (!b.path || b.pi >= b.path.length) return false;
   const tgt = b.path[b.pi], p = b.phys.pos;
+  // 燃燒彈：站在火裡就往外跑；下一個路點在火裡就停下來等（火擋路）
+  if (FIRES.length) {
+    const f = fireAt(p.x, p.z, p.y, 0.4);
+    if (f) { const ax = p.x - f.x, az = p.z - f.z, ad = Math.hypot(ax, az) || 1; out.set(ax / ad * speed, 0, az / ad * speed); return true; }
+    const ax = tgt[0] - p.x, az = tgt[1] - p.z, ad = Math.hypot(ax, az) || 1, k = Math.min(ad, 1.6) / ad;   // 往前看 1.6 公尺
+    if (fireAt(p.x + ax * k, p.z + az * k, p.y, 0.5) || (ad < 3 && fireAt(tgt[0], tgt[1], tgt[2] || 0, 0.5))) { b.fireWait = game.t; return true; }
+  }
   const dx = tgt[0] - p.x, dz = tgt[1] - p.z, d = Math.hypot(dx, dz);
   if (d < 0.5) { b.pi++; return b.pi < b.path.length; }
   out.set(dx / d * speed, 0, dz / d * speed);
@@ -571,8 +581,7 @@ function botShoot(b, tg, dist, D) {
     const end = _end.copy(_be).addScaledVector(_bd, t);
     if (k < 2) spawnTracer(mz, end, b.team === 'B' ? '#ff9a6a' : '#9fe6ff', 0.018, hitU === player);
     if (hitU) {
-      const vest = hitU === player ? INV.vest : hitU.vest !== false, helm = hitU === player ? INV.helmet : hitU.helmet !== false;
-      let dmg = weaponDamage(w, hitPart, t, vest, helm);
+      let dmg = hitDamage(w, hitPart, t, hitU);
       if (hitU === player) { if (hitPart === 'head') dmg *= D.headMul / 4; dmg *= D.dmg * 0.9; }
       const e = hits.get(hitU) || { dmg: 0, part: 'legs' }; e.dmg += dmg;
       if (hitPart === 'head' || (hitPart === 'body' && e.part === 'legs')) e.part = hitPart;

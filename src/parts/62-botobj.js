@@ -157,6 +157,7 @@ function orderGoal(b) {
 function objectiveGoal(b) {
   const atk = b.team === ROUND.atk, P = ROUND.plan || { site: 'A', exec: true }, defSp = TEAM_SPAWN.def[0];
   const og = orderGoal(b); if (og) return og;
+  if (!isCarrier(b) && BOMB.state !== 'planted') { const dg = dropGoalFor(b); if (dg) return dg; }   // 沒槍：先去撿地上的
   if (BOMB.state === 'planted') {
     if (atk) {
       if (!b.guard || b.guardFor !== ROUND.num) { b.guard = guardSpot(b); b.guardFor = ROUND.num; }
@@ -247,13 +248,21 @@ function botMoveNades(b) {
   if (b.nades.flash > 0 && (!b.flashed || hasTrait(b, 'support')) && dc > 9 && dc < 18 && game.t - (b.thrownAt || -9) > 2) {
     if (botThrow(b, 'flash', S.cx, 2, S.cz)) { b.flashed = true; return; }
   }
+  // 燃燒彈：燒守方愛躲的角落，逼他出來
+  if (b.nades.molotov > 0 && dc > 8 && dc < 20 && S.holds && S.holds.length) {
+    const h = S.holds[(b.i || 0) % S.holds.length];
+    if (botThrow(b, 'molotov', h[0], 0, h[1])) return;
+  }
 }
 // 守點時：看到攻方在附近衝過來（隊友呼叫），有手榴彈就丟過去
 function botHoldNades(b) {
-  if (b.team === ROUND.atk || !b.nades.he || game.t - (b.thrownAt || -9) < 5) return;
+  if (b.team === ROUND.atk || !(b.nades.he || b.nades.molotov) || game.t - (b.thrownAt || -9) < 5) return;
   const intel = TEAM_INTEL[b.team]; if (game.t - intel.t > 1.5) return;
   const d = Math.hypot(intel.pos.x - b.phys.pos.x, intel.pos.z - b.phys.pos.z);
-  if (d > 8 && d < 24 && Math.random() < (hasTrait(b, 'support') ? 0.8 : 0.5)) botThrow(b, 'he', intel.pos.x, 0, intel.pos.z);
+  if (!(d > 8 && d < 24) || Math.random() > (hasTrait(b, 'support') ? 0.8 : 0.5)) return;
+  // 燃燒彈擋攻方的路，沒有就丟手榴彈
+  if (b.nades.molotov > 0 && botThrow(b, 'molotov', intel.pos.x, 0, intel.pos.z)) return;
+  if (b.nades.he > 0) botThrow(b, 'he', intel.pos.x, 0, intel.pos.z);
 }
 
 // ---------- 全隊經濟：這回合全買／強起／半起／存錢 ----------
@@ -278,11 +287,13 @@ function botBuy(b, mode) {
     if (all && m() >= 200 && b.nades.flash < 2) { pay(200); b.nades.flash++; }
     if (m() >= 300 && !b.nades.he && (all || Math.random() < 0.6)) { pay(300); b.nades.he = 1; }
   };
-  const armor = () => { if (!b.helmet && m() >= 1000) { pay(b.vest ? 350 : 1000); b.vest = b.helmet = true; } else if (!b.vest && m() >= 650) { pay(650); b.vest = true; } };
+  const worn = () => b.vest && (b.armor ?? 100) < 60;   // 護甲被打爛了：重買
+  const armor = () => { if ((!b.helmet || worn()) && m() >= 1000) { pay(b.vest && !worn() ? 350 : 1000); giveArmor(b, true); } else if ((!b.vest || worn()) && m() >= 650) { pay(650); giveArmor(b, false); } };
   b.ecoMode = mode;
   if (mode === 'pistol') {
     if (hasTrait(b, 'support')) nades(true);
-    else if (Math.random() < 0.5 && m() >= 650) { pay(650); b.vest = true; }
+    else if (Math.random() < 0.5 && m() >= 650) { pay(650); giveArmor(b, false); }
+    else if (Math.random() < 0.45 && m() >= 700) { pay(700); b.secondary = WEAPONS.deagle; }
     else { if (m() >= 200) { pay(200); b.nades.flash++; } if (m() >= 300 && Math.random() < 0.5) { pay(300); b.nades.he++; } }
     return;
   }
@@ -290,12 +301,16 @@ function botBuy(b, mode) {
   if (!b.primary) {
     const sniperOk = !bots.some((o) => o !== b && o.active && o.team === b.team && o.primary === WEAPONS.sniper);
     if (mode === 'full' && sniperOk && m() >= 5750 && (hasTrait(b, 'sniper') || (m() >= 7000 && Math.random() < 0.15))) { pay(4750); b.primary = WEAPONS.sniper; }
-    else if (mode === 'full' && m() >= 2900) { pay(2900); b.primary = WEAPONS.rifle; }
-    else if (mode === 'force' && m() >= 2900 + 650) { pay(2900); b.primary = WEAPONS.rifle; }
+    else if ((mode === 'full' && m() >= 2900) || (mode === 'force' && m() >= 2900 + 650)) {
+      // 守方六成拿卡賓槍（便宜一點、比較準），攻方拿步槍
+      const w = role === 'def' && Math.random() < 0.6 ? WEAPONS.carbine : WEAPONS.rifle; pay(w.price); b.primary = w;
+    }
     else if (m() >= 1250) { const w = hasTrait(b, 'entry') || Math.random() < 0.3 ? WEAPONS.shotgun : WEAPONS.smg; if (m() >= w.price) { pay(w.price); b.primary = w; } }
+    else if (mode === 'half' && !b.secondary && m() >= 700 && Math.random() < 0.6) { pay(700); b.secondary = WEAPONS.deagle; }
   }
-  if (hasTrait(b, 'support') && mode === 'full') { armor(); nades(true); }
+  if (hasTrait(b, 'support') && mode === 'full') { armor(); nades(true); if (m() >= 500 && !b.nades.molotov) { pay(500); b.nades.molotov = 1; } }
   else { armor(); if (mode !== 'half') nades(false); else if (m() >= 200) { pay(200); b.nades.flash++; } }
+  if (mode === 'full' && !b.nades.molotov && m() >= 1500 && Math.random() < (role === 'def' ? 0.5 : 0.3)) { pay(500); b.nades.molotov = 1; }
   if (role === 'def' && !b.kit && m() >= 400 && (mode === 'full' || Math.random() < 0.3)) { pay(400); b.kit = true; }
 }
 

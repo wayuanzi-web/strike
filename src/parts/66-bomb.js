@@ -74,7 +74,7 @@ function explodeBomb() {
   for (const u of units) {
     if (!u.alive) continue;
     const d = Math.hypot(u.body.pos.x - p.x, u.body.pos.z - p.z, (u.body.pos.y - p.y) * 0.5);
-    let dmg = 420 * Math.exp(-(d / 8.5) * (d / 8.5)); if (u === player ? INV.vest : u.vest) dmg *= 0.75;
+    let dmg = 420 * Math.exp(-(d / 8.5) * (d / 8.5)); if (u === player ? INV.vest : u.vest) { wearArmor(u, dmg * 0.25); dmg *= 0.75; }
     if (dmg < 2) continue;
     if (u === player) damagePlayer(dmg, BOMB.planter || bots[0], 'body', { short: '炸彈', reward: 0 });
     else damageBot(u, dmg, 'body', _v3.set(0, 1, 0).clone(), BOMB.planter && BOMB.planter !== u ? BOMB.planter : u, { short: '炸彈', reward: 0 }, true);
@@ -104,15 +104,17 @@ function updateBomb(dt) {
 function useAction() {
   const p = player.body.pos;
   if (game.mode === 'tutorial') return player.alive && INV.bomb && isCarrier(player) && player.body.onGround && siteAt(p.x, p.y, p.z) ? 'plant' : '';
-  if (game.mode !== 'match' || !player.alive || ROUND.phase !== 'live') return '';
-  if (INV.bomb && isCarrier(player) && player.body.onGround && siteAt(p.x, p.y, p.z)) return 'plant';
-  if (BOMB.state === 'planted' && player.team !== ROUND.atk && Math.hypot(p.x - BOMB.pos.x, p.z - BOMB.pos.z) < 1.7 && Math.abs(p.y - BOMB.pos.y) < 1.4) return 'defuse';
-  return '';
+  if (game.mode === 'match' && player.alive && ROUND.phase === 'live') {
+    if (INV.bomb && isCarrier(player) && player.body.onGround && siteAt(p.x, p.y, p.z)) return 'plant';
+    if (BOMB.state === 'planted' && player.team !== ROUND.atk && Math.hypot(p.x - BOMB.pos.x, p.z - BOMB.pos.z) < 1.7 && Math.abs(p.y - BOMB.pos.y) < 1.4) return 'defuse';
+  }
+  return pickableDrop() ? 'pickup' : '';
 }
 function plantBusy() { return !!(INPUT.use && player.useT > 0); }
 function updatePlayerUse(dt) {
   const act = useAction();
   if (!act || !INPUT.use) { if (player.useT > 0 && act !== player.useKind) player.useT = 0; if (!INPUT.use) player.useT = 0; player.useKind = act; return; }
+  if (act === 'pickup') { const d = pickableDrop(); if (d) takeDrop(player, d); INPUT.use = false; player.useT = 0; return; }
   if (player.useKind !== act) { player.useT = 0; player.useKind = act; }
   if (player.useT === 0) { sfx('plant'); player.ads = false; }
   player.useT += dt;
@@ -124,7 +126,7 @@ function updatePlayerUse(dt) {
   }
 }
 function useProgress() {
-  const act = useAction(); if (!act || !(player.useT > 0)) return 0;
+  const act = useAction(); if (!act || act === 'pickup' || !(player.useT > 0)) return 0;
   return player.useT / (act === 'plant' ? PLANT_TIME : INV.kit ? DEFUSE_KIT : DEFUSE_TIME);
 }
 

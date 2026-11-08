@@ -197,11 +197,37 @@ const VMODELS = {};
     VMODELS.pistol = vmAssemble(metal, poly, vmRightArm(0.015, -0.075, 0.015), vmLeftArm(-0.02, -0.08, -0.0),
       [partBox(0.024, 0.09, 0.03, 0, 0, 0, M)], new V3(0.02, -0.1, 0.01), new V3(0, 0.035, -0.21));
   }
-  // 投擲物：右手拿著（三種顏色）
+  // 卡賓槍「嵐」：平頂導軌、短槍管、伸縮管狀槍托、護木比較長
+  {
+    const metal = [
+      partBox(0.058, 0.072, 0.36, 0, 0.018, -0.12, M), partCyl(0.012, 0.3, 0, 0.02, -0.5, M), partCyl(0.018, 0.06, 0, 0.02, -0.68, D, 6),
+      partBox(0.03, 0.012, 0.42, 0, 0.06, -0.16, D), partBox(0.012, 0.05, 0.014, 0, 0.07, -0.46, D), partBox(0.03, 0.026, 0.03, 0, 0.076, 0.0, D),
+      partBox(0.022, 0.022, 0.2, 0, 0.012, 0.16, D), partBox(0.05, 0.09, 0.06, 0, -0.01, 0.28, K), partBox(0.006, 0.006, 0.06, 0, -0.045, 0.0, M),
+      partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.14, '#15171a'),
+    ];
+    for (let k = 0; k < 8; k++) metal.push(partBox(0.034, 0.006, 0.012, 0, 0.068, -0.3 + k * 0.035, D));
+    const poly = [partBox(0.07, 0.072, 0.24, 0, 0.016, -0.36, P2), partProfile([[0.04, -0.02], [0.0, -0.02], [0.035, -0.14], [0.078, -0.14]], 0.045, 0, P)];
+    for (let k = 0; k < 4; k++) poly.push(partBox(0.074, 0.008, 0.012, 0, 0.0, -0.28 - k * 0.045, P));
+    VMODELS.carbine = vmAssemble(metal, poly, vmRightArm(0.012, -0.085, 0.03), vmLeftArm(-0.005, -0.05, -0.38),
+      [partBox(0.03, 0.15, 0.05, 0, -0.03, 0, M)], new V3(0, -0.09, -0.16), new V3(0, 0.02, -0.72));
+  }
+  // 重手槍「雷」：大滑套、三角槍口
+  {
+    const metal = [
+      partBox(0.044, 0.052, 0.26, 0, 0.042, -0.1, M), partBox(0.038, 0.036, 0.21, 0, 0.0, -0.09, D),
+      partBox(0.01, 0.014, 0.012, 0, 0.074, -0.22, D), partBox(0.03, 0.014, 0.014, 0, 0.074, 0.02, D),
+      partBox(0.006, 0.006, 0.055, 0, -0.032, -0.04, M), partCyl(0.011, 0.02, 0, 0.042, -0.235, '#15171a'),
+    ];
+    for (let k = 0; k < 5; k++) metal.push(partBox(0.046, 0.034, 0.004, 0, 0.044, 0.01 - k * 0.011, D));
+    const poly = [partProfile([[0.03, -0.014], [-0.024, -0.014], [0.006, -0.135], [0.058, -0.135]], 0.04, 0, P)];
+    VMODELS.deagle = vmAssemble(metal, poly, vmRightArm(0.015, -0.075, 0.015), vmLeftArm(-0.02, -0.08, -0.0),
+      [partBox(0.028, 0.1, 0.034, 0, 0, 0, M)], new V3(0.022, -0.1, 0.01), new V3(0, 0.042, -0.25));
+  }
+  // 投擲物：右手拿著（四種顏色）
   const nade = (body, band) => vmAssemble([partCyl(0.007, 0.03, 0.03, 0.06, 0.0, '#c8c2b0'), partBox(0.012, 0.05, 0.02, 0.025, 0.035, 0.02, D)],
     [partCyl(0.032, 0.1, 0, 0, 0, body, 10), partCyl(0.0335, 0.018, 0, 0, -0.02, band, 10)], vmRightArm(0.012, -0.075, 0.06), vmLeftArm(-0.04, -0.06, -0.1),
     [partBox(0.001, 0.001, 0.001, 0, 0, 0, M)], new V3(0, 0, 0), new V3(0, 0, -0.05));
-  for (const g of [VMODELS.he = nade('#5d6440', '#2b2d22'), VMODELS.flash = nade('#c9cdd2', '#3b6fb0'), VMODELS.smoke = nade('#77808a', '#d8d8d8')]) g.children[1].rotation.x = Math.PI / 2;
+  for (const g of [VMODELS.he = nade('#5d6440', '#2b2d22'), VMODELS.flash = nade('#c9cdd2', '#3b6fb0'), VMODELS.smoke = nade('#77808a', '#d8d8d8'), VMODELS.molotov = nade('#6b4a26', '#e9dfc8')]) g.children[1].rotation.x = Math.PI / 2;
 })();
 let gun = VMODELS.rifle; gun.visible = true;
 // 走進陰影時手上的槍也跟著變暗（matcap 不受場景燈光影響，用這個近似）

@@ -72,6 +72,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 #hpN { font-size: calc(var(--u) * 6); font-weight: 800; min-width: 2.2ch; font-variant-numeric: tabular-nums; line-height: 1; }
 #hpBar { width: calc(var(--u) * 16); height: calc(var(--u) * 1.2); background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; }
 #hpBar i { display: block; height: 100%; width: 100%; background: var(--bone); transition: width .15s; }
+#ar { display: inline-flex; align-items: center; gap: 3px; margin-left: calc(var(--u) * 2); color: #b9c6d6; font-weight: 800; font-size: calc(var(--u) * 3.6); font-variant-numeric: tabular-nums; }
+#ar svg { width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); fill: currentColor; } #ar.helm { color: #d7e4f2; } #ar[hidden] { display: none; }
 #hp.low #hpN { color: var(--hurt); } #hp.low #hpBar i { background: var(--hurt); }
 #ammo { position: absolute; left: 50%; bottom: calc(var(--sb) + var(--u) * 3); transform: translateX(-50%); font-family: var(--f-num); background: var(--panel);
   padding: calc(var(--u) * .5) calc(var(--u) * 2.4); border-radius: 4px; display: flex; align-items: baseline; gap: calc(var(--u) * 1); }
@@ -297,7 +299,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div id="fps" hidden>-- fps</div>
     <div id="tip" hidden></div>
     <div id="rl" hidden>換彈中<i><b id="rlB"></b></i></div>
-    <div id="hp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><span id="hpN">100</span><span id="hpBar"><i id="hpI"></i></span></div>
+    <div id="hp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><span id="hpN">100</span><span id="hpBar"><i id="hpI"></i></span><span id="ar" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/></svg><b id="arN">100</b></span></div>
     <div id="ammo"><span id="ammoN">30</span><small id="ammoR">/ 90</small><span class="w" id="wName">曙七步槍</span><span id="nadeH"></span></div>
     <div id="money" hidden><b id="moneyN">$ 800</b><span class="chip" id="bombIco" hidden>炸彈</span><span class="chip kit" id="kitIco" hidden>拆彈器</span><span id="cash"></span></div>
     <div id="useBox" hidden><span id="useT">裝彈中</span><i><b id="useB"></b></i></div>

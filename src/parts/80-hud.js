@@ -93,6 +93,8 @@ function hudUpdate(dt) {
   if (tipT > 0) { tipT -= dt; if (tipT < 0.5) $('tip').style.opacity = Math.max(0, tipT * 2); if (tipT <= 0) $('tip').hidden = true; }
   const hp = Math.ceil(player.hp);
   const specOn = !!game.specBot; $('hp').hidden = specOn; $('ammo').hidden = specOn;
+  const ar = INV.vest ? Math.ceil(INV.armor || 0) : 0, arE = $('ar');
+  if (ar !== +arE.dataset.v || arE.classList.contains('helm') !== !!INV.helmet) { arE.dataset.v = ar; arE.hidden = !ar; $('arN').textContent = ar; arE.classList.toggle('helm', !!INV.helmet); }
   if (hp !== lastHp) { lastHp = hp; $('hpN').textContent = hp; $('hpI').style.width = hp + '%'; $('hp').classList.toggle('low', hp < 30); }
   if (W.isNade) { if (lastAmmo !== -2) { lastAmmo = -2; $('ammoN').textContent = INV[INV.nade]; $('ammoR').textContent = ''; $('ammo').classList.remove('low'); } }
   else if (W.ammo * 1000 + W.reserve !== lastAmmo) { lastAmmo = W.ammo * 1000 + W.reserve; $('ammoN').textContent = W.ammo; $('ammoR').textContent = '/ ' + W.reserve; $('ammo').classList.toggle('low', W.ammo <= 6); }
@@ -121,7 +123,7 @@ function hudGear(dt) {
   if (key !== lastGear) { lastGear = key; $('wName').textContent = nm; $('nadeH').textContent = nh; }
   // 裝彈／拆彈：按鈕和進度條
   const act = useAction();
-  const ub = $('bUse'); ub.hidden = !act; if (act) { ub.textContent = act === 'plant' ? '按住裝彈' : '按住拆彈'; ub.classList.toggle('down', !!INPUT.use); }
+  const ub = $('bUse'); ub.hidden = !act; if (act) { ub.textContent = act === 'plant' ? '按住裝彈' : act === 'pickup' ? '撿起' + pickableDrop().def.short : '按住拆彈'; ub.classList.toggle('down', !!INPUT.use); }
   const pr = useProgress(); $('useBox').hidden = !(pr > 0);
   if (pr > 0) { $('useT').textContent = (act === 'plant' ? '裝彈中' : '拆彈中') + '…'; $('useB').style.width = (pr * 100).toFixed(0) + '%'; }
   else if (act && !isTouch && player.alive) { $('useBox').hidden = false; $('useT').textContent = act === 'plant' ? '按住 E 裝彈' : '按住 E 拆彈'; $('useB').style.width = '0%'; }
