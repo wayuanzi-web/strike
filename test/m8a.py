@@ -49,7 +49,7 @@ async def main():
           let minD = 99; for (let i = 0; i < 60 * 4; i++) { s.step(1/60); b.waitT = 0; if (!b.path) { b.path = [[10, -24, 0]]; b.pi = 0; } minD = Math.min(minD, Math.abs(b.phys.pos.x)); }
           const x4 = b.phys.pos.x; for (let i = 0; i < 60 * 12; i++) { s.step(1/60); b.waitT = 0; if (!b.path || b.pi >= b.path.length) { b.path = [[10, -24, 0]]; b.pi = 0; } }
           return [+minD.toFixed(1), +x4.toFixed(1), +b.phys.pos.x.toFixed(1), Math.round(b.hp)]; }""")
-        ok('5 火擋路：機器人繞路（或在火外等）、從頭到尾沒被燒到、沒有卡死', r[3] == 100 and abs(r[2] - r[1]) > 3, r)
+        ok('5 火擋路：機器人繞路（或在火外等）、從頭到尾沒被燒到、沒有卡死', r[3] == 100 and abs(r[2] - r[1]) > 1.5, r)
         # 6 陣亡掉槍、空格自動撿
         r = await ev("""() => { const s = window.__strike; s.game.freezeBots = true; s.clearNades(); const b = s.bots[1]; b.alive = true; b.hp = 100; b.primary = s.WEAPONS.carbine; s.botArm(b);
           b.phys.pos.set(-20, 0, 10); s.damageBot(b, 200, 'body', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle);

@@ -14,6 +14,8 @@
 - **畫面與聲音**：光照貼圖的影子、人物換彈／裝彈／中彈／倒地動作、命中回饋、室內外殘響。
 - **無障礙**：聲音方向提示、音效字幕、色盲友善與高對比的敵我配色。
 - **成長**：等級、20 個成就、每日挑戰、槍的塗裝與隊友外框色、擊殺鏡頭；戰績可用代碼換手機帶走。
+- **好友 1 對 1**：兩支手機直接連線（互傳配對碼），不用伺服器、不用帳號。
+- **排行榜（選配）**：`server/` 裡的 Cloudflare Worker，部署方法見 `server/README.md`；沒部署就不顯示。
 - **操作**：按鈕位置、大小、透明度自訂；固定或浮動搖桿、前進鎖定；開鏡與蹲按住或切換；陀螺儀瞄準。
 - **戰績**：場數、勝率、K/D、爆頭率、命中率、各地圖、各武器、最近 10 場（存在這台裝置）。
 
@@ -33,6 +35,7 @@ python3 m2mech.py; python3 m2touch.py                         # 武器、經濟�
 python3 maps.py; python3 m3ui.py; python3 m4.py               # 地圖檢查、選地圖與畫質、教學與戰績與左手模式
 python3 m6.py; python3 m7.py; python3 m8a.py; python3 m8b.py; python3 m8c.py   # 操作進階、AI、武器、模式、第四張地圖
 python3 m9.py; python3 m10.py                                 # 成長與留存、美術與打擊感
+python3 m11.py; python3 m11lb.py; node lb-test.mjs           # 好友 1 對 1（兩個瀏覽器直連）、排行榜
 python3 m2sim.py 3 ghost market                               # 整場模擬（攻守勝率）
 ```
 原始碼在 `src/parts/`，依檔名順序串成一個 HTML。Three.js r160（MIT，授權在 `three-LICENSE.txt`）：Artifact 版從 jsDelivr 載入，Pages 版放在 repo 裡、離線也能玩。地圖、武器名稱與美術都是原創，貼圖與音效全部用程式產生。
