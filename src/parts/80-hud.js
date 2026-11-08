@@ -78,23 +78,23 @@ function hudUpdate(dt) {
   const fov = camera.fov * DEG, half = window.innerHeight / 2;
   const target = Math.max(5, Math.tan(W.spread * DEG) / Math.tan(fov / 2) * half);
   gapNow = lerp(gapNow, target, 1 - Math.exp(-dt * 18));
-  xh.style.setProperty('--g', gapNow.toFixed(1) + 'px');
+  sty(xh, '--g', gapNow.toFixed(1) + 'px');
   // 準星跟著後座：畫到子彈真正的落點（畫面只轉了 45% 的後座）
   if (S.followRecoil) {
     const k = half / Math.tan(fov / 2);
     const dp = (W.rp * (1 - VIEW_TRACK) - W.vp - player.punchP) * DEG, dy = (W.ry * (1 - VIEW_TRACK) - player.punchY) * DEG;
-    xh.style.transform = `translate(${(-Math.tan(dy) * k).toFixed(1)}px, ${(-Math.tan(dp) * k).toFixed(1)}px)`;
-  } else xh.style.transform = '';
-  xh.classList.toggle('ads', player.adsT > 0.6);
-  xh.classList.toggle('lock', !!AIM.onTarget);
-  xh.hidden = !player.alive;
-  if (hmT > 0) { hmT -= dt; hm.style.opacity = Math.min(1, hmT * 6); } else hm.style.opacity = 0;
-  if (vigT > 0) { vigT -= dt; vig.style.opacity = Math.max(0, vigT); } else vig.style.opacity = player.alive && player.hp < 30 ? 0.35 + Math.sin(performance.now() / 300) * 0.1 : 0;
-  for (const b of [...dirs.children]) { const t = +b.dataset.t - dt; b.dataset.t = t; b.style.opacity = Math.min(1, t); if (t <= 0) b.remove(); }
-  for (const p of [...$('feed').children]) { const t = +p.dataset.t - dt; p.dataset.t = t; if (t < 0.5) p.style.opacity = Math.max(0, t * 2); if (t <= 0) p.remove(); }
+    sty(xh, 'transform', `translate(${(-Math.tan(dy) * k).toFixed(1)}px, ${(-Math.tan(dp) * k).toFixed(1)}px)`);
+  } else sty(xh, 'transform', '');
+  tgl(xh, 'ads', player.adsT > 0.6);
+  tgl(xh, 'lock', AIM.onTarget);
+  hid(xh, !player.alive);
+  if (hmT > 0) { hmT -= dt; sty(hm, 'opacity', String(Math.min(1, hmT * 6))); } else sty(hm, 'opacity', '0');
+  if (vigT > 0) { vigT -= dt; sty(vig, 'opacity', Math.max(0, vigT).toFixed(2)); } else sty(vig, 'opacity', player.alive && player.hp < 30 ? (0.35 + Math.sin(performance.now() / 300) * 0.1).toFixed(2) : '0');
+  if (dirs.childElementCount) for (const b of [...dirs.children]) { const t = +b.dataset.t - dt; b.dataset.t = t; b.style.opacity = Math.min(1, t); if (t <= 0) b.remove(); }
+  const feedE = $('feed'); if (feedE.childElementCount) for (const p of [...feedE.children]) { const t = +p.dataset.t - dt; p.dataset.t = t; if (t < 0.5) p.style.opacity = Math.max(0, t * 2); if (t <= 0) p.remove(); }
   if (tipT > 0) { tipT -= dt; if (tipT < 0.5) $('tip').style.opacity = Math.max(0, tipT * 2); if (tipT <= 0) $('tip').hidden = true; }
   const hp = Math.ceil(player.hp);
-  const specOn = !!game.specBot; $('hp').hidden = specOn; $('ammo').hidden = specOn;
+  const specOn = !!game.specBot; hid($('hp'), specOn); hid($('ammo'), specOn);
   const ar = INV.vest ? Math.ceil(INV.armor || 0) : 0, arE = $('ar');
   if (ar !== +arE.dataset.v || arE.classList.contains('helm') !== !!INV.helmet) { arE.dataset.v = ar; arE.hidden = !ar; $('arN').textContent = ar; arE.classList.toggle('helm', !!INV.helmet); }
   if (hp !== lastHp) { lastHp = hp; $('hpN').textContent = hp; $('hpI').style.width = hp + '%'; $('hp').classList.toggle('low', hp < 30); }
@@ -105,19 +105,19 @@ function hudUpdate(dt) {
   if (player.kills !== lastK) { lastK = player.kills; $('sK').textContent = player.kills; }
   if (player.deaths !== lastD) { lastD = player.deaths; $('sD').textContent = player.deaths; }
   if (player.heads !== lastH) { lastH = player.heads; $('sH').textContent = player.heads; }
-  $('rl').hidden = !(W.reloadT > 0);
+  hid($('rl'), !(W.reloadT > 0));
   if (W.reloadT > 0) $('rlB').style.width = ((1 - W.reloadT / WP.reload) * 100).toFixed(0) + '%';
   hudGear(dt);
-  $('bAds').classList.toggle('on', player.ads);
-  $('bCrouch').classList.toggle('on', player.crouch);
-  $('bAuto').classList.toggle('on', !!S.autoFire);
+  tgl($('bAds'), 'on', player.ads);
+  tgl($('bCrouch'), 'on', player.crouch);
+  tgl($('bAuto'), 'on', S.autoFire);
 }
 // 裝備、金錢、裝彈拆彈、狙擊鏡、閃光、煙
 let lastGear = '';
 function hudGear(dt) {
   const m = game.mode === 'match';
-  $('money').hidden = !m || !!game.specBot;
-  if (m) { $('moneyN').textContent = '$ ' + (player.money || 0); $('bombIco').hidden = !INV.bomb || !player.alive; $('kitIco').hidden = !INV.kit || !player.alive; }
+  hid($('money'), !m || !!game.specBot);
+  if (m) { const mt = '$ ' + (player.money || 0); if (hv($('moneyN'), 't', mt)) $('moneyN').textContent = mt; hid($('bombIco'), !INV.bomb || !player.alive); hid($('kitIco'), !INV.kit || !player.alive); }
   if (cashT > 0) { cashT -= dt; if (cashT < 0.5) $('cash').style.opacity = Math.max(0, cashT * 2); }
   const nm = W.isNade ? NADES[INV.nade].name : WP.name;
   const nh = NADE_ORDER.filter((k) => INV[k] > 0).map((k) => NADES[k].short[0] + INV[k]).join(' ');
@@ -125,16 +125,17 @@ function hudGear(dt) {
   if (key !== lastGear) { lastGear = key; $('wName').textContent = nm; $('nadeH').textContent = nh; }
   // 裝彈／拆彈：按鈕和進度條
   const act = useAction();
-  const ub = $('bUse'); ub.hidden = !act; if (act) { ub.textContent = act === 'plant' ? '按住裝彈' : act === 'pickup' ? '撿起' + pickableDrop().def.short : '按住拆彈'; ub.classList.toggle('down', !!INPUT.use); }
-  const pr = useProgress(); $('useBox').hidden = !(pr > 0);
+  const ub = $('bUse'); hid(ub, !act); if (act) { const ut = act === 'plant' ? '按住裝彈' : act === 'pickup' ? '撿起' + pickableDrop().def.short : '按住拆彈'; if (hv(ub, 't', ut)) ub.textContent = ut; tgl(ub, 'down', INPUT.use); }
+  const pr = useProgress(); let ubox = pr > 0;
   if (pr > 0) { $('useT').textContent = (act === 'plant' ? '裝彈中' : '拆彈中') + '…'; $('useB').style.width = (pr * 100).toFixed(0) + '%'; }
-  else if (act && !isTouch && player.alive) { $('useBox').hidden = false; $('useT').textContent = act === 'plant' ? '按住 E 裝彈' : '按住 E 拆彈'; $('useB').style.width = '0%'; }
-  $('bBuy').hidden = !buyOpen() || !$('buy').hidden;
-  $('bRadio').hidden = !(m && player.alive && game.state === 'play') || !$('radio').hidden;
-  $('bNade').classList.toggle('on', W.isNade); $('bNade').style.opacity = NADE_ORDER.some((k) => INV[k] > 0) ? '' : '.4';
-  $('scope').hidden = !(WP.scope && !W.isNade && player.alive && player.adsT > 0.85);
-  const fl = player.flashT > 0 ? clamp(player.flashT / 1.2, 0, 1) : 0; $('flashOv').style.opacity = fl.toFixed(3);
-  $('smokeOv').style.opacity = (smokeAtCamera() * 0.85).toFixed(3);
+  else if (act && !isTouch && player.alive) { ubox = true; $('useT').textContent = act === 'plant' ? '按住 E 裝彈' : '按住 E 拆彈'; $('useB').style.width = '0%'; }
+  hid($('useBox'), !ubox);
+  hid($('bBuy'), !buyOpen() || !$('buy').hidden);
+  hid($('bRadio'), !(m && player.alive && game.state === 'play') || !$('radio').hidden);
+  tgl($('bNade'), 'on', W.isNade); sty($('bNade'), 'opacity', NADE_ORDER.some((k) => INV[k] > 0) ? '' : '.4');
+  hid($('scope'), !(WP.scope && !W.isNade && player.alive && player.adsT > 0.85));
+  const fl = player.flashT > 0 ? clamp(player.flashT / 1.2, 0, 1) : 0; sty($('flashOv'), 'opacity', fl.toFixed(2));
+  sty($('smokeOv'), 'opacity', (smokeAtCamera() * 0.85).toFixed(2));
 }
 function showDead(by, head) {
   $('deadBy').textContent = '被「' + by + '」' + (head ? '爆頭' : '擊倒');

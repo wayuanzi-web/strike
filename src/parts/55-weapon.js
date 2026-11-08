@@ -279,7 +279,7 @@ function traceShot(o, d, range) {
   const w = rayWorld(o, d, range);
   let t = w ? w.t : range, bot = null, part = null;
   for (const b of bots) {
-    if (!b.active || !b.alive || b.team !== 'B') continue;   // 子彈會穿過隊友（不會誤傷）
+    if (!b.active || !b.alive || b.team === player.team) continue;   // 子彈會穿過隊友（不會誤傷）；死鬥每個機器人自己一隊
     const h = rayBody(o, d, b.boxes, t);
     if (h) { t = h.t; bot = b; part = h.part; }
   }

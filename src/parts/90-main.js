@@ -12,7 +12,7 @@ function updateAim(dt) {
   const w = rayWorld(_ae, _ad, WP.range); const wallT = w ? w.t : WP.range;
   let on = false;
   for (const b of bots) {
-    if (!b.active || !b.alive || b.team !== 'B') continue;
+    if (!b.active || !b.alive || b.team === player.team) continue;
     const inf = 0.06 + 0.004 * Math.hypot(b.phys.pos.x - _ae.x, b.phys.pos.z - _ae.z);   // 遠的敵人命中框放大多一點
     const h = rayBody(_ae, _ad, b.boxes, wallT, inf);
     if (h && !(SMOKES.length && smokeBlocks(_ae, _ac.copy(_ae).addScaledVector(_ad, h.t)))) { on = true; AIM.dist = h.t; break; }   // 隔著煙不自動開火
@@ -25,7 +25,7 @@ function updateAim(dt) {
   // 輔助：準星附近（依距離決定的錐形內）而且看得到的最近敵人
   let best = null, ba = 1e9;
   for (const b of bots) {
-    if (!b.active || !b.alive || b.team !== 'B') continue;
+    if (!b.active || !b.alive || b.team === player.team) continue;
     const p = b.phys.pos; _ac.set(p.x, p.y + b.phys.h * 0.55, p.z);   // 磁吸對準胸口，不是頭
     const dx = _ac.x - _ae.x, dy = _ac.y - _ae.y, dz = _ac.z - _ae.z, dist = Math.hypot(dx, dy, dz);
     if (dist > 90) continue;
@@ -92,7 +92,7 @@ function syncMenuHints() {
 function backToMenu() {
   if (game.mode === 'duel' && NET.on) netSend({ t: 'end', win: true });   // 中途離開算對方贏
   clearNades(); resetBomb(); closeBuy(); leaveMode(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints(); syncMenuLevel(); KC.on = false; $('kc').hidden = true;
-  closeRadio(); $('bRadio').hidden = true; $('bBuy').hidden = true;
+  closeRadio(); hid($('bRadio'), true); hid($('bBuy'), true);
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   player.alive = false; $('menu').hidden = false;
@@ -101,7 +101,7 @@ function pauseGame() {
   if (game.state !== 'play') return;
   closeBuy(); closeRadio();
   game.state = 'pause'; resetTouchState();
-  syncSettingsUI(); $('pause').hidden = false;
+  syncSettingsUI(); $('pause').hidden = false; $('bRespawn').hidden = game.mode === 'duel';   // 好友對戰不能自己重來
   if (pointerLocked()) document.exitPointerLock();
 }
 function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; game.state = player.alive ? 'play' : 'dead'; if (game.state === 'dead') game.state = 'play'; }
@@ -116,10 +116,18 @@ onTap($('bAgain'), () => {
 });
 onTap($('bMenu'), backToMenu);
 $('bBoard').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); $('bBoard').classList.toggle('on'); boardT = 0; });
-onTap($('bSet1'), () => { syncSettingsUI(); $('pause').hidden = false; $('bResume').textContent = '好了'; $('bRespawn').hidden = true; game.fromMenu = true; });
-onTap($('bResume'), () => { if (game.fromMenu) { game.fromMenu = false; $('pause').hidden = true; $('bResume').textContent = '繼續'; $('bRespawn').hidden = false; return; } resumeGame(); });
-onTap($('bRespawn'), () => {
+onTap($('bSet1'), () => { syncSettingsUI(); $('pause').hidden = false; $('bResume').textContent = '好了'; $('bRespawn').hidden = $('bQuit').hidden = true; game.fromMenu = true; });
+onTap($('bResume'), () => { if (game.fromMenu) { game.fromMenu = false; $('pause').hidden = true; $('bResume').textContent = '繼續'; $('bRespawn').hidden = $('bQuit').hidden = false; return; } resumeGame(); });
+// 回選單：對戰、好友對戰中途離開要按兩次確認（會算輸）
+let quitArm = -1e9;
+onTap($('bQuit'), () => {
   if (game.fromMenu) return;
+  const risky = (game.mode === 'match' && ROUND.phase !== 'over') || (game.mode === 'duel' && NET.on);
+  if (risky && performance.now() - quitArm > 3000) { quitArm = performance.now(); $('bQuit').textContent = '再按一次離開'; setTimeout(() => { $('bQuit').textContent = '回選單'; }, 3000); return; }
+  quitArm = -1e9; $('bQuit').textContent = '回選單'; resetTouchState(); backToMenu();
+});
+onTap($('bRespawn'), () => {
+  if (game.fromMenu || game.mode === 'duel') return;
   $('pause').hidden = true; $('dead').hidden = true; resetTouchState(); startGame(game.mode);   // 重來：從頭開始這個模式
 });
 $('bBuy').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); openBuy(); });
@@ -180,7 +188,7 @@ function step(dt) {
     updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
     return;
   }
-  if (game.state === 'pause' || game.state === 'over') return;
+  if ((game.state === 'pause' && game.mode !== 'duel') || game.state === 'over') return;   // 好友對戰暫停時遊戲照跑（不然對方會以為斷線）
   updateRound(dt); updateTutorial(dt); updateMode(dt);
   keyboardMove();
   // 視角：開鏡時乘上開鏡靈敏度與視野比例；瞄準輔助在敵人身上時轉得慢一點
@@ -205,7 +213,7 @@ function step(dt) {
   }
   player.adsT = clamp(player.adsT + (player.ads && player.alive ? 1 : -1) * dt * 7, 0, 1);
   updatePlayer(dt);
-  const auto = !INPUT.fire && S.autoFire && INPUT.mode === 'touch' && AIM.onTarget && $('buy').hidden;
+  const auto = !INPUT.fire && S.autoFire && INPUT.mode === 'touch' && AIM.onTarget && $('buy').hidden && game.mode !== 'range';   // 練槍場量的是你自己的反應，不自動開火
   updateWeapon(dt, (INPUT.fire || auto) && player.alive, auto, AIM.dist || 0);
   if (game.mode === 'match') updatePlan();
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);

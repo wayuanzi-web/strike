@@ -48,7 +48,10 @@ function assignPosts() {
   const def = otherTeam(ROUND.atk);
   const list = bots.filter((b) => b.active && b.team === def).sort(() => Math.random() - 0.5);
   const first = Math.random() < 0.5 ? 'A' : 'B', cnt = { A: 0, B: 0 };
-  list.forEach((b, i) => { const s = i % 2 ? (first === 'A' ? 'B' : 'A') : first; b.post = s; b.holdIdx = cnt[s]++; b.rotN = -1; });
+  // 每回合守點的順序打亂一點：前三個常用守點之外，高處守點（有的話）也有機會排到
+  const order = {}; for (const k of ['A', 'B']) { const n = SITES[k].holds.length, base = [0, 1, 2].filter((i) => i < n), extra = []; for (let i = 3; i < n; i++) if (SITES[k].holds[i][4]) extra.push(i);
+    if (extra.length && Math.random() < 0.5) base.splice(1 + Math.floor(Math.random() * 2), 0, pick(extra)); order[k] = base; }
+  list.forEach((b, i) => { const s = i % 2 ? (first === 'A' ? 'B' : 'A') : first; b.post = s; const o = order[s]; b.holdIdx = o[cnt[s]++ % o.length]; b.rotN = -1; });
   // 攻方：打法、分組、誰佯攻
   const P = ROUND.plan, type = P.type = pickTactic(); ROUND.lastTactic = type;
   P.otherSite = P.site === 'A' ? 'B' : 'A';
@@ -199,7 +202,7 @@ function objectiveGoal(b) {
     if (!hasTrait(b, 'anchor') && Math.random() < 0.85) { b.post = call.site; b.holdIdx = 3 + (b.i % 2); }
   }
   const S = SITES[b.post || 'A'], h = S.holds[(b.holdIdx || 0) % S.holds.length];
-  return { tag: 'post' + (b.post || 'A') + (b.holdIdx || 0), x: h[0], z: h[1], kind: 'hold', yaw: yawTo(h[0], h[1], h[2], h[3]) };
+  return { tag: 'post' + (b.post || 'A') + (b.holdIdx || 0), x: h[0], z: h[1], y: h[4], kind: 'hold', yaw: yawTo(h[0], h[1], h[2], h[3]) };   // h[4]：高處的守點
 }
 // 巡邏狀態在對戰時改成跑目標
 function botObjective(b, dt) {
@@ -298,6 +301,8 @@ function botBuy(b, mode) {
     return;
   }
   if (mode === 'eco') { if (hasTrait(b, 'support') && m() >= 2200) { pay(200); b.nades.flash++; } return; }
+  // 手上是衝鋒槍、霰彈槍，錢夠全買就換成步槍（舊的直接收掉）
+  if (b.primary && (b.primary === WEAPONS.smg || b.primary === WEAPONS.shotgun) && mode === 'full' && m() >= 2900 + 1000) b.primary = null;
   if (!b.primary) {
     const sniperOk = !bots.some((o) => o !== b && o.active && o.team === b.team && o.primary === WEAPONS.sniper);
     if (mode === 'full' && sniperOk && m() >= 5750 && (hasTrait(b, 'sniper') || (m() >= 7000 && Math.random() < 0.15))) { pay(4750); b.primary = WEAPONS.sniper; }

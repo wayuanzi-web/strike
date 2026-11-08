@@ -1,5 +1,12 @@
 /* ===== 10-core：共用工具、設定 ===== */
-const $ = (id) => document.getElementById(id);
+const $$c = new Map();
+const $ = (id) => { let e = $$c.get(id); if (!e || !e.isConnected) { e = document.getElementById(id); if (e) $$c.set(id, e); } return e; };   // 快取：HUD 每格查幾十次
+// HUD 寫入去重：值沒變就不碰 DOM（每次寫 style 都可能觸發重算版面）
+const _hv = new WeakMap();
+function hv(el, k, v) { let m = _hv.get(el); if (!m) _hv.set(el, (m = {})); if (m[k] === v) return false; m[k] = v; return true; }
+function sty(el, k, v) { if (el && hv(el, 's' + k, v)) { if (k[0] === '-') el.style.setProperty(k, v); else el.style[k] = v; } }
+function hid(el, v) { v = !!v; if (el && hv(el, 'h', v)) el.hidden = v; }
+function tgl(el, c, v) { v = !!v; if (el && hv(el, 'c' + c, v)) el.classList.toggle(c, v); }
 const DEG = Math.PI / 180;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -34,9 +41,11 @@ const isTouch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
 // maxShooters 同時開火的機器人上限、settleK 剛發現時手不穩加幾度
 const DIFF = {
   easy:   { react: 0.9,  base: 1.8,  distK: 0.055, dmg: 0.45, burst: [2, 4], pause: [0.5, 0.9],  pMoveK: 3.0, headMul: 2,   warn: 1, turn: 3.5, maxShooters: 1, settleK: 3.0, mercy: true },
-  normal: { react: 0.7,  base: 1.55, distK: 0.045, dmg: 0.52, burst: [3, 4], pause: [0.4, 0.75], pMoveK: 2.8, headMul: 2.5, warn: 1, turn: 4.5, maxShooters: 2, settleK: 2.8, mercy: true },
+  normal: { react: 0.64, base: 1.5,  distK: 0.044, dmg: 0.56, burst: [3, 4], pause: [0.4, 0.75], pMoveK: 2.8, headMul: 2.5, warn: 1, turn: 4.5, maxShooters: 2, settleK: 2.8, mercy: true },
   hard:   { react: 0.42, base: 1.1,  distK: 0.035, dmg: 0.72, burst: [3, 5], pause: [0.3, 0.55], pMoveK: 2.2, headMul: 3,   warn: 0, turn: 6.5, maxShooters: 3, settleK: 2.4, mercy: false },
 };
 // 隊友：普通的準度，不需要手下留情（只會打機器人）
 DIFF.ally = Object.assign({}, DIFF.normal, { mercy: false, warn: 0 });
+DIFF.allyHard = Object.assign({}, DIFF.ally, { react: 0.52, base: 1.25, distK: 0.038, turn: 5.8 });
+DIFF.ally = Object.assign(DIFF.ally, { react: 0.7, base: 1.55, distK: 0.045, dmg: 0.52 });   // 隊友維持原本普通的準度（普通難度調硬後不跟著變）
 // mercy：簡單、普通才有的手下留情（畫面外先打偏、你血少或連死時手抖、血一半以上不會一發死）。困難全部拿掉

@@ -219,11 +219,13 @@ function pickPatrol(b) {
       setPath(b, n.x, n.z); if (b.path && b.path.length) return;
     }
   }
+  // 有高處（二樓、平台）的地圖，四分之一的機會往高處走
+  const ups = NAV.upCount && Math.random() < 0.25 ? NAV.nodes.filter((n) => n.ok && n.up && n.nb.length) : null;
   for (let k = 0; k < 12; k++) {
-    const n = pick(NAV.nodes);
+    const n = ups && ups.length ? pick(ups) : pick(NAV.nodes);
     if (!n.ok || !n.nb.length) continue;
     if (Math.hypot(n.x - b.phys.pos.x, n.z - b.phys.pos.z) < 12) continue;
-    setPath(b, n.x, n.z); if (b.path && b.path.length) return;
+    setPath(b, n.x, n.z, n.y); if (b.path && b.path.length) return;
   }
 }
 function followPath(b, speed, out) {
@@ -339,7 +341,8 @@ function tryFlank(b, tgt) {
   return true;
 }
 // 這隻機器人用的難度：敵人用你選的難度；隊友固定用「普通」但不手下留情
-function botDiff(b) { return b.team === 'B' ? (DIFF[S.difficulty] || DIFF.normal) : DIFF.ally; }
+// 敵人用你選的難度；隊友跟著難度稍微變強（困難時隊友才打得過困難的敵人）
+function botDiff(b) { return b.team !== player.team ? (DIFF[S.difficulty] || DIFF.normal) : S.difficulty === 'hard' ? DIFF.allyHard : DIFF.ally; }
 
 const _wish = new V3();
 function updateBot(b, dt) {
