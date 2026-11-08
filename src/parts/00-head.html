@@ -125,6 +125,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 .brand p { margin: 0; color: var(--mute); font-size: calc(var(--u) * 3.2); letter-spacing: .06em; }
 .brand .tag { font-family: var(--f-num); font-weight: 600; color: var(--dawn); letter-spacing: .2em; font-size: calc(var(--u) * 2.8); text-transform: uppercase; }
 .row { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 2); align-items: center; }
+.row.modes small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.8)); margin-right: calc(var(--u) * 1); }
 .btn { min-height: 44px; padding: calc(var(--u) * 2) calc(var(--u) * 5); border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid var(--line);
   font-size: calc(var(--u) * 3.6); font-weight: 700; letter-spacing: .08em; touch-action: manipulation; }
 .btn.go { background: var(--dawn); color: var(--dawn-ink); border-color: var(--dawn); }
@@ -341,6 +342,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
       <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
+      <div class="row modes"><small>更多模式</small><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button></div>
       <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
       <div class="install" id="installBox" hidden><span id="installT"></span><button class="btn" id="bInstall" hidden>安裝到主畫面</button></div>
       <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>

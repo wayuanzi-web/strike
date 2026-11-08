@@ -3,10 +3,18 @@
 const STATS_KEY = 'strike.stats';
 function emptyStats() {
   return { v: 1, matches: 0, wins: 0, losses: 0, roundsW: 0, roundsL: 0, kills: 0, deaths: 0, heads: 0, shots: 0, hits: 0,
-    plants: 0, defuses: 0, mvp: 0, bestKills: 0, practiceKills: 0, tutorialDone: false, maps: {}, weapons: {}, recent: [] };
+    plants: 0, defuses: 0, mvp: 0, bestKills: 0, practiceKills: 0, tutorialDone: false, maps: {}, weapons: {}, recent: [],
+    modes: { dm: { n: 0, w: 0, best: 0 }, koth: { n: 0, w: 0 }, range: { n: 0, bestMs: 0, bestAcc: 0 } } };
 }
 let STATS = emptyStats();
-try { const raw = localStorage.getItem(STATS_KEY); if (raw) STATS = Object.assign(emptyStats(), JSON.parse(raw)); } catch (e) { /* 讀不到就從零開始 */ }
+try { const raw = localStorage.getItem(STATS_KEY); if (raw) { STATS = Object.assign(emptyStats(), JSON.parse(raw)); STATS.modes = Object.assign(emptyStats().modes, STATS.modes); } } catch (e) { /* 讀不到就從零開始 */ }
+// 死鬥、搶點、練槍場的紀錄（不算進對戰的勝率）
+function statModeEnd(kind, win, r) {
+  const M = STATS.modes[kind]; M.n++; if (win) M.w = (M.w || 0) + 1;
+  if (kind === 'dm') M.best = Math.max(M.best || 0, player.kills);
+  if (r && r.hit >= RANGE.n / 2) { if (!M.bestMs || r.avgMs < M.bestMs) M.bestMs = r.avgMs; M.bestAcc = Math.max(M.bestAcc || 0, r.acc); }
+  saveStats();
+}
 function saveStats() { try { localStorage.setItem(STATS_KEY, JSON.stringify(STATS)); } catch (e) { /* 存不了也照玩 */ } }
 // 這場比賽的暫存（打完才寫進生涯）
 const MSTAT = { kills: 0, deaths: 0, heads: 0, shots0: 0, hits0: 0, plants: 0, defuses: 0, weapons: {} };
@@ -40,7 +48,8 @@ function renderStats() {
   const s = STATS, kd = s.deaths ? (s.kills / s.deaths).toFixed(2) : s.kills ? s.kills.toFixed(2) : '—';
   const DIFF_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
   const big = [['場數', s.matches], ['勝率', pct(s.wins, s.matches)], ['擊殺', s.kills], ['K/D', kd], ['爆頭率', pct(s.heads, s.kills)], ['命中率', pct(s.hits, s.shots)]];
-  const small = [['勝／敗', `${s.wins}／${s.losses}`], ['回合', `${s.roundsW}：${s.roundsL}`], ['陣亡', s.deaths], ['裝彈', s.plants], ['拆彈', s.defuses], ['最有價值', s.mvp], ['單場最多擊殺', s.bestKills], ['練習擊殺', s.practiceKills]];
+  const small = [['勝／敗', `${s.wins}／${s.losses}`], ['回合', `${s.roundsW}：${s.roundsL}`], ['陣亡', s.deaths], ['裝彈', s.plants], ['拆彈', s.defuses], ['最有價值', s.mvp], ['單場最多擊殺', s.bestKills], ['練習擊殺', s.practiceKills],
+    ['死鬥', `${s.modes.dm.n} 場・${s.modes.dm.w} 次第一・最多 ${s.modes.dm.best || 0} 殺`], ['搶點', `${s.modes.koth.n} 場 ${s.modes.koth.w} 勝`], ['練槍場最快平均', s.modes.range.bestMs ? s.modes.range.bestMs + ' 毫秒' : '—'], ['練槍場最高命中率', s.modes.range.bestAcc ? Math.round(s.modes.range.bestAcc * 100) + '%' : '—']];
   const maps = MAP_ORDER.map((id) => { const m = s.maps[id] || { played: 0, won: 0 }; return `<li><b>${MAPS[id].name}</b><span>${m.played} 場・勝率 ${pct(m.won, m.played)}</span></li>`; }).join('');
   const wk = Object.entries(s.weapons).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<li><b>${k}</b><span>${n} 殺</span></li>`).join('') || '<li><span>還沒有</span></li>';
   const rec = s.recent.map((r) => `<tr class="${r.win ? 'w' : 'l'}"><td>${r.t}</td><td>${(MAPS[r.map] || { name: r.map }).name}</td><td>${r.win ? '勝' : '敗'} ${r.a}:${r.b}</td><td>${r.k}／${r.d}／${r.h}</td><td>${DIFF_NAME[r.diff] || ''}</td></tr>`).join('');

@@ -54,7 +54,9 @@ function startGame(mode = 'practice') {
   if (mode === 'tutorial') { clearNades(); resetBomb(); closeBuy(); startTutorial(); return; }
   TUT.on = false; beacon.visible = false; $('tut').hidden = true;
   clearNades(); resetBomb(); closeBuy(); INV.primary = INV.secondary = null; INV.he = INV.flash = INV.smoke = INV.molotov = 0; INV.kit = false;
+  game.lastMode = mode; leaveMode();
   if (mode === 'match') { startMatch(); enterPlay(); openBuy(); return; }
+  if (mode === 'dm' || mode === 'koth' || mode === 'range') { startMode(mode); return; }
   game.mode = 'practice'; setupBots('practice');
   bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   spawnPlayer();
@@ -88,7 +90,7 @@ function syncMenuHints() {
   $('firstHint').hidden = !first; $('bTut').classList.toggle('go', first); $('bMatch').classList.toggle('go', !first);
 }
 function backToMenu() {
-  clearNades(); resetBomb(); closeBuy(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints();
+  clearNades(); resetBomb(); closeBuy(); leaveMode(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints();
   closeRadio(); $('bRadio').hidden = true; $('bBuy').hidden = true;
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
@@ -107,7 +109,7 @@ onTap($('bTut'), () => startGame('tutorial'));
 onTap($('bStats'), openStats);
 onTap($('bPerf'), openPerf);
 onTap($('bMatch'), () => startGame('match'));
-onTap($('bAgain'), () => startGame('match'));
+onTap($('bAgain'), () => startGame(game.lastMode || 'match'));
 onTap($('bMenu'), backToMenu);
 $('bBoard').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); $('bBoard').classList.toggle('on'); boardT = 0; });
 onTap($('bSet1'), () => { syncSettingsUI(); $('pause').hidden = false; $('bResume').textContent = '好了'; $('bRespawn').hidden = true; game.fromMenu = true; });
@@ -175,7 +177,7 @@ function step(dt) {
     return;
   }
   if (game.state === 'pause' || game.state === 'over') return;
-  updateRound(dt); updateTutorial(dt);
+  updateRound(dt); updateTutorial(dt); updateMode(dt);
   keyboardMove();
   // 視角：開鏡時乘上開鏡靈敏度與視野比例；瞄準輔助在敵人身上時轉得慢一點
   if (INPUT.runLock && T.joyId === null && INPUT.mode === 'touch') { INPUT.mx = 0; INPUT.mz = 1; }   // 前進鎖定
@@ -227,7 +229,7 @@ function step(dt) {
     player.respawnT -= dt; player.deadT = (player.deadT || 0) + dt;
     if (game.mode === 'match') { $('deadT').textContent = '這回合不能重生，觀戰隊友中'; if (player.deadT > 2) $('dead').hidden = true; }
     else $('deadT').textContent = Math.max(0, player.respawnT).toFixed(1) + ' 秒後重生';
-    if (player.respawnT <= 0) { $('dead').hidden = true; spawnPlayer(); }
+    if (player.respawnT <= 0) { $('dead').hidden = true; spawnPlayer(modeSpawnFor(player)); }
   }
   hudUpdate(dt);
 }
@@ -254,4 +256,4 @@ requestAnimationFrame(frame);
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
-  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop };
+  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone };

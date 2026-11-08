@@ -71,7 +71,7 @@ function startRound() {
 }
 // 有人陣亡：掉炸彈、檢查勝負（炸彈裝好之後，攻方全滅也要等守方拆掉才算贏）
 function onUnitDied(u) {
-  if (game.mode !== 'tutorial') dropGunsOf(u);
+  if (game.mode !== 'tutorial' && game.mode !== 'range') dropGunsOf(u);
   if (game.mode !== 'match') return;
   dropBomb(u);
   if (ROUND.phase !== 'live') return;

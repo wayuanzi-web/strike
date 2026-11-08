@@ -88,6 +88,7 @@ function makeBot(name, team) {
   b.body = b.phys;   // 物理身體：玩家程式用 bot.body，機器人程式用 bot.phys，是同一個
   b.gunM = mdl.gunM; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.kit = false;
   b.wpn = WEAPONS.rifle; b.mag = 30; b.reloadT = 0; b.blindT = 0; b.useT = 0;
+  b.baseTeam = team;
   if (team === 'A') { b.tag = nameTag(name); b.g.add(b.tag); }
   b.g.visible = false;
   bots.push(b);
@@ -112,8 +113,11 @@ function initBots() {
 // 依模式啟用：練習＝4 隻敵人、可重生；對戰＝5 對 5（4 個隊友＋你）
 function setupBots(mode) {
   SHOOT_TOKENS.clear();
+  const cnt = { A: 0, B: 0 };
   for (const b of bots) {
-    b.active = mode === 'match' ? true : mode === 'tutorial' ? false : (b.team === 'B' && b.i < 4); b.dummy = false;
+    b.team = b.baseTeam;
+    b.active = mode === 'match' ? true : mode === 'tutorial' || mode === 'range' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : (b.team === 'B' && b.i < 4); b.dummy = false;
+    if (mode === 'dm') b.team = 'D' + b.i;   // 死鬥：每個人自己一隊
     b.kills = b.deaths = b.heads = 0;
     if (mode !== 'match') { b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b); }
     if (!b.active) { b.alive = false; b.g.visible = false; }
@@ -132,7 +136,7 @@ function unitEye(u, out) { const p = u.body.pos; return u.isPlayer ? out.set(p.x
 function unitSpeed(u) { return Math.hypot(u.body.vel.x, u.body.vel.z); }
 function enemiesOf(team) {
   const out = [];
-  if (team === 'B' && player.alive) out.push(player);
+  if (team !== player.team && player.alive) out.push(player);
   for (const b of bots) if (b.active && b.alive && b.team !== team) out.push(b);
   return out;
 }
@@ -143,6 +147,7 @@ function pointSeesPlayer(x, z, pe) {
   return false;
 }
 function respawnBot(b) {
+  if (modeRespawn(b)) return;
   const pe = eyePos(new V3()), pp = player.body.pos;
   const cands = BOT_SPAWNS.map((s) => ({ x: s[0], z: s[1] }));
   for (let k = 0; k < 40; k++) { const n = pick(NAV.nodes); if (n.ok && n.nb.length && Math.hypot(n.x - pp.x, n.z - pp.z) > 22) cands.push({ x: n.x, z: n.z }); }
@@ -186,6 +191,7 @@ function findTarget(b) {
 function botCanSee(b) { return !!findTarget(b); }   // 舊介面（測試用）
 // 對戰時不要追太遠：守方（還沒裝彈）只在自己包點 20 公尺內追；攻方衝之前只追 14 公尺內的
 function leashOK(b, pos) {
+  if (game.mode === 'koth' && MODE.zone) return Math.hypot(pos.x - MODE.zone.x, pos.z - MODE.zone.z) < KOTH.r + 12;   // 搶點：不追離圈太遠
   if (game.mode !== 'match' || ROUND.phase !== 'live' || BOMB.planted) return true;
   if (b.team !== ROUND.atk) { const s = SITES[b.post || 'A']; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < (hasTrait(b, 'entry') ? 18 : 14); }
   if (ROUND.plan && ROUND.plan.exec) { const s = SITES[ROUND.plan.site]; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < 18 || Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z) < 12; }
@@ -265,7 +271,7 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
   const byPlayer = attacker === player, w = weapon || (byPlayer ? WP : attacker.wpn) || WEAPONS.rifle;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.deaths++; b.fallDir = Math.sign(Math.random() - 0.5);
-    b.respawnT = game.mode === 'practice' ? 4.5 : Infinity;
+    b.respawnT = modeRespawnTime();
     SHOOT_TOKENS.delete(b);
     const enemy = attacker !== b && attacker.team !== b.team;
     if (byPlayer) {
@@ -335,7 +341,7 @@ function updateBot(b, dt) {
     if (b.respawnT <= 0) respawnBot(b);
     return;
   }
-  if (b.tag) b.tag.visible = true;
+  if (b.tag) b.tag.visible = b.team === player.team;
   // 教學的靶子：不會看、不會開槍，一直面向你
   if (b.dummy) { b.state = 'hold'; b.holdT = 99; b.holdObj = false; b.blindT = 99; b.target = null; b.visible = false; b.path = null; b.holdYaw = Math.atan2(-(player.body.pos.x - b.phys.pos.x), -(player.body.pos.z - b.phys.pos.z)); b.holdCrouch = false; }
   if (b.flinchT > 0) b.flinchT -= dt;
@@ -408,6 +414,8 @@ function updateBot(b, dt) {
     if (!b.visible) adv = b.lostT > 1.5 ? 0.8 : 0;   // 對方剛躲起來：先守著掩體邊緣，過一會兒才追
     const sv = b.crouch ? 0 : 3.3;
     _wish.set(rx * b.strafe * sv + fx * adv * 3.5, 0, rz * b.strafe * sv + fz * adv * 3.5);
+    // 搶點：邊打邊往圈裡擠（圈外的人才會）
+    if (game.mode === 'koth' && MODE.zone) { const zx = MODE.zone.x - p.x, zz = MODE.zone.z - p.z, zd = Math.hypot(zx, zz); if (zd > KOTH.r - 1.2) { _wish.x += zx / zd * 2.6; _wish.z += zz / zd * 2.6; } }
     if (!b.visible && b.lostT > 0.3) b.crouch = false;
     b.crouchWant = b.crouch && b.visible;
     // 同隊有人在打這個目標、自己排不到（打你時的令牌）就有機會去包抄
@@ -450,6 +458,8 @@ function updateBot(b, dt) {
     if (!b.path || b.pi >= b.path.length || b.flankT <= 0) {
       b.state = 'search'; b.searchT = 6; if (tg) b.lastSeen.copy(tg.body.pos); setPath(b, b.lastSeen.x, b.lastSeen.z);
     }
+  } else if (b.state === 'search' && game.mode === 'koth') {
+    b.state = 'patrol'; b.path = null; b.goalTag = null;   // 搶點：不到處找人，回圈裡
   } else if (b.state === 'search') {
     b.searchT -= dt;
     if (b.alertYaw !== undefined) { turnTo(b, b.alertYaw, 8, dt); if (Math.abs(angDiff(b.yaw, b.alertYaw)) < 0.1) b.alertYaw = undefined; }
@@ -473,6 +483,8 @@ function updateBot(b, dt) {
     else if (b.useT >= b.useNeed) { b.useT = 0; b.state = 'patrol'; defuseBomb(b); }
   } else if (game.mode === 'match') {
     botObjective(b, dt);
+  } else if (game.mode === 'koth') {
+    kothObjective(b, dt);
   } else {
     // 巡邏：練習模式走到隨機遠處；對戰時往前推進，到了有時守一下
     if (b.waitT > 0) { b.waitT -= dt; b.yaw += Math.sin(b.waitT * 2) * dt * 0.8; }
