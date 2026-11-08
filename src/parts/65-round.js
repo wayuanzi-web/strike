@@ -22,7 +22,7 @@ function resetBotGear(b) { b.primary = null; b.vest = b.helmet = b.kit = false; 
 function startMatch() {
   game.mode = 'match'; setupBots('match');
   ROUND.score = { A: 0, B: 0 }; ROUND.num = 0; ROUND.over = false; ROUND.history = []; ROUND.atk = 'A'; ROUND.loss = { A: 0, B: 0 }; ROUND.swapped = false; ROUND.log = [];
-  player.kills = player.deaths = player.heads = 0; player.deathStreak = 0;
+  player.kills = player.deaths = player.heads = 0; player.deathStreak = 0; statMatchStart();
   for (const u of matchUnits()) { u.money = ECON.start; u.keep = false; if (u !== player) resetBotGear(u); }
   player.alive = false;
   startRound();
@@ -128,6 +128,8 @@ function showMatchOver() {
   $('overS').textContent = `${ROUND.score.A} : ${ROUND.score.B}`;
   $('overM').textContent = mvp ? `本場最有價值：${mvp.name}（${mvp.kills} 殺 ${mvp.deaths} 死）` : '';
   $('overY').textContent = `你：${player.kills} 殺 · ${player.deaths} 死 · ${player.heads} 爆頭`;
+  statMatchEnd(win, ROUND.score.A, ROUND.score.B, !!(mvp && mvp.me));
+  $('overC').textContent = `生涯：${STATS.matches} 場 ${STATS.wins} 勝（勝率 ${pct(STATS.wins, STATS.matches)}）· 擊殺 ${STATS.kills}`;
   $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy();
   if (pointerLocked()) document.exitPointerLock();
 }

@@ -51,6 +51,8 @@ function enterPlay() {
 }
 // 練習：4 個敵人，陣亡馬上重生
 function startGame(mode = 'practice') {
+  if (mode === 'tutorial') { clearNades(); resetBomb(); closeBuy(); startTutorial(); return; }
+  TUT.on = false; beacon.visible = false; $('tut').hidden = true;
   clearNades(); resetBomb(); closeBuy(); INV.primary = INV.secondary = null; INV.he = INV.flash = INV.smoke = 0; INV.kit = false;
   if (mode === 'match') { startMatch(); enterPlay(); openBuy(); return; }
   game.mode = 'practice'; setupBots('practice');
@@ -80,8 +82,13 @@ function pickMap(id) {
   $('boot').textContent = '載入地圖中…'; $('boot').hidden = false;
   setTimeout(() => { switchMap(id); menuBackdrop(); syncMapMenu(); $('boot').hidden = true; }, 30);
 }
+// 選單提示：第一次玩建議先教學
+function syncMenuHints() {
+  const first = !STATS.tutorialDone && STATS.matches === 0;
+  $('firstHint').hidden = !first; $('bTut').classList.toggle('go', first); $('bMatch').classList.toggle('go', !first);
+}
 function backToMenu() {
-  clearNades(); resetBomb(); closeBuy();
+  clearNades(); resetBomb(); closeBuy(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints();
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   player.alive = false; $('menu').hidden = false;
@@ -95,6 +102,8 @@ function pauseGame() {
 }
 function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; game.state = player.alive ? 'play' : 'dead'; if (game.state === 'dead') game.state = 'play'; }
 onTap($('bStart'), () => startGame('practice'));
+onTap($('bTut'), () => startGame('tutorial'));
+onTap($('bStats'), openStats);
 onTap($('bMatch'), () => startGame('match'));
 onTap($('bAgain'), () => startGame('match'));
 onTap($('bMenu'), backToMenu);
@@ -121,6 +130,7 @@ function applySize() {
   $('rotate').hidden = !(portrait && isTouch);
   if (portrait && isTouch && game.state === 'play') pauseGame();
   if (T.joyId === null) setJoyIdle();
+  applyHand();
 }
 window.addEventListener('resize', applySize);
 window.addEventListener('orientationchange', () => setTimeout(applySize, 200));
@@ -160,7 +170,7 @@ function step(dt) {
     return;
   }
   if (game.state === 'pause' || game.state === 'over') return;
-  updateRound(dt);
+  updateRound(dt); updateTutorial(dt);
   keyboardMove();
   // 視角：開鏡時乘上開鏡靈敏度與視野比例；瞄準輔助在敵人身上時轉得慢一點
   let ldx = INPUT.lookDX, ldy = INPUT.lookDY; INPUT.lookDX = INPUT.lookDY = 0;
@@ -226,7 +236,7 @@ function render() {
 buildNav();
 initBots();
 setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });   // 選單背景
-syncSettingsUI(); buildBuyMenu(); buildMapMenu();
+syncSettingsUI(); buildBuyMenu(); buildMapMenu(); syncMenuHints();
 document.body.classList.toggle('kb', !isTouch);
 applySize();
 // 先把所有材質編譯好，開局時不會卡一下
@@ -237,4 +247,4 @@ requestAnimationFrame(frame);
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
-  INV, WEAPONS, NADES, BOMB, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };
+  INV, WEAPONS, NADES, BOMB, TUT, applyHand, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };

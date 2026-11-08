@@ -13,14 +13,24 @@ const joyR = () => Math.max(40, window.innerHeight * 0.13);
 const degPerPx = () => 180 / Math.max(320, Math.min(window.innerWidth, window.innerHeight * 2.2)) * S.sens;
 const VERT_K = 0.8;   // 上下拖比左右慢一點，手機上下距離短，容易拉過頭
 
+// 左手模式：搖桿在右半邊、轉視角在左半邊，按鈕左右對調
+const inJoyZone = (x) => (S.lefty ? x > window.innerWidth * 0.55 : x < window.innerWidth * 0.45);
+function applyHand() {
+  document.documentElement.style.setProperty('--bs', S.btnScale || 1); document.body.classList.toggle('lefty', !!S.lefty);
+  for (const el of touchEl.querySelectorAll('.tb')) {
+    el.style.left = ''; el.style.right = '';
+    if (S.lefty) { const r = getComputedStyle(el).right; el.style.right = 'auto'; el.style.left = r; }
+  }
+  if (T.joyId === null) setJoyIdle();
+}
 function placeJoyBase() {
   // 底座畫在哪裡：不要被擠出畫面（中立點還是手指按下的位置）
   const r = joyR();
-  joyEl.style.left = clamp(T.jx, r + 6, window.innerWidth * 0.45) + 'px';
+  joyEl.style.left = (S.lefty ? clamp(T.jx, window.innerWidth * 0.55, window.innerWidth - r - 6) : clamp(T.jx, r + 6, window.innerWidth * 0.45)) + 'px';
   joyEl.style.top = clamp(T.jy, r + 6, window.innerHeight - r - 6) + 'px';
 }
 function setJoyIdle() {
-  joyEl.style.left = (window.innerWidth * 0.16) + 'px'; joyEl.style.top = (window.innerHeight * 0.68) + 'px';
+  joyEl.style.left = (window.innerWidth * (S.lefty ? 0.84 : 0.16)) + 'px'; joyEl.style.top = (window.innerHeight * 0.68) + 'px';
   joyK.style.transform = ''; joyEl.className = 'idle';
 }
 // 暫停、陣亡、重生、轉向時把所有按住的狀態清乾淨
@@ -35,10 +45,10 @@ touchEl.addEventListener('pointerdown', (e) => {
   if (e.target !== touchEl) return;              // 按鈕自己處理
   e.preventDefault(); audioInit(); INPUT.mode = 'touch';
   const x = e.clientX, y = e.clientY;
-  if (x < window.innerWidth * 0.45 && T.joyId === null) {
+  if (inJoyZone(x) && T.joyId === null) {
     T.joyId = e.pointerId; T.ox = T.jx = x; T.oy = T.jy = y;
     placeJoyBase(); joyEl.className = 'on'; moveJoy(x, y);
-  } else if (x >= window.innerWidth * 0.45) {
+  } else if (!inJoyZone(x)) {
     if (!player.alive && game.mode === 'match') nextSpectate();
     T.lookers.set(e.pointerId, { x, y }); if (T.lookId === null) T.lookId = e.pointerId; updateLooking();
   }

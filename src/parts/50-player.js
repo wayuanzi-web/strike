@@ -122,12 +122,12 @@ function damagePlayer(dmg, bot, part, weapon) {
   player.punchPV += Math.min(3, dmg * 0.08) * 22; player.punchYV += rand(-1, 1) * 14;
   player.tag = Math.min(player.tag, 0.45);
   sfx('hurt');
-  try { if (navigator.vibrate && INPUT.mode === 'touch') navigator.vibrate(25); } catch (e) { /* iPhone 不支援 */ }
+  try { if (S.vibrate && navigator.vibrate && INPUT.mode === 'touch') navigator.vibrate(25); } catch (e) { /* iPhone 不支援 */ }
   const dx = bot.body.pos.x - player.body.pos.x, dz = bot.body.pos.z - player.body.pos.z;
   hudHurt(angDiff(player.yaw, Math.atan2(-dx, -dz)), dmg);
   if (player.hp <= 0) {
     resetTouchState();
-    player.alive = false; player.deaths++; player.deathStreak = (player.deathStreak || 0) + 1; player.killer = bot.name;
+    player.alive = false; player.deaths++; statDeath(); player.deathStreak = (player.deathStreak || 0) + 1; player.killer = bot.name;
     player.respawnT = game.mode === 'match' ? Infinity : 3.5;    // 對戰模式：這回合不重生，改觀戰
     player.ads = false; INPUT.fire = false; INPUT.use = false; player.useT = 0; closeBuy();
     const w = weapon || bot.wpn || WEAPONS.rifle;

@@ -46,7 +46,7 @@ function plantBomb(u) {
   BOMB.site = siteAt(u.body.pos.x, 0, u.body.pos.z) || 'A';
   BOMB.pos.set(u.body.pos.x, u.body.pos.y, u.body.pos.z);
   bombMesh.position.copy(BOMB.pos); bombMesh.rotation.set(0, u === player ? player.yaw : u.yaw, 0); bombMesh.visible = true;
-  if (u === player) INV.bomb = false;
+  if (u === player) { INV.bomb = false; statPlant(); }
   addMoney(u, ECON.plant, '裝彈');
   hudBanner(`炸彈已裝在 ${BOMB.site} 點`, `${BOMB_TIME} 秒後爆炸`, 2.2, u.team === player.team ? 'win' : 'lose');
   sfx('plant');
@@ -55,7 +55,7 @@ function plantBomb(u) {
   if (typeof onBombPlanted === 'function') onBombPlanted();
 }
 function defuseBomb(u) {
-  BOMB.state = 'defused'; BOMB.defuser = u;
+  BOMB.state = 'defused'; BOMB.defuser = u; if (u === player) statDefuse();
   addMoney(u, ECON.defuse, '拆彈');
   endRound(u.team, '炸彈拆除', 'defuse');
 }
@@ -101,8 +101,9 @@ function updateBomb(dt) {
 // ---------- 你按住「裝彈／拆彈」 ----------
 // 能做什麼：'plant'（你帶炸彈、在包點、站在地上）、'defuse'（你是守方、靠近已裝好的炸彈）或 ''
 function useAction() {
-  if (game.mode !== 'match' || !player.alive || ROUND.phase !== 'live') return '';
   const p = player.body.pos;
+  if (game.mode === 'tutorial') return player.alive && INV.bomb && isCarrier(player) && player.body.onGround && siteAt(p.x, p.y, p.z) ? 'plant' : '';
+  if (game.mode !== 'match' || !player.alive || ROUND.phase !== 'live') return '';
   if (INV.bomb && isCarrier(player) && player.body.onGround && siteAt(p.x, p.y, p.z)) return 'plant';
   if (BOMB.state === 'planted' && player.team !== ROUND.atk && Math.hypot(p.x - BOMB.pos.x, p.z - BOMB.pos.z) < 1.7 && Math.abs(p.y - BOMB.pos.y) < 1.4) return 'defuse';
   return '';

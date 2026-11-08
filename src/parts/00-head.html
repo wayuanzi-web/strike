@@ -227,6 +227,31 @@ body.match #dead { background: none; }
 .maps button { text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); min-height: 44px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid var(--line); touch-action: manipulation; }
 .maps b { font-size: max(13px, calc(var(--u) * 3.4)); } .maps small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); }
 .maps button[aria-checked="true"] { border-color: var(--dawn); background: rgba(255,179,71,.16); } .maps button[aria-checked="true"] b { color: var(--dawn-lt); }
+/* ---------- M4：教學、戰績、安裝提示、左手、按鈕大小 ---------- */
+#tut { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); width: min(68vw, 620px); background: rgba(10,15,22,.88); border: 1px solid var(--dawn);
+  border-radius: 8px; padding: calc(var(--u) * 1.6) calc(var(--u) * 3); z-index: 4; pointer-events: none; }
+#tut div { display: flex; align-items: center; gap: calc(var(--u) * 2); }
+#tutN { font-family: var(--f-num); color: var(--mute); font-size: max(12px, calc(var(--u) * 2.8)); } #tutT { font-size: max(15px, calc(var(--u) * 4)); color: var(--dawn-lt); flex: 1; }
+#tutSkip { pointer-events: auto; font-size: max(12px, calc(var(--u) * 2.6)); color: var(--mute); padding: 6px 10px; border: 1px solid var(--line); border-radius: 5px; min-height: 36px; }
+#tutX { margin: calc(var(--u) * .8) 0 0; font-size: max(13px, calc(var(--u) * 3.2)); line-height: 1.5; }
+.hint { color: var(--dawn-lt); } .mdiff { display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * 2); align-items: center; font-size: calc(var(--u) * 3.2); } .mdiff .seg { grid-column: auto; }
+.install { display: flex; align-items: center; gap: calc(var(--u) * 2); flex-wrap: wrap; font-size: max(12px, calc(var(--u) * 2.8)); color: var(--mute); }
+#stats .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; }
+.sbig { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; } .sbig div { background: rgba(255,255,255,.05); border-radius: 6px; padding: 8px; display: grid; justify-items: center; }
+.sbig strong { font-family: var(--f-num); font-size: calc(var(--u) * 7); color: var(--dawn-lt); line-height: 1; } .sbig small, .ssmall small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); }
+.ssmall { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px 14px; } .ssmall div { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.06); padding: 3px 0; }
+.ssmall b { font-family: var(--f-num); }
+.scols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } #stats h3 { margin: 0 0 6px; font-size: max(13px, calc(var(--u) * 3.2)); color: var(--mute); }
+#stats ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; } #stats li { display: flex; justify-content: space-between; font-size: max(12px, calc(var(--u) * 3)); }
+#stats li span { color: var(--mute); } #stats table { width: 100%; border-collapse: collapse; font-size: max(12px, calc(var(--u) * 2.8)); font-variant-numeric: tabular-nums; }
+#stats th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 4px; } #stats td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.06); }
+#stats tr.w td:nth-child(3) { color: #7fe9f0; } #stats tr.l td:nth-child(3) { color: #ff8f80; }
+#touch .tb { scale: var(--bs, 1); }
+/* 左手模式：按鈕在左，所以血量、錢移到右下，雷達移到右上，擊殺訊息移到左邊 */
+body.lefty #hp, body.lefty #money { left: auto; right: calc(var(--sr) + var(--u) * 3); }
+body.lefty #radar { left: auto; right: calc(var(--sr) + var(--u) * 3); }
+body.lefty #fps { left: auto; right: calc(var(--sr) + var(--u) * 3); }
+body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(var(--st) + var(--u) * 16); justify-items: start; }
 #boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); font-size: 15px; background: var(--ink); }
 </style>
 <div id="app">
@@ -285,7 +310,10 @@ body.match #dead { background: none; }
         <li><b>1／2／Q</b>換槍　<b>G</b>投擲物　<b>B</b>購買　<b>E</b>按住裝彈／拆彈</li>
       </ul>
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
-      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bSet1">設定</button></div>
+      <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
+      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
+      <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
+      <div class="install" id="installBox" hidden><span id="installT"></span><button class="btn" id="bInstall" hidden>安裝到主畫面</button></div>
       <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>
     </div>
   </div>
@@ -299,6 +327,9 @@ body.match #dead { background: none; }
         <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>準星跟著後座</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>操作手</span><div class="seg" data-k="lefty"><button data-v="0">右手（搖桿在左）</button><button data-v="1">左手（搖桿在右）</button></div></div>
+        <div class="opt"><span>按鈕大小</span><div class="seg" data-k="btnScale"><button data-v="0.85">小</button><button data-v="1">中</button><button data-v="1.15">大</button></div></div>
+        <div class="opt"><span>震動</span><div class="seg" data-k="vibrate"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
@@ -313,7 +344,13 @@ body.match #dead { background: none; }
     <div id="buyGrid"></div><p class="mnote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p></div></div>
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
+    <p id="overC"></p>
     <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
+  <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>
+  <div id="tutDone" class="ov" hidden><div class="card"><h2>教學完成</h2><p class="mnote">對戰時：準備時間先買東西；攻方帶炸彈去 A 或 B 點裝，守方守住或拆彈。活下來的人下回合保留裝備。</p>
+    <div class="row"><button class="btn go" id="tutMatch">開始對戰</button><button class="btn" id="tutMenu">回選單</button></div></div></div>
+  <div id="stats" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>戰績</h2><div class="row"><button class="btn" id="statClear">清除戰績</button><button class="btn go" id="statX">好了</button></div></div>
+    <div id="statBody"></div><p class="mnote">戰績只存在這台裝置的瀏覽器裡。</p></div></div>
   <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadRep"></p><p id="deadT"></p></div></div>
   <div id="rotate" hidden><svg viewBox="0 0 48 48"><rect x="15" y="5" width="18" height="38" rx="3"/><path d="M21 38h6"/></svg><p>請把手機轉成橫向</p><small>破曉突擊只支援橫向畫面</small></div>
   <div id="boot">載入中…</div>

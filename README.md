@@ -1,17 +1,30 @@
-# 破曉突擊（暫名）
+# 破曉突擊
 
-手機網頁上的第一人稱 3D 槍戰，玩法參考 CS 這類回合制團隊射擊。目前是 **M0 手感原型**：灰盒地圖「曙光倉區」、觸控操作、一把步槍、四個會巡邏會還手的機器人。
+手機網頁上的第一人稱 3D 槍戰，玩法參考 CS 這類回合制團隊射擊：五對五炸彈模式，你和 4 個電腦隊友對上 5 個電腦敵人。
 
-## 怎麼玩
-- 手機橫拿。左半邊拖曳移動（推到底是跑），右半邊拖曳轉視角；開火鍵按住也能拖著瞄。
-- 右邊按鈕：開鏡、跳、蹲、換彈、自動開火開關。暫停鍵裡可以調靈敏度、瞄準輔助、機器人難度、畫質。
-- 電腦測試：WASD 移動、滑鼠轉視角（點畫面鎖定）、左鍵開火、右鍵開鏡、空白跳、C／Ctrl 蹲、R 換彈、Esc 暫停。
+**開始玩**：https://wayuanzi-web.github.io/strike/ （手機橫拿。加到主畫面後全螢幕、沒網路也能玩）
+
+## 玩法
+- **對戰 5v5**：攻方把炸彈裝在 A 或 B 點，守方阻止或拆彈；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。準備時間用賺來的錢買槍、護甲、投擲物。
+- **練習**：4 個敵人、陣亡馬上重生、所有武器免費試。
+- **新手教學**：10 步，約 2 分鐘。
+- **三張地圖**：曙光倉區（破曉）、正午舊城（正午）、黃昏鐵道（黃昏）。
+- **戰績**：場數、勝率、K/D、爆頭率、命中率、各地圖、各武器、最近 10 場（存在這台裝置）。
+
+## 操作
+- 手機：左半邊拖曳移動（推到底是跑），右半邊拖曳轉視角；開火鍵按住也能拖著瞄。按鈕：開鏡、跳、蹲、換彈、換槍、投擲、自動開火、按住裝彈／拆彈、購買。
+- 設定：靈敏度、開鏡靈敏度、左右手（搖桿換邊）、按鈕大小、震動、自動開火、瞄準輔助、難度、畫質（自動／省電／標準／清晰）。
+- 電腦：WASD 移動、滑鼠轉視角（點畫面鎖定）、左鍵開火、右鍵開鏡、空白跳、C／Ctrl 蹲、R 換彈、1／2／Q 換槍、G 投擲物、B 購買、E 按住裝彈／拆彈、Esc 暫停。
 
 ## 開發
 ```
-python3 src/build.py                                   # 產生 src/dist/（Artifact 版與本機測試頁）
+python3 src/build.py                                          # 產生 src/dist/（Artifact 版與本機測試頁）
 python3 src/build.py https://wayuanzi-web.github.io/strike/   # 產生 repo 根目錄的網頁 App
-python3 src/gen_icons.py                               # 重畫 App 圖示
-cd test && python3 mech.py && python3 touch.py && python3 cdn.py   # 無頭瀏覽器自動測試
+python3 src/gen_icons.py                                      # 重畫 App 圖示
+cd test
+python3 mech.py; python3 touch.py; python3 cdn.py             # 手感、觸控、CDN 版
+python3 m2mech.py; python3 m2touch.py                         # 武器、經濟、炸彈、投擲物
+python3 maps.py; python3 m3ui.py; python3 m4.py               # 地圖檢查、選地圖與畫質、教學與戰績與左手模式
+python3 m2sim.py 3 ghost market                               # 整場模擬（攻守勝率）
 ```
-原始碼在 `src/parts/`，依檔名順序串成一個 HTML。Three.js r160（MIT，授權在 `three-LICENSE.txt`）：Artifact 版從 jsDelivr 載入，Pages 版放在 repo 裡、離線也能玩。
+原始碼在 `src/parts/`，依檔名順序串成一個 HTML。Three.js r160（MIT，授權在 `three-LICENSE.txt`）：Artifact 版從 jsDelivr 載入，Pages 版放在 repo 裡、離線也能玩。地圖、武器名稱與美術都是原創，貼圖與音效全部用程式產生。

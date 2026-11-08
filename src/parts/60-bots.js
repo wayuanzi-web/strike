@@ -110,7 +110,7 @@ function initBots() {
 function setupBots(mode) {
   SHOOT_TOKENS.clear();
   for (const b of bots) {
-    b.active = mode === 'match' ? true : (b.team === 'B' && b.i < 4);
+    b.active = mode === 'match' ? true : mode === 'tutorial' ? false : (b.team === 'B' && b.i < 4); b.dummy = false;
     b.kills = b.deaths = b.heads = 0;
     if (mode !== 'match') { b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.nades = { he: 0, flash: 0, smoke: 0 }; botArm(b); }
     if (!b.active) { b.alive = false; b.g.visible = false; }
@@ -255,13 +255,13 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
   const byPlayer = attacker === player, w = weapon || (byPlayer ? WP : attacker.wpn) || WEAPONS.rifle;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.deaths++; b.fallDir = Math.sign(Math.random() - 0.5);
-    b.respawnT = game.mode === 'match' ? Infinity : 4.5;
+    b.respawnT = game.mode === 'practice' ? 4.5 : Infinity;
     SHOOT_TOKENS.delete(b);
     const enemy = attacker !== b && attacker.team !== b.team;
     if (byPlayer) {
       player.kills++; player.deathStreak = 0; if (part === 'head') player.heads++;
       if (game.mode !== 'match') W.reserve = Math.min(WP.reserve, W.reserve + 15);
-      hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head');
+      hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head'); statKill(w, part === 'head');
     } else if (enemy) { attacker.kills++; if (part === 'head') attacker.heads++; }
     if (enemy) addMoney(attacker, w.reward || 0, '擊殺');
     hudFeed(attacker === b ? '' : attacker.name, b.name, part === 'head', attacker.team, b.team, byPlayer, w.short);
@@ -326,6 +326,8 @@ function updateBot(b, dt) {
     return;
   }
   if (b.tag) b.tag.visible = true;
+  // 教學的靶子：不會看、不會開槍，一直面向你
+  if (b.dummy) { b.state = 'hold'; b.holdT = 99; b.holdObj = false; b.blindT = 99; b.target = null; b.visible = false; b.path = null; b.holdYaw = Math.atan2(-(player.body.pos.x - b.phys.pos.x), -(player.body.pos.z - b.phys.pos.z)); b.holdCrouch = false; }
   if (b.flinchT > 0) b.flinchT -= dt;
   if (b.blindT > 0) b.blindT -= dt;
   if (b.reloadT > 0) { b.reloadT -= dt; if (b.reloadT <= 0) { b.reloadT = 0; b.mag = b.wpn.mag; } }

@@ -162,6 +162,7 @@ function pickSeg(seg, b) {
     S[k] = typeof cur === 'boolean' ? b.dataset.v === '1' : b.dataset.v;
     saveSettings(); syncSettingsUI();
     if (k === 'quality') applySize();
+    if (k === 'lefty' || k === 'btnScale') applyHand();
   }
 }
 

@@ -242,7 +242,7 @@ function shoot() {
   if (n > 1) W.pumpT = 0.55;
   if (!(n > 1) && !WP.scope) ejectShell();
   sfx('shot', 1, { w: WP });
-  try { if (navigator.vibrate && INPUT.mode === 'touch') navigator.vibrate(WP.scope || n > 1 ? 18 : 8); } catch (e) { /* iPhone 不支援震動 */ }
+  try { if (S.vibrate && navigator.vibrate && INPUT.mode === 'touch') navigator.vibrate(WP.scope || n > 1 ? 18 : 8); } catch (e) { /* iPhone 不支援震動 */ }
   botsHearShot(player.body.pos, 'A');
 }
 // 一條射線：先找打到的牆，再看有沒有更近的機器人
