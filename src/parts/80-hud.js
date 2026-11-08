@@ -143,6 +143,8 @@ function showDead(by, head) {
 function syncSettingsUI() {
   $('sSens').value = S.sens; $('oSens').textContent = (+S.sens).toFixed(2);
   $('sAds').value = S.adsSens; $('oAds').textContent = (+S.adsSens).toFixed(2);
+  $('sGyro').value = S.gyroSens; $('oGyro').textContent = (+S.gyroSens).toFixed(2); for (const el of $('gyroRow').children) el.classList.toggle('dim', S.gyro === 'off');
+  $('oLayout').textContent = S.layout && Object.keys(S.layout).length ? `已自訂 ${Object.keys(S.layout).length} 顆` : '預設';
   for (const seg of document.querySelectorAll('.seg')) {
     const k = seg.dataset.k, v = S[k];
     for (const b of seg.children) {
@@ -154,6 +156,7 @@ function syncSettingsUI() {
 }
 $('sSens').addEventListener('input', (e) => { S.sens = +e.target.value; saveSettings(); syncSettingsUI(); });
 $('sAds').addEventListener('input', (e) => { S.adsSens = +e.target.value; saveSettings(); syncSettingsUI(); });
+$('sGyro').addEventListener('input', (e) => { S.gyroSens = +e.target.value; saveSettings(); syncSettingsUI(); });
 for (const seg of document.querySelectorAll('.seg')) {
   for (const btn of seg.children) onTap(btn, () => pickSeg(seg, btn));
 }
@@ -164,6 +167,8 @@ function pickSeg(seg, b) {
     saveSettings(); syncSettingsUI();
     if (k === 'quality') applySize();
     if (k === 'lefty' || k === 'btnScale') applyHand();
+    if (k === 'joyMode' || k === 'runLock') { INPUT.runLock = false; setJoyIdle(); }
+    if (k === 'gyro' && S.gyro !== 'off') askGyro();
   }
 }
 

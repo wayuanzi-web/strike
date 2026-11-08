@@ -254,6 +254,22 @@ body.match #dead { background: none; }
 #radio button:active { background: rgba(95,216,238,.3); } #rX { color: var(--mute); }
 #board small.tr { color: var(--mute); font-size: .78em; margin-left: .4em; font-weight: 500; }
 body.lefty #bRadio { left: auto; right: calc(var(--sr) + var(--u) * 3); }
+#gyroRow { display: contents; } .set .dim { opacity: .45; } .mute { color: var(--mute); }
+#touch .tb { opacity: var(--op, 1); } #joy.on { opacity: var(--op, 1); } #joy.idle { opacity: calc(.45 * var(--op, 1)); }
+#joy.arm::before, #joy.lock::before { content: '鎖定前進'; position: absolute; left: 50%; top: calc(var(--u) * -9); transform: translateX(-50%); white-space: nowrap;
+  padding: 2px 8px; border-radius: 10px; font-size: max(11px, calc(var(--u) * 2.6)); font-weight: 700; background: rgba(12,18,26,.6); color: var(--mute); border: 1px solid var(--line); }
+#joy.arm::before { background: var(--dawn); color: #1a1208; border-color: var(--dawn); }
+#joy.lock { opacity: .8; border-color: var(--dawn); } #joy.lock::before { content: '前進鎖定中'; color: var(--dawn-lt); border-color: var(--dawn); }
+body.editing #touch { background: repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 40px), repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, transparent 1px 40px), rgba(6,10,15,.45); }
+body.editing #touch .tb[hidden] { display: grid !important; }
+body.editing #touch .tb, body.editing #joy { outline: 2px dashed rgba(243,236,224,.35); outline-offset: 3px; }
+body.editing #joy { opacity: calc(.8 * var(--op, 1)); pointer-events: auto; }
+#touch .tb.sel, #joy.sel { outline: 3px solid var(--dawn) !important; }
+body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadio, body.editing #bBoard { visibility: hidden; }
+#edit { position: absolute; left: 50%; top: calc(var(--st) + 8px); transform: translateX(-50%); z-index: 9; display: grid; grid-template-columns: auto auto auto auto; align-items: center; gap: 6px 14px;
+  background: rgba(10,15,22,.92); border: 1px solid var(--dawn); border-radius: 10px; padding: 8px 14px; font-size: max(12px, calc(var(--u) * 3)); width: max-content; max-width: calc(100vw - 24px); }
+#edit #edName { grid-column: 1 / -1; color: var(--dawn-lt); }
+#edit label { display: flex; align-items: center; gap: 6px; } #edit input { width: max(90px, calc(var(--u) * 22)); } #edit output { min-width: 3em; }
 #perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
 #bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
 #glLost { z-index: 20; }
@@ -340,17 +356,30 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>效能</span><div class="row"><button class="btn" id="bPerf">效能報告／跑分</button></div></div>
         <div class="opt"><span>操作手</span><div class="seg" data-k="lefty"><button data-v="0">右手（搖桿在左）</button><button data-v="1">左手（搖桿在右）</button></div></div>
+        <div class="opt"><span>按鈕位置</span><div class="row"><button class="btn" id="bLayout">自訂按鈕位置</button><small id="oLayout" class="mute"></small></div></div>
+        <div class="opt"><span>搖桿</span><div class="seg" data-k="joyMode"><button data-v="float">浮動</button><button data-v="fixed">固定</button></div></div>
+        <div class="opt"><span>前進鎖定</span><div class="seg" data-k="runLock"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>開鏡鍵</span><div class="seg" data-k="adsMode"><button data-v="toggle">按一下切換</button><button data-v="hold">按住</button></div></div>
+        <div class="opt"><span>蹲鍵</span><div class="seg" data-k="crouchMode"><button data-v="toggle">按一下切換</button><button data-v="hold">按住</button></div></div>
+        <div class="opt"><span>轉視角曲線</span><div class="seg" data-k="curve"><button data-v="linear">固定</button><button data-v="accel">加速</button></div></div>
+        <div class="opt"><span>陀螺儀瞄準</span><div class="seg" data-k="gyro"><button data-v="off">關</button><button data-v="ads">只在開鏡時</button><button data-v="on">一直開</button></div></div>
+        <div id="gyroRow"><label for="sGyro"><span>陀螺儀靈敏度</span><input type="range" id="sGyro" min="0.3" max="3" step="0.05"><output id="oGyro"></output></label>
+        <div class="opt"><span>陀螺儀方向</span><div class="seg" data-k="gyroInv"><button data-v="0">正常</button><button data-v="1">反向</button></div></div></div>
         <div class="opt"><span>按鈕大小</span><div class="seg" data-k="btnScale"><button data-v="0.85">小</button><button data-v="1">中</button><button data-v="1.15">大</button></div></div>
         <div class="opt"><span>震動</span><div class="seg" data-k="vibrate"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>顯示幀數</span><div class="seg" data-k="showFps"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質「自動」會依手機速度調解析度，太卡就自動降；「省電」最低解析度、不開抗鋸齒、不畫遠景（切到或切出省電要重新整理才完全生效）。iPhone 側邊的靜音開關打開時，遊戲不會有聲音。</p>
+        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。搖桿「浮動」是手指按哪裡就以哪裡為中心，「固定」是底座不動。轉視角曲線「加速」：慢慢拖比較細、快甩轉得比較多。前進鎖定：搖桿往前推到底再往上拉，放開後會一直往前走，再按一下搖桿區取消。陀螺儀：橫拿手機原地左右轉身就是左右看、上下仰就是上下看，iPhone 第一次開會問你要不要允許動作感測；方向感覺相反就選「反向」。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質「自動」會依手機速度調解析度，太卡就自動降；「省電」最低解析度、不開抗鋸齒、不畫遠景（切到或切出省電要重新整理才完全生效）。iPhone 側邊的靜音開關打開時，遊戲不會有聲音。</p>
       </div>
     </div>
   </div>
 
+  <div id="edit" hidden><b id="edName"></b>
+    <label><span>大小</span><input type="range" id="edSize" min="0.6" max="1.6" step="0.05"><output id="oEdSize"></output></label>
+    <label><span>透明度</span><input type="range" id="edOp" min="0.2" max="1" step="0.05"><output id="oEdOp"></output></label>
+    <div class="row"><button class="btn" id="edReset">恢復預設</button><button class="btn go" id="edDone">完成</button></div></div>
   <button id="bBuy" hidden>購買</button>
   <button id="bRadio" hidden>指令</button>
   <div id="radio" hidden><button id="rFollow">跟我來</button><button id="rA">打 A 點</button><button id="rB">打 B 點</button><button id="rHold">守這裡</button><button id="rFree">自由行動</button><button id="rX">取消</button></div>

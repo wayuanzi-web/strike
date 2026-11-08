@@ -178,7 +178,8 @@ function step(dt) {
   updateRound(dt); updateTutorial(dt);
   keyboardMove();
   // 視角：開鏡時乘上開鏡靈敏度與視野比例；瞄準輔助在敵人身上時轉得慢一點
-  let ldx = INPUT.lookDX, ldy = INPUT.lookDY; INPUT.lookDX = INPUT.lookDY = 0;
+  if (INPUT.runLock && T.joyId === null && INPUT.mode === 'touch') { INPUT.mx = 0; INPUT.mz = 1; }   // 前進鎖定
+  let ldx = INPUT.lookDX + INPUT.gyroDX, ldy = INPUT.lookDY + INPUT.gyroDY; INPUT.lookDX = INPUT.lookDY = INPUT.gyroDX = INPUT.gyroDY = 0;
   W.dragging = Math.abs(ldx) + Math.abs(ldy) > 0.02;
   const adsFov = W.isNade ? BASE_FOV : WP.adsFov;
   const adsScale = lerp(1, S.adsSens * (adsFov / BASE_FOV) * (WP.scope ? 1.3 : 1.6), player.adsT);
@@ -252,4 +253,4 @@ requestAnimationFrame(frame);
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
-  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };
+  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy };
