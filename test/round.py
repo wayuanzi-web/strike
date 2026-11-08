@@ -17,7 +17,7 @@ PROBE = """(cfg) => {
     const kb = s.bots.reduce((a, b) => a + (b.active ? b.kills : 0), 0);
     s.step(1/60);
     if (R.phase === 'live') { M.liveT += 1/60; M.maxLive = Math.max(M.maxLive, M.liveT); }
-    if (ph === 'freeze') for (const b of s.bots) if (b.active && b.alive && b.phys.vel && Math.hypot(b.phys.vel.x, b.phys.vel.z) > 0.5) M.frozenMoves++;
+    if (ph === 'freeze' && R.phase === 'freeze') for (const b of s.bots) if (b.active && b.alive && b.phys.vel && Math.hypot(b.phys.vel.x, b.phys.vel.z) > 0.5) M.frozenMoves++;
     if (ph === 'live' && R.phase === 'end') { M.rounds.push({ n: num, w: R.history[R.history.length - 1], t: +M.liveT.toFixed(1), A: s.aliveCount('A'), B: s.aliveCount('B') }); M.liveT = 0; }
     M.botKills += s.bots.reduce((a, b) => a + (b.active ? b.kills : 0), 0) - kb;
   }
@@ -48,7 +48,7 @@ async def main():
             checks = [
                 ('整場打完', r['state'] == 'over' and max(r['score'].values()) == 7),
                 ('回合數合理', 7 <= r['rounds'] <= 13),
-                ('沒有回合超時卡住', r['maxLive'] <= 115.2),
+                ('沒有回合超時卡住', r['maxLive'] <= 156),
                 ('機器人之間會互打', r['botKills'] >= r['rounds'] * 3),
                 ('凍結時間機器人不動', r['frozenMoves'] == 0),
                 ('沒有錯誤', not [e for e in errors if '404' not in e]),

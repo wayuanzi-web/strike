@@ -17,6 +17,18 @@ const PALETTE = {
   B: { vest: '#a08a62', plate: '#8c7852', shirt: '#7a7660', pants: '#5f6448', helmet: '#3e3f3a', band: '#ff6a2a', pack: '#5b5442', pouch: '#6f5f45', rim: '1.0, 0.75, 0.5' },
   A: { vest: '#56677e', plate: '#4a596d', shirt: '#5f6873', pants: '#3f4854', helmet: '#33383f', band: '#2fd8e0', pack: '#434c58', pouch: '#4d5866', rim: '0.55, 0.8, 1.0' },
 };
+// 機器人手上的槍：每種一個幾何（全部機器人共用），換槍只換幾何；muzzle 是槍口位置
+const BOT_GUNS = (function () {
+  const G = '#1f2226', W = '#3a342b', out = {};
+  const mk = (parts, mz) => ({ geo: mergeParts(parts), muzzle: new V3(0.16, 1.37, mz) });
+  out.rifle = mk([partBox(0.06, 0.09, 0.42, 0.16, 1.37, -0.38, G), partBox(0.035, 0.035, 0.26, 0.16, 1.39, -0.7, G), partBox(0.045, 0.16, 0.06, 0.16, 1.26, -0.42, G, 0.25), partBox(0.05, 0.08, 0.2, 0.16, 1.36, -0.08, W)], -0.84);
+  out.smg = mk([partBox(0.06, 0.09, 0.3, 0.16, 1.37, -0.36, G), partBox(0.03, 0.03, 0.12, 0.16, 1.39, -0.57, G), partBox(0.04, 0.15, 0.05, 0.16, 1.27, -0.36, G), partBox(0.03, 0.05, 0.16, 0.16, 1.37, -0.12, G)], -0.64);
+  out.sniper = mk([partBox(0.06, 0.09, 0.5, 0.16, 1.37, -0.4, G), partBox(0.03, 0.03, 0.42, 0.16, 1.39, -0.86, G), partBox(0.055, 0.055, 0.26, 0.16, 1.46, -0.38, '#2c3036'), partBox(0.06, 0.1, 0.24, 0.16, 1.35, -0.06, '#4a4436')], -1.08);
+  out.shotgun = mk([partBox(0.06, 0.09, 0.3, 0.16, 1.37, -0.32, G), partBox(0.045, 0.045, 0.42, 0.16, 1.4, -0.68, G), partBox(0.035, 0.035, 0.32, 0.16, 1.355, -0.62, W), partBox(0.05, 0.08, 0.22, 0.16, 1.35, -0.08, W)], -0.9);
+  out.pistol = mk([partBox(0.04, 0.06, 0.18, 0.06, 1.37, -0.5, G), partBox(0.035, 0.1, 0.045, 0.06, 1.3, -0.44, G, 0.2)], -0.6);
+  out.pistol.muzzle.x = 0.06;
+  return out;
+})();
 const BC0 = { skin: '#c08f6a', glove: '#2b2b2b', boot: '#2a2622', gun: '#1f2226', goggle: '#16191d', belt: '#2f2b25' };
 function makeBotModel(team) {
   const BC = Object.assign({}, BC0, PALETTE[team]);
@@ -43,13 +55,12 @@ function makeBotModel(team) {
     partBox(0.11, 0.26, 0.11, 0.25, 1.36, -0.02, BC.shirt, 0.5), partBox(0.1, 0.1, 0.28, 0.2, 1.3, -0.2, BC.shirt, 0, 0.2), partBox(0.09, 0.08, 0.09, 0.16, 1.32, -0.34, BC.glove),
     partBox(0.11, 0.26, 0.11, -0.25, 1.36, -0.04, BC.shirt, 0.6), partBox(0.115, 0.06, 0.115, -0.25, 1.42, -0.03, BC.band, 0.6),
     partBox(0.1, 0.1, 0.32, -0.12, 1.32, -0.3, BC.shirt, 0, -0.45), partBox(0.09, 0.08, 0.09, -0.02, 1.35, -0.48, BC.glove),
-    partBox(0.06, 0.09, 0.42, 0.16, 1.37, -0.38, BC.gun), partBox(0.035, 0.035, 0.26, 0.16, 1.39, -0.7, BC.gun), partBox(0.045, 0.16, 0.06, 0.16, 1.26, -0.42, BC.gun, 0.25),
-    partBox(0.05, 0.08, 0.2, 0.16, 1.36, -0.08, '#3a342b'),
   ];
   const upper = new THREE.Group(); body.add(upper);       // 蹲下時上身整個往下移（不壓扁）
   upper.add(new THREE.Mesh(mergeParts(parts), mat));
   const fl = new THREE.Sprite(BOT_FLASH_MAT); fl.position.copy(BOT_MUZZLE); fl.scale.set(0.32, 0.32, 1); fl.visible = false; upper.add(fl);
-  return { g, body, legL, legR, fl, upper, mat };
+  const gunM = new THREE.Mesh(BOT_GUNS.rifle.geo, mat); upper.add(gunM);
+  return { g, body, legL, legR, fl, upper, mat, gunM };
 }
 // 隊友頭上的名牌（CS 也會顯示隊友名字），隔牆也看得到
 function nameTag(text) {
@@ -72,6 +83,8 @@ function makeBot(name, team) {
     stuckT: 0, lastP: new V3(), deadT: 0, respawnT: 0, boxes: newBoxes(), walk: 0, searchT: 0, spottedT: 0,
   };
   b.body = b.phys;   // 物理身體：玩家程式用 bot.body，機器人程式用 bot.phys，是同一個
+  b.gunM = mdl.gunM; b.money = 0; b.nades = { he: 0, flash: 0, smoke: 0 }; b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.kit = false;
+  b.wpn = WEAPONS.rifle; b.mag = 30; b.reloadT = 0; b.blindT = 0; b.useT = 0;
   if (team === 'A') { b.tag = nameTag(name); b.g.add(b.tag); }
   b.g.visible = false;
   bots.push(b);
@@ -81,6 +94,7 @@ function botSpawn(b, sx, sz, faceX = 0, faceZ = 0) {
   const p = b.phys.pos; p.set(sx, 0, sz); b.phys.vel.set(0, 0, 0); b.phys.h = STAND_H; b.phys.crouched = false;
   b.hp = 100; b.alive = true; b.state = 'patrol'; b.path = null; b.waitT = rand(0, 1); b.visible = false; b.target = null; b.lostT = 9;
   b.deadT = 0; b.crouch = false; b.burst = 0; b.pauseT = 0; b.react = 0; b.coverUsed = 0; b.flinchT = 0; b.tagT = 0; b.holdT = 0;
+  b.blindT = 0; b.useT = 0; b.goalTag = null; b.holdObj = false; b.guard = null; b.objT = 0; b.reloadT = 0; b.mag = b.wpn.mag; b.nadeTry = 0; b.smoked = b.flashed = false;
   b.yaw = Math.atan2(-(faceX - sx), -(faceZ - sz)) + rand(-0.3, 0.3);
   b.g.visible = true; b.g.rotation.set(0, b.yaw, 0); b.g.position.copy(p);
   b.bodyGroup.scale.set(1, 1, 1); b.bodyGroup.rotation.set(0, 0, 0); b.ck = 0; b.upper.position.y = 0;
@@ -97,10 +111,16 @@ function setupBots(mode) {
   for (const b of bots) {
     b.active = mode === 'match' ? true : (b.team === 'B' && b.i < 4);
     b.kills = b.deaths = b.heads = 0;
+    if (mode !== 'match') { b.primary = WEAPONS.rifle; b.vest = b.helmet = true; b.nades = { he: 0, flash: 0, smoke: 0 }; botArm(b); }
     if (!b.active) { b.alive = false; b.g.visible = false; }
   }
 }
 const activeBots = () => bots.filter((b) => b.active);
+// 拿槍：有主武器拿主武器，沒有拿手槍；彈匣裝滿
+function botArm(b) {
+  b.wpn = b.primary || WEAPONS.pistol; b.mag = b.wpn.mag; b.reloadT = 0;
+  const g = BOT_GUNS[b.wpn.id] || BOT_GUNS.rifle; b.gunM.geometry = g.geo; b.fl.position.copy(g.muzzle);
+}
 
 // ---------- 「單位」：你或機器人，給目標選擇、開槍共用 ----------
 player.team = 'A'; player.isPlayer = true; player.name = '你';
@@ -140,7 +160,7 @@ function botEye(b, out) { const p = b.phys.pos; return out.set(p.x, p.y + b.phys
 function canSeeUnit(b, u) {
   const pp = u.body.pos, bp = b.phys.pos;
   const dx = pp.x - bp.x, dz = pp.z - bp.z, dist = Math.hypot(dx, dz);
-  if (dist > 85) return false;
+  if (dist > (game.mode === 'match' ? 50 : 85)) return false;
   const fov = b.state === 'patrol' || b.state === 'hold' ? 62 : b.state === 'search' ? 110 : 180;
   if (fov < 180 && dist > 3 && Math.abs(angDiff(b.yaw, Math.atan2(-dx, -dz))) > fov * DEG) return false;
   botEye(b, _be);
@@ -150,6 +170,7 @@ function canSeeUnit(b, u) {
 }
 // 挑目標：原本的目標還看得到就繼續打它，否則挑看得到的最近敵人
 function findTarget(b) {
+  if (b.blindT > 0.5) return null;      // 被閃到：看不見
   if (b.target && b.target.alive && canSeeUnit(b, b.target)) return b.target;
   let best = null, bd = 1e9;
   for (const u of enemiesOf(b.team)) {
@@ -159,6 +180,13 @@ function findTarget(b) {
   return best;
 }
 function botCanSee(b) { return !!findTarget(b); }   // 舊介面（測試用）
+// 對戰時不要追太遠：守方（還沒裝彈）只在自己包點 20 公尺內追；攻方衝之前只追 14 公尺內的
+function leashOK(b, pos) {
+  if (game.mode !== 'match' || ROUND.phase !== 'live' || BOMB.planted) return true;
+  if (b.team !== ROUND.atk) { const s = SITES[b.post || 'A']; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < 14; }
+  if (ROUND.plan && ROUND.plan.exec) { const s = SITES[ROUND.plan.site]; return Math.hypot(pos.x - s.cx, pos.z - s.cz) < 18 || Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z) < 12; }
+  return Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z) < 14;
+}
 function setPath(b, x, z) {
   b.path = findPath(b.phys.pos.x, b.phys.pos.z, x, z); b.pi = 0; b.stuckT = 0; b.lastP.copy(b.phys.pos);
 }
@@ -212,27 +240,30 @@ function botsHearShot(pos, team = 'A') {
   for (const b of bots) {
     if (!b.active || !b.alive || b.team === team || b.state === 'combat' || b.state === 'cover' || b.state === 'flank') continue;
     if (b.state === 'search' && b.searchT > 3) continue;
+    if (b.state === 'plant' || b.state === 'defuse') continue;
     const d = Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z);
-    if (d > 45) continue;
+    if (d > 45 || !leashOK(b, pos)) continue;
     b.state = 'search'; b.searchT = 9; b.lastSeen.set(pos.x + rand(-3, 3), 0, pos.z + rand(-3, 3));
     setPath(b, b.lastSeen.x, b.lastSeen.z);
   }
 }
 // 機器人被打：attacker 是你或另一隻機器人
-function damageBot(b, dmg, part, dir, attacker = player) {
+function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
   if (!b.alive) return;
   b.hp -= dmg;
-  const byPlayer = attacker === player;
+  const byPlayer = attacker === player, w = weapon || (byPlayer ? WP : attacker.wpn) || WEAPONS.rifle;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.deaths++; b.fallDir = Math.sign(Math.random() - 0.5);
     b.respawnT = game.mode === 'match' ? Infinity : 4.5;
     SHOOT_TOKENS.delete(b);
+    const enemy = attacker !== b && attacker.team !== b.team;
     if (byPlayer) {
       player.kills++; player.deathStreak = 0; if (part === 'head') player.heads++;
-      W.reserve = Math.min(RIFLE.reserve, W.reserve + 15);
+      if (game.mode !== 'match') W.reserve = Math.min(WP.reserve, W.reserve + 15);
       hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head');
-    } else { attacker.kills++; if (part === 'head') attacker.heads++; }
-    hudFeed(attacker.name, b.name, part === 'head', attacker.team, b.team, byPlayer);
+    } else if (enemy) { attacker.kills++; if (part === 'head') attacker.heads++; }
+    if (enemy) addMoney(attacker, w.reward || 0, '擊殺');
+    hudFeed(attacker === b ? '' : attacker.name, b.name, part === 'head', attacker.team, b.team, byPlayer, w.short);
     if (typeof onUnitDied === 'function') onUnitDied(b);
     return;
   }
@@ -241,9 +272,12 @@ function damageBot(b, dmg, part, dir, attacker = player) {
   b.flinchT = part === 'head' ? 0.6 : 0.35; b.tagT = 1.5; b.hitAnim = part === 'head' ? 0.2 : 0.15; b.hitHead = part === 'head'; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
   if (b.hp < 55 && (b.coverUsed || 0) < 2 && b.state === 'combat' && Math.random() < 0.75) { if (seekCover(b, attacker)) return; }
   // 被打到：轉頭面向攻擊者，過去找
-  if (b.state !== 'combat') {
+  if (b.state !== 'combat' && b.state !== 'plant' && b.state !== 'defuse' && leashOK(b, attacker.body.pos)) {
     b.lastSeen.copy(attacker.body.pos); b.state = 'search'; b.searchT = 8; setPath(b, b.lastSeen.x, b.lastSeen.z);
     b.alertYaw = Math.atan2(-(attacker.body.pos.x - b.phys.pos.x), -(attacker.body.pos.z - b.phys.pos.z));
+  } else if (b.state === 'hold' || b.state === 'patrol') {
+    // 太遠不追：原地轉向打它的人
+    b.holdYaw = Math.atan2(-(attacker.body.pos.x - b.phys.pos.x), -(attacker.body.pos.z - b.phys.pos.z)); b.yaw = lerp(b.yaw, b.yaw + angDiff(b.yaw, b.holdYaw), 0.5);
   }
 }
 
@@ -292,6 +326,8 @@ function updateBot(b, dt) {
   }
   if (b.tag) b.tag.visible = true;
   if (b.flinchT > 0) b.flinchT -= dt;
+  if (b.blindT > 0) b.blindT -= dt;
+  if (b.reloadT > 0) { b.reloadT -= dt; if (b.reloadT <= 0) { b.reloadT = 0; b.mag = b.wpn.mag; } }
   b.offT = inPlayerView(b) ? 0 : (b.offT || 0) + dt;
   if (b.spottedT > 0) b.spottedT -= dt;
   const frozen = typeof roundFrozen === 'function' && roundFrozen();
@@ -307,10 +343,16 @@ function updateBot(b, dt) {
       const intel = TEAM_INTEL[b.team]; intel.t = game.t; intel.pos.copy(tgt.body.pos);
       if (!tgt.isPlayer) tgt.spottedT = 1.5;
       const hiding = b.state === 'cover' && b.coverT < b.coverWait && p.distanceTo(tgt.body.pos) > 6;
-      if (b.state !== 'combat' && !hiding) {
+      const committed = b.state === 'defuse' && b.useT > (b.useNeed || 10) * 0.55;   // 快拆完了就不管了
+      if (game.mode === 'match' && b.team !== ROUND.atk) defenderCall(tgt.body.pos);
+      if (committed) { b.visible = false; }
+      else if (b.state !== 'combat' && !hiding) {
+        b.useT = 0;
         // 剛發現：反應時間；背對的要多花轉身的時間
         const need = Math.abs(angDiff(b.yaw, Math.atan2(-(tgt.body.pos.x - p.x), -(tgt.body.pos.z - p.z))));
         b.react = D.react * rand(0.8, 1.25) * (b.state === 'search' ? 0.85 : 1) + need / Math.PI * 0.45; b.settle = 1;
+        // 守點中（槍已經對著入口）：反應快、手比較穩
+        if (b.state === 'hold' && b.holdObj) { b.react *= 0.6; b.settle = 0.45; }
         b.state = 'combat'; b.strafeT = 0; b.burst = 0; b.pauseT = 0; b.warnLeft = tgt.isPlayer ? D.warn : 0;
         b.flankCheck = rand(1.0, 2.0);
       } else if (!was || prev !== tgt) {
@@ -333,16 +375,22 @@ function updateBot(b, dt) {
   } else if (b.state === 'combat') {
     if (!b.visible) {
       b.lostT += dt;
-      if (b.lostT > 0.9 || !tg) { b.state = tg ? 'search' : 'patrol'; b.searchT = 7; if (tg) setPath(b, b.lastSeen.x, b.lastSeen.z); else { b.path = null; b.target = null; } }
+      if (b.lostT > 0.9 || !tg) {
+        if (tg && leashOK(b, b.lastSeen)) { b.state = 'search'; b.searchT = 7; setPath(b, b.lastSeen.x, b.lastSeen.z); }
+        else { b.state = 'patrol'; b.path = null; b.goalTag = null; if (!tg) b.target = null; }
+      }
     }
     turnTo(b, Math.atan2(-(b.lastSeen.x - p.x), -(b.lastSeen.z - p.z)), D.turn, dt);
     b.strafeT -= dt;
     if (b.strafeT <= 0) {
-      b.strafe = pick([-1, 1, -1, 1, 0]); b.strafeT = rand(0.35, 1.1);
-      b.crouch = b.strafe === 0 && Math.random() < 0.35;
+      const holding = game.mode === 'match' && b.team !== ROUND.atk && !BOMB.planted;   // 守方守點：少跑動、多蹲
+      b.strafe = pick(holding ? [0, 0, -1, 1] : [-1, 1, -1, 1, 0]); b.strafeT = rand(0.35, 1.1);
+      b.crouch = b.strafe === 0 && Math.random() < (holding ? 0.6 : 0.35);
     }
     const rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), fx = -Math.sin(b.yaw), fz = -Math.cos(b.yaw);
-    let adv = 0; if (dist > 30) adv = 0.7; else if (dist < 5) adv = -0.6;
+    const pref = b.wpn.bot.pref; let adv = 0; if (dist > Math.max(pref[1], 12)) adv = 0.7; else if (dist < pref[0]) adv = -0.6;
+    if (b.wpn.scope && b.visible) { b.strafe = 0; }
+    if (adv > 0 && (!leashOK(b, p) || (game.mode === 'match' && b.team !== ROUND.atk && !BOMB.planted))) adv = 0;
     if (!b.visible) adv = b.lostT > 1.5 ? 0.8 : 0;   // 對方剛躲起來：先守著掩體邊緣，過一會兒才追
     const sv = b.crouch ? 0 : 3.3;
     _wish.set(rx * b.strafe * sv + fx * adv * 3.5, 0, rz * b.strafe * sv + fz * adv * 3.5);
@@ -353,22 +401,27 @@ function updateBot(b, dt) {
       b.flankCheck = undefined;
       const mates = bots.some((o) => o !== b && o.alive && o.team === b.team && o.state === 'combat' && o.target === tg);
       const blocked = tg === player ? !SHOOT_TOKENS.has(b) && SHOOT_TOKENS.size > 0 : mates;
-      if (tg && blocked && dist > 8 && Math.random() < 0.6) tryFlank(b, tg);
+      if (tg && blocked && dist > 8 && Math.random() < 0.6 && leashOK(b, tg.body.pos)) tryFlank(b, tg);
     }
     if (b.state === 'combat' && b.visible && tg) {
       b.react -= dt; b.settle = Math.max(0, b.settle - dt * 0.7);
       if (unitSpeed(tg) > RUN_SPEED * 0.6) b.settle = Math.min(1, b.settle + dt * 0.5);   // 目標一直跑，就一直瞄不穩
-      if (b.react <= 0 && (tg !== player || wantToken(b, D))) {
+      if (b.react <= 0 && b.reloadT <= 0 && (tg !== player || wantToken(b, D))) {
         if (b.pauseT > 0) b.pauseT -= dt;
         else {
-          if (b.burst <= 0) b.burst = Math.round(rand(D.burst[0], D.burst[1]));
+          const bw = b.wpn.bot, bu = bw.burst || D.burst, pa = bw.pause || D.pause;
+          if (b.burst <= 0) b.burst = Math.round(rand(bu[0], bu[1]));
           b.fireCd -= dt;
           if (b.fireCd <= 0 && Math.abs(angDiff(b.yaw, toYaw)) < 0.12) {
-            botShoot(b, tg, dist, D); b.burst--; b.fireCd = 0.11;
-            if (b.burst <= 0) { b.pauseT = rand(D.pause[0], D.pause[1]); if (Math.random() < 0.3) SHOOT_TOKENS.delete(b); }
+            botShoot(b, tg, dist, D); b.burst--; b.fireCd = bw.rate; b.mag--;
+            if (b.mag <= 0) { b.reloadT = b.wpn.reload; b.burst = 0; }
+            if (b.burst <= 0) { b.pauseT = rand(pa[0], pa[1]); if (Math.random() < 0.3) SHOOT_TOKENS.delete(b); }
           }
         }
-      }
+      } else if (b.reloadT > 0) SHOOT_TOKENS.delete(b);
+      // 對方躲起來一陣子、自己有手榴彈：丟過去
+    } else if (b.state === 'combat' && !b.visible && b.lostT > 0.8 && b.nades.he > 0 && dist > 6 && dist < 24 && game.t - (b.thrownAt || -9) > 4) {
+      botThrow(b, 'he', b.lastSeen.x, b.lastSeen.y, b.lastSeen.z);
     } else SHOOT_TOKENS.delete(b);
   } else if (b.state === 'cover') {
     b.coverT += dt;
@@ -392,8 +445,20 @@ function updateBot(b, dt) {
   } else if (b.state === 'hold') {
     // 守點：蹲或站在掩體旁，左右看
     b.holdT -= dt; b.crouchWant = b.holdCrouch;
-    b.yaw = b.holdYaw + Math.sin(game.t * 0.7 + b.i) * 0.6;
+    turnTo(b, b.holdYaw + Math.sin(game.t * 0.7 + b.i) * 0.5, 3, dt);
     if (b.holdT <= 0) { b.state = 'patrol'; b.path = null; }
+    // 對戰：目標換了（開始進攻、炸彈裝好了、要轉點）就離開
+    if (b.holdObj && game.t > (b.holdCheck || 0)) { b.holdCheck = game.t + 0.4; if (objectiveGoal(b).tag !== b.goalTag) { b.state = 'patrol'; b.path = null; b.holdObj = false; } else botHoldNades(b); }
+  } else if (b.state === 'plant') {
+    b.crouchWant = true; b.useT += dt;
+    if (!isCarrier(b) || ROUND.phase !== 'live') { b.state = 'patrol'; b.useT = 0; }
+    else if (b.useT >= PLANT_TIME) { b.useT = 0; plantBomb(b); b.state = 'patrol'; b.path = null; }
+  } else if (b.state === 'defuse') {
+    b.crouchWant = true; b.useT += dt; turnTo(b, Math.atan2(-(BOMB.pos.x - p.x), -(BOMB.pos.z - p.z)), 4, dt);
+    if (BOMB.state !== 'planted' || ROUND.phase !== 'live') { b.state = 'patrol'; b.useT = 0; }
+    else if (b.useT >= b.useNeed) { b.useT = 0; b.state = 'patrol'; defuseBomb(b); }
+  } else if (game.mode === 'match') {
+    botObjective(b, dt);
   } else {
     // 巡邏：練習模式走到隨機遠處；對戰時往前推進，到了有時守一下
     if (b.waitT > 0) { b.waitT -= dt; b.yaw += Math.sin(b.waitT * 2) * dt * 0.8; }
@@ -452,9 +517,9 @@ function updateBot(b, dt) {
   hitBoxes(p, b.phys.h, b.boxes);
 }
 
-// 機器人開槍：瞄準目標胸口，誤差 = 基本誤差 + 距離 × 係數 + 自己在動 + 目標在動 + 剛發現時手還不穩
+// 機器人開槍：瞄準目標胸口，誤差 = （基本誤差 + 距離 × 係數 + 自己在動 + 目標在動 + 剛發現時手還不穩）× 武器準度
 function botShoot(b, tg, dist, D) {
-  const pp = tg.body.pos, isP = tg === player;
+  const pp = tg.body.pos, isP = tg === player, w = b.wpn, n = w.pellets || 1;
   botEye(b, _be);
   // 開火前再確認一次看得到（感知 0.1 秒才更新一次）
   if (!lineClear(_be, _pt.set(pp.x, pp.y + tg.body.h - 0.12, pp.z)) && !lineClear(_be, _pt.set(pp.x, pp.y + tg.body.h * 0.62, pp.z))) { b.visible = false; return; }
@@ -472,37 +537,49 @@ function botShoot(b, tg, dist, D) {
   }
   _bd.subVectors(_pt, _be).normalize();
   const moving = Math.hypot(b.phys.vel.x, b.phys.vel.z) > 1 ? 1 : 0;
-  let errDeg = D.base + dist * D.distK + moving * 1.0 + (unitSpeed(tg) / RUN_SPEED) * D.pMoveK + b.settle * D.settleK + (b.phys.crouched ? -0.2 : 0) + (b.flinchT > 0 ? 3.5 : 0);
+  let errDeg = D.base + dist * D.distK + moving * (w.scope ? 6 : 1.0) + (unitSpeed(tg) / RUN_SPEED) * D.pMoveK + b.settle * D.settleK + (b.phys.crouched ? -0.2 : 0) + (b.flinchT > 0 ? 3.5 : 0);
+  errDeg *= w.bot.err;
+  if (b.blindT > 0) errDeg += 14;
   if (isP && D.mercy) {
     if (b.offT > 0) errDeg *= 1.6;
     const hpK = player.hp < 40 ? 1 + (40 - player.hp) / 40 * 0.5 : 1, streakK = 1 + Math.min(player.deathStreak || 0, 3) * 0.12;
     errDeg *= hpK * streakK;
   }
   if (forceMiss) errDeg = Math.min(errDeg, 1.2);
-  const yaw = Math.atan2(-_bd.x, -_bd.z) + gauss() * errDeg * 0.5 * DEG;
-  const pitch = Math.asin(clamp(_bd.y, -1, 1)) + gauss() * errDeg * 0.5 * DEG;
-  _bd.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
-  const w = rayWorld(_be, _bd, 160);
-  let t = w ? w.t : 160;
-  // 子彈打到這條線上最近的敵隊單位（不一定是瞄的那個）
-  let hitU = null, hitPart = null;
-  if (!forceMiss) for (const u of enemiesOf(b.team)) { const h = rayBody(_be, _bd, u.boxes, t); if (h) { t = h.t; hitU = u; hitPart = h.part; } }
-  const end = _end.copy(_be).addScaledVector(_bd, t);
+  const yaw0 = Math.atan2(-_bd.x, -_bd.z) + gauss() * errDeg * 0.5 * DEG;
+  const pitch0 = Math.asin(clamp(_bd.y, -1, 1)) + gauss() * errDeg * 0.5 * DEG;
   b.g.updateMatrixWorld();
   const mz = b.fl.getWorldPosition(_v3);
-  spawnTracer(mz, end, b.team === 'B' ? '#ff9a6a' : '#9fe6ff', 0.018, hitU === player);
-  if (hitU === player) {
-    let dmg = 25 * (hitPart === 'head' ? D.headMul : PART_MUL[hitPart]) * D.dmg;
-    if (D.mercy && player.hp > 50 && player.hp - dmg <= 0) dmg = player.hp - 1;   // 血量一半以上時不會被一發打死（困難沒有）
-    damagePlayer(dmg, b, hitPart);
-  } else if (hitU) {
-    // 機器人互打：跟你的步槍一樣（36 傷害、護甲、頭盔）
-    let dmg = 36 * PART_MUL[hitPart] * Math.pow(RIFLE.falloff, t / 12.7);
-    if (hitPart !== 'legs') dmg *= RIFLE.armorPen; if (hitPart === 'head') dmg *= 0.94;
-    damageBot(hitU, dmg, hitPart, _bd, b);
-    spawnPuff(end, '#9e1d16', 0.3, 0.3, 0.2);
-  } else if (w) addDecal(end, w.n);
-  sfx('botshot', 1, { pos: b.phys.pos });
+  const hits = new Map(); let lastEnd = null;
+  for (let k = 0; k < n; k++) {
+    let yaw = yaw0, pitch = pitch0;
+    if (n > 1) { const r = Math.sqrt(Math.random()) * w.pelletSpread * DEG, a = Math.random() * 6.283; yaw += Math.cos(a) * r; pitch += Math.sin(a) * r; }
+    _bd.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+    const wl = rayWorld(_be, _bd, 160);
+    let t = wl ? wl.t : 160;
+    // 子彈打到這條線上最近的敵隊單位（不一定是瞄的那個）
+    let hitU = null, hitPart = null;
+    if (!forceMiss) for (const u of enemiesOf(b.team)) { const h = rayBody(_be, _bd, u.boxes, t); if (h) { t = h.t; hitU = u; hitPart = h.part; } }
+    const end = _end.copy(_be).addScaledVector(_bd, t);
+    if (k < 2) spawnTracer(mz, end, b.team === 'B' ? '#ff9a6a' : '#9fe6ff', 0.018, hitU === player);
+    if (hitU) {
+      const vest = hitU === player ? INV.vest : hitU.vest !== false, helm = hitU === player ? INV.helmet : hitU.helmet !== false;
+      let dmg = weaponDamage(w, hitPart, t, vest, helm);
+      if (hitU === player) { if (hitPart === 'head') dmg *= D.headMul / 4; dmg *= D.dmg * 0.9; }
+      const e = hits.get(hitU) || { dmg: 0, part: 'legs' }; e.dmg += dmg;
+      if (hitPart === 'head' || (hitPart === 'body' && e.part === 'legs')) e.part = hitPart;
+      hits.set(hitU, e);
+      if (hitU !== player && k < 3) spawnPuff(end, '#9e1d16', 0.3, 0.3, 0.2);
+    } else if (wl && k < 3) addDecal(end, wl.n);
+  }
+  for (const [u, e] of hits) {
+    if (u === player) {
+      let dmg = e.dmg;
+      if (D.mercy && player.hp > 50 && player.hp - dmg <= 0) dmg = player.hp - 1;   // 血量一半以上時不會被一發打死（困難沒有）
+      damagePlayer(dmg, b, e.part, w);
+    } else damageBot(u, e.dmg, e.part, _bd.clone(), b, w);
+  }
+  sfx('botshot', 1, { pos: b.phys.pos, w });
   muzzleLight(mz, 1.0);
   b.flashT = 0.05; b.firedAt = game.t;
   botsHearShot(b.phys.pos, b.team);

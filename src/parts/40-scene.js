@@ -70,49 +70,124 @@ const VM_MATS = {
   cloth: new THREE.MeshMatcapMaterial({ matcap: matcapTex('#6f7566', '#c4c9b6', '#4d4b42'), vertexColors: true }),
 };
 // 步槍：通用突擊步槍外形（不是任何一把真槍）。槍身朝 -z，原點在握把附近
-const gun = new THREE.Group();
-const gunRig = new THREE.Group(); gunRig.add(gun); vmScene.add(gunRig);
-(function buildGun() {
-  const M = '#ffffff', D = '#9aa0a8', P = '#ffffff', P2 = '#c9bfae';
-  const metal = [
-    partProfile([[0.12, -0.022], [-0.33, -0.022], [-0.33, 0.058], [0.09, 0.058], [0.12, 0.035]], 0.064, 0, M),   // 機匣
-    partBox(0.03, 0.012, 0.36, 0, 0.066, -0.13, D),                                                       // 上導軌
-    partCyl(0.0125, 0.24, 0, 0.018, -0.68, M), partCyl(0.019, 0.075, 0, 0.018, -0.83, D, 6),             // 槍管、消焰器
-    partBox(0.008, 0.024, 0.075, 0.017, 0.018, -0.83, '#4a4e55'), partBox(0.008, 0.024, 0.075, -0.017, 0.018, -0.83, '#4a4e55'),
-    partBox(0.016, 0.05, 0.02, 0, 0.055, -0.56, M), partBox(0.008, 0.045, 0.012, 0, 0.0675, -0.56, D),     // 準星座、準星
-    partBox(0.04, 0.012, 0.05, 0, 0.066, -0.06, M), partBox(0.005, 0.03, 0.025, -0.014, 0.075, -0.06, D), partBox(0.005, 0.03, 0.025, 0.014, 0.075, -0.06, D),  // 照門
-    partBox(0.012, 0.012, 0.05, 0.04, 0.035, -0.04, D),                                                   // 拉機柄
-    partBox(0.006, 0.006, 0.07, 0, -0.052, 0.0, M), partBox(0.006, 0.03, 0.006, 0, -0.038, 0.035, M),     // 扳機護弓
-    partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.15, '#15171a'),                                             // 拋殼口
-  ];
-  for (let k = 0; k < 10; k++) metal.push(partBox(0.034, 0.006, 0.012, 0, 0.074, -0.29 + k * 0.032, D));   // 導軌齒
-  const poly = [
-    partProfile([[-0.3, -0.036], [-0.58, -0.03], [-0.58, 0.046], [-0.3, 0.052]], 0.072, 0, P),           // 護木
-    partProfile([[0.04, -0.02], [0.0, -0.02], [0.035, -0.145], [0.078, -0.145]], 0.045, 0, P),           // 握把
-    partProfile([[0.12, 0.05], [0.12, -0.03], [0.3, -0.095], [0.335, -0.095], [0.335, 0.058], [0.2, 0.058]], 0.056, 0, P),  // 槍托
-    partBox(0.06, 0.13, 0.02, 0, -0.02, 0.33, P2),                                                        // 托底板
-  ];
-  for (let k = 0; k < 5; k++) { poly.push(partBox(0.074, 0.008, 0.012, 0, 0.02, -0.33 - k * 0.05, P2)); }   // 護木散熱溝
-  // 手：手套、袖子（右手握握把、左手托護木）
-  const glove = '#5a5d5e', sleeve = '#8a907c', cuff = '#6a7062';
-  const cloth = [
-    partBox(0.085, 0.09, 0.34, 0.035, -0.135, 0.22, sleeve, 0.35), partBox(0.095, 0.1, 0.05, 0.035, -0.105, 0.07, cuff, 0.35),
-    partBox(0.065, 0.075, 0.09, 0.012, -0.085, 0.03, glove, -0.3), partBox(0.06, 0.02, 0.05, -0.02, -0.06, -0.02, glove),
-  ];
-  // 左手（托護木）單獨一個，換彈時會伸去拿彈匣
-  const left = [
-    partBox(0.085, 0.09, 0.38, -0.08, -0.115, -0.32, sleeve, 0.35, 0.55), partBox(0.095, 0.1, 0.05, -0.04, -0.07, -0.43, cuff, 0.35, 0.55),
-    partBox(0.08, 0.05, 0.1, -0.005, -0.045, -0.47, glove), partBox(0.03, 0.06, 0.09, 0.035, -0.01, -0.47, glove),
-  ];
-  gun.add(new THREE.Mesh(mergeParts(metal), VM_MATS.metal));
-  gun.add(new THREE.Mesh(mergeParts(poly), VM_MATS.poly));
-  gun.add(new THREE.Mesh(mergeParts(cloth), VM_MATS.cloth));
-  const leftArm = new THREE.Mesh(mergeParts(left), VM_MATS.cloth); gun.add(leftArm); gun.userData.leftArm = leftArm;
-  // 彈匣（換彈時會動，單獨一個）：往前彎的長條
-  const mag = new THREE.Mesh(mergeParts([partProfile([[0.035, 0.08], [-0.035, 0.08], [-0.07, -0.1], [0.002, -0.112]], 0.042, 0, '#ffffff')]), VM_MATS.metal);
-  mag.position.set(0, -0.1, -0.2); gun.add(mag); gun.userData.mag = mag;
-  gun.userData.muzzle = new V3(0, 0.018, -0.88);
+// ---------- 手上的槍：每種武器一組模型，換槍時換掉 gunRig 裡的那組 ----------
+const gunRig = new THREE.Group(); vmScene.add(gunRig);
+const GLOVE = '#5a5d5e', SLEEVE = '#8a907c', CUFF = '#6a7062';
+// 右手（握握把）：位置是手套中心；左手：位置是手套中心，可以是單獨的物件（換彈時會動）
+function vmRightArm(x, y, z) {
+  const ox = x - 0.012, oy = y + 0.085, oz = z - 0.03;
+  return [partBox(0.085, 0.09, 0.34, 0.035 + ox, -0.135 + oy, 0.22 + oz, SLEEVE, 0.35), partBox(0.095, 0.1, 0.05, 0.035 + ox, -0.105 + oy, 0.07 + oz, CUFF, 0.35),
+    partBox(0.065, 0.075, 0.09, 0.012 + ox, -0.085 + oy, 0.03 + oz, GLOVE, -0.3), partBox(0.06, 0.02, 0.05, -0.02 + ox, -0.06 + oy, -0.02 + oz, GLOVE)];
+}
+function vmLeftArm(x, y, z) {
+  const ox = x + 0.005, oy = y + 0.045, oz = z + 0.47;
+  return [partBox(0.085, 0.09, 0.38, -0.08 + ox, -0.115 + oy, -0.32 + oz, SLEEVE, 0.35, 0.55), partBox(0.095, 0.1, 0.05, -0.04 + ox, -0.07 + oy, -0.43 + oz, CUFF, 0.35, 0.55),
+    partBox(0.08, 0.05, 0.1, -0.005 + ox, -0.045 + oy, -0.47 + oz, GLOVE), partBox(0.03, 0.06, 0.09, 0.035 + ox, -0.01 + oy, -0.47 + oz, GLOVE)];
+}
+function vmAssemble(metal, poly, cloth, left, magParts, magPos, muzzle) {
+  const g = new THREE.Group();
+  if (metal.length) g.add(new THREE.Mesh(mergeParts(metal), VM_MATS.metal));
+  if (poly.length) g.add(new THREE.Mesh(mergeParts(poly), VM_MATS.poly));
+  if (cloth.length) g.add(new THREE.Mesh(mergeParts(cloth), VM_MATS.cloth));
+  const la = new THREE.Mesh(mergeParts(left.length ? left : [partBox(0.001, 0.001, 0.001, 0, 0, 0, GLOVE)]), VM_MATS.cloth); g.add(la); g.userData.leftArm = la;
+  const mag = new THREE.Mesh(mergeParts(magParts), VM_MATS.metal); mag.position.copy(magPos); g.add(mag); g.userData.mag = mag; g.userData.magY = magPos.y;
+  g.userData.muzzle = muzzle; g.visible = false; gunRig.add(g);
+  return g;
+}
+const VMODELS = {};
+(function buildViewmodels() {
+  const M = '#ffffff', D = '#9aa0a8', P = '#ffffff', P2 = '#c9bfae', K = '#4a4e55';
+  // 步槍「曙七」
+  {
+    const metal = [
+      partProfile([[0.12, -0.022], [-0.33, -0.022], [-0.33, 0.058], [0.09, 0.058], [0.12, 0.035]], 0.064, 0, M),
+      partBox(0.03, 0.012, 0.36, 0, 0.066, -0.13, D), partCyl(0.0125, 0.24, 0, 0.018, -0.68, M), partCyl(0.019, 0.075, 0, 0.018, -0.83, D, 6),
+      partBox(0.008, 0.024, 0.075, 0.017, 0.018, -0.83, K), partBox(0.008, 0.024, 0.075, -0.017, 0.018, -0.83, K),
+      partBox(0.016, 0.05, 0.02, 0, 0.055, -0.56, M), partBox(0.008, 0.045, 0.012, 0, 0.0675, -0.56, D),
+      partBox(0.04, 0.012, 0.05, 0, 0.066, -0.06, M), partBox(0.005, 0.03, 0.025, -0.014, 0.075, -0.06, D), partBox(0.005, 0.03, 0.025, 0.014, 0.075, -0.06, D),
+      partBox(0.012, 0.012, 0.05, 0.04, 0.035, -0.04, D), partBox(0.006, 0.006, 0.07, 0, -0.052, 0.0, M), partBox(0.006, 0.03, 0.006, 0, -0.038, 0.035, M),
+      partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.15, '#15171a'),
+    ];
+    for (let k = 0; k < 10; k++) metal.push(partBox(0.034, 0.006, 0.012, 0, 0.074, -0.29 + k * 0.032, D));
+    const poly = [
+      partProfile([[-0.3, -0.036], [-0.58, -0.03], [-0.58, 0.046], [-0.3, 0.052]], 0.072, 0, P),
+      partProfile([[0.04, -0.02], [0.0, -0.02], [0.035, -0.145], [0.078, -0.145]], 0.045, 0, P),
+      partProfile([[0.12, 0.05], [0.12, -0.03], [0.3, -0.095], [0.335, -0.095], [0.335, 0.058], [0.2, 0.058]], 0.056, 0, P),
+      partBox(0.06, 0.13, 0.02, 0, -0.02, 0.33, P2),
+    ];
+    for (let k = 0; k < 5; k++) poly.push(partBox(0.074, 0.008, 0.012, 0, 0.02, -0.33 - k * 0.05, P2));
+    VMODELS.rifle = vmAssemble(metal, poly, vmRightArm(0.012, -0.085, 0.03), vmLeftArm(-0.005, -0.045, -0.47),
+      [partProfile([[0.035, 0.08], [-0.035, 0.08], [-0.07, -0.1], [0.002, -0.112]], 0.042, 0, M)], new V3(0, -0.1, -0.2), new V3(0, 0.018, -0.88));
+  }
+  // 衝鋒槍「蜂」：短機匣、短槍管、摺疊托、直彈匣
+  {
+    const metal = [
+      partBox(0.058, 0.07, 0.34, 0, 0.018, -0.1, M), partCyl(0.012, 0.16, 0, 0.022, -0.34, M), partCyl(0.022, 0.06, 0, 0.022, -0.44, D, 6),
+      partBox(0.026, 0.01, 0.26, 0, 0.058, -0.1, D), partBox(0.012, 0.04, 0.014, 0, 0.068, -0.24, D), partBox(0.03, 0.02, 0.03, 0, 0.068, 0.04, D),
+      partBox(0.012, 0.012, 0.04, 0.035, 0.03, -0.12, D), partBox(0.006, 0.006, 0.06, 0, -0.04, 0.0, M),
+      partBox(0.012, 0.012, 0.2, 0.02, 0.0, 0.17, D), partBox(0.012, 0.012, 0.2, -0.02, 0.0, 0.17, D), partBox(0.05, 0.08, 0.015, 0, -0.02, 0.27, D),
+    ];
+    const poly = [
+      partProfile([[0.04, -0.02], [0.0, -0.02], [0.03, -0.14], [0.072, -0.14]], 0.045, 0, P),
+      partBox(0.065, 0.05, 0.12, 0, -0.01, -0.25, P), partBox(0.035, 0.09, 0.035, 0, -0.07, -0.29, P2),
+    ];
+    VMODELS.smg = vmAssemble(metal, poly, vmRightArm(0.012, -0.085, 0.03), vmLeftArm(-0.005, -0.1, -0.3),
+      [partBox(0.03, 0.16, 0.045, 0, -0.03, 0, M)], new V3(0, -0.08, -0.12), new V3(0, 0.022, -0.48));
+  }
+  // 狙擊槍「鷲」：長槍管、瞄準鏡、拉機柄、厚槍托
+  {
+    const metal = [
+      partBox(0.06, 0.07, 0.42, 0, 0.018, -0.12, M), partCyl(0.014, 0.6, 0, 0.022, -0.62, M), partCyl(0.02, 0.07, 0, 0.022, -0.95, D, 6),
+      partCyl(0.026, 0.3, 0, 0.11, -0.13, '#5a5f66', 10), partCyl(0.034, 0.07, 0, 0.11, -0.3, '#5a5f66', 10), partCyl(0.03, 0.06, 0, 0.11, 0.03, '#5a5f66', 10),
+      partBox(0.02, 0.05, 0.03, 0, 0.068, -0.22, D), partBox(0.02, 0.05, 0.03, 0, 0.068, -0.02, D),
+      partBox(0.06, 0.012, 0.012, 0.05, 0.03, 0.02, D), partCyl(0.012, 0.02, 0.085, 0.03, 0.02, D, 6),
+      partBox(0.006, 0.006, 0.07, 0, -0.052, 0.0, M),
+    ];
+    const poly = [
+      partProfile([[-0.02, -0.04], [-0.48, -0.03], [-0.48, 0.03], [-0.02, 0.04]], 0.07, 0, P),
+      partProfile([[0.04, -0.02], [0.0, -0.02], [0.035, -0.145], [0.078, -0.145]], 0.048, 0, P),
+      partProfile([[0.1, 0.06], [0.1, -0.04], [0.36, -0.11], [0.4, -0.11], [0.4, 0.07], [0.25, 0.07]], 0.06, 0, P),
+      partBox(0.064, 0.14, 0.02, 0, -0.02, 0.4, P2),
+    ];
+    VMODELS.sniper = vmAssemble(metal, poly, vmRightArm(0.012, -0.085, 0.03), vmLeftArm(-0.005, -0.06, -0.4),
+      [partBox(0.04, 0.06, 0.08, 0, 0, 0, M)], new V3(0, -0.05, -0.12), new V3(0, 0.022, -0.99));
+  }
+  // 霰彈槍「犀」：粗槍管＋下方彈倉管、泵動護木（左手握著，開槍後會拉）
+  {
+    const metal = [
+      partBox(0.06, 0.08, 0.3, 0, 0.015, -0.08, M), partCyl(0.019, 0.62, 0, 0.032, -0.53, M), partCyl(0.015, 0.5, 0, -0.012, -0.48, D),
+      partBox(0.012, 0.015, 0.015, 0, 0.056, -0.82, D), partBox(0.006, 0.006, 0.07, 0, -0.045, 0.02, M), partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.1, '#15171a'),
+    ];
+    const poly = [
+      partProfile([[0.04, -0.02], [0.0, -0.02], [0.035, -0.145], [0.078, -0.145]], 0.048, 0, P),
+      partProfile([[0.08, 0.05], [0.08, -0.04], [0.32, -0.1], [0.35, -0.1], [0.35, 0.05], [0.2, 0.06]], 0.056, 0, P),
+      partBox(0.064, 0.13, 0.02, 0, -0.025, 0.35, P2),
+    ];
+    // 泵動護木和左手一起動（當成左手的一部分）
+    const left = vmLeftArm(-0.005, -0.05, -0.44).concat([partBox(0.058, 0.05, 0.16, 0, -0.01, -0.44, P2)]);
+    for (let k = 0; k < 5; k++) left.push(partBox(0.062, 0.006, 0.01, 0, 0.005, -0.38 - k * 0.028, P));
+    VMODELS.shotgun = vmAssemble(metal, poly, vmRightArm(0.012, -0.085, 0.03), left,
+      [partCyl(0.011, 0.05, 0, 0, 0, '#c43d2a')], new V3(0.02, -0.04, -0.1), new V3(0, 0.032, -0.86));
+  }
+  // 手槍「隼」：滑套、雙手握
+  {
+    const metal = [
+      partBox(0.034, 0.042, 0.21, 0, 0.035, -0.09, M), partBox(0.03, 0.03, 0.17, 0, 0.0, -0.08, D),
+      partBox(0.008, 0.012, 0.01, 0, 0.061, -0.19, D), partBox(0.024, 0.012, 0.012, 0, 0.061, 0.0, D),
+      partBox(0.006, 0.006, 0.05, 0, -0.03, -0.04, M), partCyl(0.009, 0.02, 0, 0.035, -0.2, '#15171a'),
+    ];
+    for (let k = 0; k < 4; k++) metal.push(partBox(0.036, 0.03, 0.004, 0, 0.038, 0.0 - k * 0.01, D));
+    const poly = [partProfile([[0.025, -0.012], [-0.02, -0.012], [0.005, -0.12], [0.05, -0.12]], 0.032, 0, P)];
+    VMODELS.pistol = vmAssemble(metal, poly, vmRightArm(0.015, -0.075, 0.015), vmLeftArm(-0.02, -0.08, -0.0),
+      [partBox(0.024, 0.09, 0.03, 0, 0, 0, M)], new V3(0.02, -0.1, 0.01), new V3(0, 0.035, -0.21));
+  }
+  // 投擲物：右手拿著（三種顏色）
+  const nade = (body, band) => vmAssemble([partCyl(0.007, 0.03, 0.03, 0.06, 0.0, '#c8c2b0'), partBox(0.012, 0.05, 0.02, 0.025, 0.035, 0.02, D)],
+    [partCyl(0.032, 0.1, 0, 0, 0, body, 10), partCyl(0.0335, 0.018, 0, 0, -0.02, band, 10)], vmRightArm(0.012, -0.075, 0.06), vmLeftArm(-0.04, -0.06, -0.1),
+    [partBox(0.001, 0.001, 0.001, 0, 0, 0, M)], new V3(0, 0, 0), new V3(0, 0, -0.05));
+  for (const g of [VMODELS.he = nade('#5d6440', '#2b2d22'), VMODELS.flash = nade('#c9cdd2', '#3b6fb0'), VMODELS.smoke = nade('#77808a', '#d8d8d8')]) g.children[1].rotation.x = Math.PI / 2;
 })();
+let gun = VMODELS.rifle; gun.visible = true;
 // 走進陰影時手上的槍也跟著變暗（matcap 不受場景燈光影響，用這個近似）
 let vmLight = 1;
 function updateViewmodelLight(dt) {
@@ -137,6 +212,10 @@ const flashTex = starTexture();
 const flash = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false }));
 flash.position.copy(gun.userData.muzzle); flash.visible = false; gun.add(flash);
 const flash2 = flash.clone(); flash2.rotation.y = Math.PI / 2; flash2.scale.set(0.7, 1.6, 1); flash.add(flash2);
+function setViewmodel(kind) {
+  const g = VMODELS[kind] || VMODELS.rifle; if (g === gun) return;
+  gun.visible = false; gun = g; gun.visible = true; gun.add(flash); flash.position.copy(gun.userData.muzzle);
+}
 
 // ---------- 彈道線：一小段亮線從槍口飛到命中點 ----------
 const tracers = [];
@@ -379,13 +458,27 @@ let shotI = 0;
 function sfx(kind, vol = 1, o = {}) {
   if (!AC || !S.sound || vol < 0.02) return;
   if (kind === 'shot') {
-    if (BUF.shot) playBuf(BUF.shot[shotI++ % 4], 0.9);
+    // 每把槍用同一組槍聲換音高、音量（手槍尖、狙擊低沉、霰彈多一層低頻）
+    const w = (o.w && o.w.snd) || { rate: 1, vol: 0.9 };
+    if (BUF.shot) playBuf(BUF.shot[shotI++ % 4], w.vol, { rate: w.rate * rand(0.97, 1.03) });
     else { noise(0.16, 2400, 0.7, 0.9); noise(0.09, 600, 1, 0.8); tone(140, 0.08, 0.35, 'sine', 0, 50); }
+    if (w.rate < 0.85) { noise(0.25, 220, 0.8, 0.5); tone(70, 0.22, 0.35, 'sine', 0, 35); }
   } else if (kind === 'botshot') {
-    const sp = o.pos ? spatial(o.pos) : { vol, lp: 6000, pan: 0, delay: 0 };
-    if (BUF.shot) playBuf(BUF.shot[shotI++ % 4], sp.vol * 0.85, { lp: sp.lp, pan: sp.pan, delay: sp.delay, rate: rand(0.92, 0.98) });
+    const sp = o.pos ? spatial(o.pos) : { vol, lp: 6000, pan: 0, delay: 0 }, w = (o.w && o.w.snd) || { rate: 1, vol: 0.9 };
+    if (BUF.shot) playBuf(BUF.shot[shotI++ % 4], sp.vol * 0.95 * w.vol, { lp: sp.lp, pan: sp.pan, delay: sp.delay, rate: w.rate * rand(0.92, 0.98) });
     else { noise(0.14, 1500, 0.8, 0.7 * sp.vol); }
-  } else if (kind === 'hit') { if (BUF.hit) playBuf(BUF.hit, 0.8); else tone(1500, 0.05, 0.18, 'square'); }
+  } else if (kind === 'boom' || kind === 'bang' || kind === 'hiss' || kind === 'clink' || kind === 'beep' || kind === 'bombboom') {
+    const sp = o.pos ? spatial(o.pos) : { vol: 1, pan: 0 }, v = vol * sp.vol, pn = sp.pan;
+    if (kind === 'boom') { noise(0.6, 380, 0.7, 1.2 * v, 'lowpass', 0, pn); noise(0.12, 2200, 0.6, 0.6 * v, 'lowpass', 0, pn); tone(55, 0.5, 0.6 * v, 'sine', 0, 30); }
+    else if (kind === 'bombboom') { noise(1.6, 260, 0.7, 1.6 * v, 'lowpass', 0, pn); noise(0.3, 1800, 0.6, 0.9 * v, 'lowpass', 0, pn); tone(42, 1.2, 0.9 * v, 'sine', 0, 22); }
+    else if (kind === 'bang') { noise(0.25, 3500, 0.5, 1.0 * v, 'highpass', 0, pn); noise(0.4, 600, 0.7, 0.6 * v, 'lowpass', 0, pn); }
+    else if (kind === 'hiss') noise(1.4, 1600, 0.4, 0.35 * v, 'bandpass', 0, pn);
+    else if (kind === 'clink') noise(0.04, 3000 + Math.random() * 800, 8, 0.35 * v, 'bandpass', 0, pn);
+    else if (kind === 'beep') { const t = AC.currentTime, osc = AC.createOscillator(), g = AC.createGain(); osc.type = 'square'; osc.frequency.value = 2100;
+      g.gain.setValueAtTime(0.09 * Math.max(0.25, v), t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.09); osc.connect(g); g.connect(master); osc.start(t); osc.stop(t + 0.1); }
+  } else if (kind === 'ring') { tone(3800, 2.4 * vol + 0.4, 0.05 * vol, 'sine'); }
+  else if (kind === 'cash') { tone(1568, 0.06, 0.07, 'triangle'); tone(2093, 0.12, 0.07, 'triangle', 0.05); }
+  else if (kind === 'plant') { noise(0.05, 2000, 5, 0.3, 'bandpass'); tone(1400, 0.05, 0.05, 'square', 0.02); } else if (kind === 'hit') { if (BUF.hit) playBuf(BUF.hit, 0.8); else tone(1500, 0.05, 0.18, 'square'); }
   else if (kind === 'head') { if (BUF.head) playBuf(BUF.head, 0.75, { rate: 1 }); else { tone(2100, 0.05, 0.2, 'square'); tone(2800, 0.06, 0.14, 'square', 0.03); } }
   else if (kind === 'kill') { tone(880, 0.06, 0.09, 'triangle'); tone(1320, 0.1, 0.09, 'triangle', 0.05); }
   else if (kind === 'hurt') { noise(0.12, 300, 1, 0.8); tone(90, 0.12, 0.3, 'sine'); }

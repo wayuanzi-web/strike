@@ -187,6 +187,42 @@ body.match #dead { background: none; }
 #rotate small { color: var(--mute); font-size: 14px; }
 @keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 @media (prefers-reduced-motion: reduce) { #rotate svg { animation: none; transform: rotate(-90deg); } }
+
+/* ---------- M2：金錢、炸彈、換槍、投擲物、裝彈拆彈、購買選單、狙擊鏡、閃光與煙 ---------- */
+#money { position: absolute; left: calc(var(--sl) + var(--u) * 3); bottom: calc(var(--sb) + var(--u) * 13.5); display: flex; gap: calc(var(--u) * 1.2); align-items: center; font-family: var(--f-num); }
+#money b { background: var(--panel); padding: calc(var(--u) * .4) calc(var(--u) * 1.8); border-radius: 4px; font-size: calc(var(--u) * 4.2); font-weight: 800; color: #9fe8a8; font-variant-numeric: tabular-nums; }
+#money .chip { font-family: var(--f-body); font-size: max(11px, calc(var(--u) * 2.6)); font-weight: 700; padding: calc(var(--u) * .5) calc(var(--u) * 1.4); border-radius: 3px; background: rgba(255,120,40,.85); color: #1a0a00; }
+#money .chip.kit { background: rgba(127,233,240,.85); }
+#cash { font-family: var(--f-num); font-weight: 800; font-size: calc(var(--u) * 3.6); color: #9fe8a8; text-shadow: 0 1px 4px rgba(0,0,0,.7); transition: opacity .4s; white-space: nowrap; }
+#cash small { font-family: var(--f-body); font-size: max(11px, calc(var(--u) * 2.4)); color: var(--bone); margin-left: .4em; font-weight: 600; }
+#nadeH { font-family: var(--f-body); font-size: max(11px, calc(var(--u) * 2.4)); color: var(--dawn-lt); margin-left: calc(var(--u) * 1); }
+#mtop .clk strong.bomb { color: #ff5a3d; animation: blink .5s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .45; } }
+#useBox { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); width: calc(var(--u) * 34); text-align: center; font-size: max(12px, calc(var(--u) * 3)); color: var(--bone); text-shadow: 0 1px 4px #000; }
+#useBox i { display: block; height: 5px; background: rgba(255,255,255,.2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+#useBox i b { display: block; height: 100%; width: 0; background: var(--dawn); }
+#scope { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at center, transparent 0, transparent calc(var(--u) * 46), rgba(0,0,0,.92) calc(var(--u) * 46.6), #000 calc(var(--u) * 52)); }
+#scope::before, #scope::after { content: ""; position: absolute; background: rgba(0,0,0,.85); }
+#scope::before { left: 0; right: 0; top: 50%; height: 1px; } #scope::after { top: 0; bottom: 0; left: 50%; width: 1px; }
+#flashOv { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+#smokeOv { position: absolute; inset: 0; background: #a9adb1; opacity: 0; pointer-events: none; }
+#bSwap { width: max(44px, calc(var(--u) * 12)); height: max(44px, calc(var(--u) * 12)); right: calc(var(--sr) + var(--u) * 47); bottom: calc(var(--sb) + var(--u) * 21); font-size: max(11px, calc(var(--u) * 2.5)); }
+#bNade { width: max(44px, calc(var(--u) * 12)); height: max(44px, calc(var(--u) * 12)); right: calc(var(--sr) + var(--u) * 46); bottom: calc(var(--sb) + var(--u) * 36); font-size: max(11px, calc(var(--u) * 2.5)); }
+#bUse { right: calc(var(--sr) + var(--u) * 62); bottom: calc(var(--sb) + var(--u) * 22); width: calc(var(--u) * 22); height: calc(var(--u) * 12); border-radius: calc(var(--u) * 6); font-size: max(13px, calc(var(--u) * 3.4));
+  background: rgba(255,120,40,.35); border-color: #ff8a3d; }
+#bUse.down { background: rgba(255,120,40,.7); color: #fff; }
+#bBuy { position: absolute; left: calc(var(--sl) + var(--u) * 3 + (max(44px, calc(var(--u) * 11)) + 8px) * 2); top: calc(var(--st) + var(--u) * 2.4); height: max(44px, calc(var(--u) * 11)); padding: 0 calc(var(--u) * 2.4);
+  border-radius: 6px; background: rgba(60,140,80,.85); color: #fff; font-weight: 800; font-size: max(13px, calc(var(--u) * 3.2)); letter-spacing: .08em; z-index: 5; }
+#buy { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; background: rgba(6,10,15,.55); padding: calc(var(--st) + 8px) max(12px, var(--sr)) calc(var(--sb) + 8px) max(12px, var(--sl)); }
+#buy .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; padding: calc(var(--u) * 3) calc(var(--u) * 4); gap: calc(var(--u) * 2); touch-action: pan-y; }
+#buy header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+#buyMoney { font-family: var(--f-num); font-size: calc(var(--u) * 6); font-weight: 800; color: #9fe8a8; }
+#buyGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: calc(var(--u) * 1.4); }
+.bi { text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.6) calc(var(--u) * 2); min-height: 44px; border-radius: 6px; background: rgba(255,255,255,.07); border: 1px solid var(--line); touch-action: manipulation; }
+.bi small { color: var(--mute); font-size: max(10px, calc(var(--u) * 2.2)); } .bi b { font-size: max(13px, calc(var(--u) * 3.3)); }
+.bi span { color: var(--mute); font-size: max(10px, calc(var(--u) * 2.3)); } .bi em { font-style: normal; font-family: var(--f-num); font-weight: 700; font-size: max(13px, calc(var(--u) * 3.4)); color: #9fe8a8; }
+.bi:disabled { opacity: .45; } .bi:disabled em { color: var(--hurt); } .bi.own { opacity: .7; border-color: #9fe8a8; } .bi.own em { color: #9fe8a8; }
+.bi:not(:disabled):active { background: rgba(159,232,168,.25); }
 #boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); font-size: 15px; background: var(--ink); }
 </style>
 <div id="app">
@@ -207,7 +243,12 @@ body.match #dead { background: none; }
     <div id="tip" hidden></div>
     <div id="rl" hidden>換彈中<i><b id="rlB"></b></i></div>
     <div id="hp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><span id="hpN">100</span><span id="hpBar"><i id="hpI"></i></span></div>
-    <div id="ammo"><span id="ammoN">30</span><small id="ammoR">/ 90</small><span class="w">曙七步槍</span></div>
+    <div id="ammo"><span id="ammoN">30</span><small id="ammoR">/ 90</small><span class="w" id="wName">曙七步槍</span><span id="nadeH"></span></div>
+    <div id="money" hidden><b id="moneyN">$ 800</b><span class="chip" id="bombIco" hidden>炸彈</span><span class="chip kit" id="kitIco" hidden>拆彈器</span><span id="cash"></span></div>
+    <div id="useBox" hidden><span id="useT">裝彈中</span><i><b id="useB"></b></i></div>
+    <div id="scope" hidden></div>
+    <div id="smokeOv"></div>
+    <div id="flashOv"></div>
   </div>
   <div id="touch" hidden>
     <div id="joy"><div id="joyK"></div></div>
@@ -217,12 +258,15 @@ body.match #dead { background: none; }
     <button class="tb" id="bJump" aria-label="跳"><svg viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></svg></button>
     <button class="tb" id="bReload" aria-label="換彈"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
     <button class="tb" id="bAuto" aria-label="自動開火開關">自動<br>開火</button>
+    <button class="tb" id="bSwap" aria-label="換槍">換槍</button>
+    <button class="tb" id="bNade" aria-label="投擲物">投擲</button>
+    <button class="tb" id="bUse" hidden>按住裝彈</button>
   </div>
   <button id="bPause" aria-label="暫停與設定" hidden><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
 
   <div id="menu" class="ov" hidden>
     <div class="card">
-      <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>灰盒靶場「曙光倉區」：一把步槍，對上四個會巡邏、會還手的機器人。</p></div>
+      <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>「曙光倉區」炸彈模式：攻方裝炸彈、守方拆彈，回合之間用賺來的錢買槍。</p></div>
       <ul class="help help-t">
         <li><b>左半邊</b>按住拖：移動，推到底是跑</li>
         <li><b>右半邊</b>拖曳：轉視角</li>
@@ -234,9 +278,10 @@ body.match #dead { background: none; }
         <li><b>滑鼠</b>轉視角（點畫面鎖定）</li>
         <li><b>左鍵</b>開火　<b>右鍵</b>開鏡</li>
         <li><b>C／Ctrl</b>蹲　<b>R</b>換彈　<b>Esc</b>暫停</li>
+        <li><b>1／2／Q</b>換槍　<b>G</b>投擲物　<b>B</b>購買　<b>E</b>按住裝彈／拆彈</li>
       </ul>
       <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bSet1">設定</button></div>
-      <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」，一條命一回合，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生。</p>
+      <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>
     </div>
   </div>
 
@@ -258,6 +303,9 @@ body.match #dead { background: none; }
     </div>
   </div>
 
+  <button id="bBuy" hidden>購買</button>
+  <div id="buy" hidden><div class="card"><header><h2>購買</h2><span id="buyMoney">$ 0</span><div class="row"><button class="btn" id="buyAuto">一鍵購買</button><button class="btn go" id="buyX">好了</button></div></header>
+    <div id="buyGrid"></div><p class="mnote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p></div></div>
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
     <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>

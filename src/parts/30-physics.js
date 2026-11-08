@@ -31,7 +31,7 @@ function rayWorld(o, d, maxT) {
   return best;
 }
 // 兩點之間有沒有被擋住（視線）
-function lineClear(a, b) {
+function lineClearNoSmoke(a, b) {
   _v3.subVectors(b, a); const len = _v3.length(); if (len < 1e-4) return true;
   _v3.multiplyScalar(1 / len);
   for (let i = 0; i < BOXES.length; i++) {
@@ -40,6 +40,20 @@ function lineClear(a, b) {
   }
   return true;
 }
+// 視線：牆和煙都會擋（子彈只被牆擋，用 rayWorld）
+const SMOKES = [];
+function smokeBlocks(a, b) {
+  for (const s of SMOKES) {
+    if (s.r < 0.8) continue;
+    // 煙是一個圓柱（半徑 r、高 3.4 公尺），拿線段最靠近煙中心軸的點來判斷
+    const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz;
+    let t = L2 > 1e-6 ? ((s.x - a.x) * dx + (s.z - a.z) * dz) / L2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const px = a.x + dx * t - s.x, pz = a.z + dz * t - s.z, py = a.y + (b.y - a.y) * t;
+    if (px * px + pz * pz < s.r * s.r * 0.72 && py > s.y - 0.2 && py < s.y + 3.4) return true;
+  }
+  return false;
+}
+function lineClear(a, b) { return lineClearNoSmoke(a, b) && (!SMOKES.length || !smokeBlocks(a, b)); }
 
 // ---------- 角色身體：直立的圓柱 ----------
 // body: { pos(腳底), vel, r, h, onGround }

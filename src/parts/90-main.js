@@ -9,13 +9,16 @@ function updateAim(dt) {
   if (!player.alive) { AIM.onTarget = false; return; }
   eyePos(_ae); aimDir(_ad);
   // 準星正中央的射線有沒有打到看得到的敵人（命中框稍微放大一點，手機上比較好觸發）
-  const w = rayWorld(_ae, _ad, RIFLE.range); const wallT = w ? w.t : RIFLE.range;
+  const w = rayWorld(_ae, _ad, WP.range); const wallT = w ? w.t : WP.range;
   let on = false;
   for (const b of bots) {
     if (!b.active || !b.alive || b.team !== 'B') continue;
     const inf = 0.06 + 0.004 * Math.hypot(b.phys.pos.x - _ae.x, b.phys.pos.z - _ae.z);   // 遠的敵人命中框放大多一點
-    const h = rayBody(_ae, _ad, b.boxes, wallT, inf); if (h) { on = true; AIM.dist = h.t; break; }
+    const h = rayBody(_ae, _ad, b.boxes, wallT, inf);
+    if (h && !(SMOKES.length && smokeBlocks(_ae, _ac.copy(_ae).addScaledVector(_ad, h.t)))) { on = true; AIM.dist = h.t; break; }   // 隔著煙不自動開火
   }
+  // 狙擊槍沒開鏡、投擲物：不自動開火
+  if ((WP.scope && player.adsT < 0.85) || W.isNade) on = false;
   if (on) { AIM.onT += dt; AIM.offT = 0; } else { AIM.offT += dt; AIM.onT = 0; }
   // 對到 0.03 秒才開火、離開 0.05 秒就停
   if (on && AIM.onT > 0.03) AIM.onTarget = true; else if (!on && AIM.offT > 0.05) AIM.onTarget = false;
@@ -48,7 +51,8 @@ function enterPlay() {
 }
 // 練習：4 個敵人，陣亡馬上重生
 function startGame(mode = 'practice') {
-  if (mode === 'match') { startMatch(); enterPlay(); return; }
+  clearNades(); resetBomb(); closeBuy(); INV.primary = INV.secondary = null; INV.he = INV.flash = INV.smoke = 0; INV.kit = false;
+  if (mode === 'match') { startMatch(); enterPlay(); openBuy(); return; }
   game.mode = 'practice'; setupBots('practice');
   bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   spawnPlayer();
@@ -56,12 +60,14 @@ function startGame(mode = 'practice') {
   enterPlay();
 }
 function backToMenu() {
+  clearNades(); resetBomb(); closeBuy();
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   player.alive = false; $('menu').hidden = false;
 }
 function pauseGame() {
   if (game.state !== 'play') return;
+  closeBuy();
   game.state = 'pause'; resetTouchState();
   syncSettingsUI(); $('pause').hidden = false;
   if (pointerLocked()) document.exitPointerLock();
@@ -78,6 +84,9 @@ onTap($('bRespawn'), () => {
   if (game.fromMenu) return;
   $('pause').hidden = true; $('dead').hidden = true; resetTouchState(); startGame(game.mode);   // 重來：從頭開始這個模式
 });
+$('bBuy').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); openBuy(); });
+onTap($('buyX'), closeBuy);
+onTap($('buyAuto'), autoBuy);
 $('bPause').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); pauseGame(); });
 
 // ---------- 螢幕大小、解析度、方向 ----------
@@ -115,7 +124,7 @@ function step(dt) {
     camera.position.set(Math.sin(game.menuT) * 30, 12, Math.cos(game.menuT) * 30);
     camera.lookAt(0, 1, 0);
     for (const b of bots) updateBot(b, dt);
-    updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
+    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
     return;
   }
   if (game.state === 'pause' || game.state === 'over') return;
@@ -124,7 +133,8 @@ function step(dt) {
   // 視角：開鏡時乘上開鏡靈敏度與視野比例；瞄準輔助在敵人身上時轉得慢一點
   let ldx = INPUT.lookDX, ldy = INPUT.lookDY; INPUT.lookDX = INPUT.lookDY = 0;
   W.dragging = Math.abs(ldx) + Math.abs(ldy) > 0.02;
-  const adsScale = lerp(1, S.adsSens * (ADS_FOV / BASE_FOV) * 1.6, player.adsT);
+  const adsFov = W.isNade ? BASE_FOV : WP.adsFov;
+  const adsScale = lerp(1, S.adsSens * (adsFov / BASE_FOV) * (WP.scope ? 1.3 : 1.6), player.adsT);
   updateAim(dt);
   const assist = S.aimAssist && INPUT.mode === 'touch' && AIM.bot && player.alive;
   const friction = assist && AIM.near ? 0.65 : 1;
@@ -141,9 +151,11 @@ function step(dt) {
   }
   player.adsT = clamp(player.adsT + (player.ads && player.alive ? 1 : -1) * dt * 7, 0, 1);
   updatePlayer(dt);
-  const auto = !INPUT.fire && S.autoFire && INPUT.mode === 'touch' && AIM.onTarget;
+  const auto = !INPUT.fire && S.autoFire && INPUT.mode === 'touch' && AIM.onTarget && $('buy').hidden;
   updateWeapon(dt, (INPUT.fire || auto) && player.alive, auto, AIM.dist || 0);
+  if (game.mode === 'match') updatePlan();
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);
+  updateNades(dt);
   updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
   // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
@@ -158,7 +170,7 @@ function step(dt) {
     camera.rotation.set(player.pitch + (W.rp * VIEW_TRACK + W.vp + player.punchP) * DEG + (player.alive ? 0 : -0.12),
       player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? 0 : 0.25);
   }
-  camera.fov = lerp(BASE_FOV, ADS_FOV, player.adsT); camera.updateProjectionMatrix();
+  camera.fov = spec ? BASE_FOV : lerp(BASE_FOV, adsFov, player.adsT); camera.updateProjectionMatrix();
   updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt);
   if (!player.alive) {
     const kb = bots.find((b) => b.name === player.killer);
@@ -182,7 +194,7 @@ function render() {
 buildNav();
 initBots();
 setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });   // 選單背景
-syncSettingsUI();
+syncSettingsUI(); buildBuyMenu();
 document.body.classList.toggle('kb', !isTouch);
 applySize();
 // 先把所有材質編譯好，開局時不會卡一下
@@ -192,4 +204,5 @@ requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
-  setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget };
+  setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
+  INV, WEAPONS, NADES, BOMB, SITES, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };

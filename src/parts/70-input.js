@@ -3,7 +3,7 @@
    開火鍵、跳、蹲按下後拖曳也能轉視角（跟主流手機射擊遊戲一樣）。 */
 const INPUT = {
   mx: 0, mz: 0, lookDX: 0, lookDY: 0, fire: false, jumpT: 0, crouch: false, mode: isTouch ? 'touch' : 'kb',
-  looking: false, fingerMoveT: 0, adsQueued: false,
+  looking: false, fingerMoveT: 0, adsQueued: false, use: false,
 };
 Object.defineProperty(INPUT, 'jump', { get() { return INPUT.jumpT > 0; }, set(v) { INPUT.jumpT = v ? 0.12 : 0; } });   // 跳有 0.12 秒緩衝
 const touchEl = $('touch'), joyEl = $('joy'), joyK = $('joyK');
@@ -26,7 +26,7 @@ function setJoyIdle() {
 // 暫停、陣亡、重生、轉向時把所有按住的狀態清乾淨
 function resetTouchState() {
   T.joyId = null; T.fireId = null; T.lookers.clear(); T.lookId = null;
-  INPUT.mx = INPUT.mz = 0; INPUT.fire = false; INPUT.looking = false; INPUT.lookDX = INPUT.lookDY = 0; INPUT.fingerMoveT = 0;
+  INPUT.mx = INPUT.mz = 0; INPUT.fire = false; INPUT.use = false; INPUT.looking = false; INPUT.lookDX = INPUT.lookDY = 0; INPUT.fingerMoveT = 0;
   $('bFire').classList.remove('down'); setJoyIdle();
 }
 function updateLooking() { INPUT.looking = T.lookers.size > 0 || T.fireId !== null; }
@@ -106,7 +106,17 @@ function tapBtn(id, fn, drag = false) {
 }
 tapBtn('bJump', (el) => { INPUT.jump = true; el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 120); }, true);
 tapBtn('bCrouch', () => { INPUT.crouch = !INPUT.crouch; }, true);
+tapBtn('bSwap', (el) => { swapWeapon(); el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 150); });
+tapBtn('bNade', () => cycleNade());
+// 裝彈／拆彈：按住
+(function () {
+  const el = $('bUse'); let pid = null;
+  el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); audioInit(); pid = e.pointerId; INPUT.use = true; try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ } });
+  const up = (e) => { if (e.pointerId === pid) { pid = null; INPUT.use = false; } };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+})();
 tapBtn('bAds', () => {
+  if (W.isNade) return;
   if (reloading()) { INPUT.adsQueued = !INPUT.adsQueued; hudTip(INPUT.adsQueued ? '換彈完自動開鏡' : '取消換彈後開鏡', 1.2); return; }
   player.ads = !player.ads;
 });
@@ -131,11 +141,16 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { INPUT.jump = true; e.preventDefault(); }
   if (e.code === 'KeyR') startReload();
   if (e.code === 'KeyC' || e.code === 'ControlLeft') INPUT.crouch = true;
-  if (e.code === 'Escape') pauseGame();
+  if (e.code === 'Escape') { if (!$('buy').hidden) closeBuy(); else pauseGame(); }
+  if (e.code === 'Digit1') equip('primary'); if (e.code === 'Digit2') equip('secondary');
+  if (e.code === 'KeyQ') swapWeapon(); if (e.code === 'KeyG' || e.code === 'Digit3' || e.code === 'Digit4') cycleNade();
+  if (e.code === 'KeyE') INPUT.use = true;
+  if (e.code === 'KeyB') { if ($('buy').hidden) { openBuy(); if (!$('buy').hidden && pointerLocked()) document.exitPointerLock(); } else closeBuy(); }
 });
 window.addEventListener('keyup', (e) => {
   KEYS[e.code] = false;
   if (e.code === 'KeyC' || e.code === 'ControlLeft') INPUT.crouch = false;
+  if (e.code === 'KeyE') INPUT.use = false;
 });
 function keyboardMove() {
   if (INPUT.mode !== 'kb') return;
@@ -152,7 +167,7 @@ function onMouseDown(e) {
   if (!player.alive && game.mode === 'match' && pointerLocked()) { nextSpectate(); return; }
   if (!pointerLocked()) { try { const p = lockTarget().requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* 不支援就算了 */ } return; }
   if (e.button === 0) INPUT.fire = true;
-  if (e.button === 2 && !reloading()) player.ads = !player.ads;
+  if (e.button === 2 && !reloading() && !W.isNade) player.ads = !player.ads;
 }
 function onMouseUp(e) { if (e.pointerType && e.pointerType !== 'mouse') return; if (e.button === 0 && INPUT.mode === 'kb') INPUT.fire = false; }
 for (const el of [canvas, touchEl]) { el.addEventListener('pointerdown', onMouseDown); }
@@ -161,4 +176,4 @@ document.addEventListener('mousemove', (e) => {
   if (!pointerLocked()) return;
   INPUT.lookDX += e.movementX * 0.1 * S.sens; INPUT.lookDY += e.movementY * 0.1 * S.sens;
 });
-document.addEventListener('pointerlockchange', () => { if (!pointerLocked() && game.state === 'play' && INPUT.mode === 'kb') { INPUT.fire = false; pauseGame(); } });
+document.addEventListener('pointerlockchange', () => { if (!pointerLocked() && game.state === 'play' && INPUT.mode === 'kb' && $('buy').hidden) { INPUT.fire = false; pauseGame(); } });

@@ -11,14 +11,20 @@ function hudHurt(rel, dmg) {
   dirs.appendChild(b); while (dirs.children.length > 4) dirs.firstChild.remove();
 }
 // 擊殺訊息：kTeam/vTeam 決定顏色（我方青、敵方紅、你自己琥珀），跟你有關的那條加框
-function hudFeed(killer, victim, head, kTeam, vTeam, byPlayer) {
+function hudFeed(killer, victim, head, kTeam, vTeam, byPlayer, wpn) {
   const cls = (name, team) => name === '你' ? 'you' : team === 'A' ? 'ally' : 'bot';
   const p = document.createElement('p');
   const k = document.createElement('span'); k.className = cls(killer, kTeam); k.textContent = killer;
-  const m = document.createElement('span'); m.className = 'hs'; m.textContent = head ? '◎ 爆頭 ›' : '›';
+  const m = document.createElement('span'); m.className = 'hs'; m.textContent = (wpn ? '［' + wpn + '］' : '') + (head ? '◎ 爆頭 ›' : '›');
   const v = document.createElement('span'); v.className = cls(victim, vTeam); v.textContent = victim;
   p.append(k, m, v); p.dataset.t = '5'; if (killer === '你' || victim === '你') p.className = 'mine';
   const f = $('feed'); f.appendChild(p); while (f.children.length > 4) f.firstChild.remove();
+}
+// 賺錢的小提示（+$300 擊殺）
+let cashT = 0;
+function hudCash(n, why) {
+  const c = $('cash'); c.innerHTML = `${n > 0 ? '+' : ''}$${n}<small>${why || ''}</small>`; c.style.opacity = 1; cashT = 2.2;
+  if (n > 0) sfx('cash');
 }
 // 回合橫幅（第幾回合、勝負）
 let bannerT = 0;
@@ -34,11 +40,14 @@ function pips(el, team) {
 }
 // 計分板：兩隊每個人的擊殺、陣亡、爆頭
 function drawBoard() {
-  const row = (u, team) => `<tr class="${team}${u === player ? ' me' : ''}${u.alive ? '' : ' dead'}"><td>${u.name}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td><td class="n">${u.heads || 0}</td><td class="n">${u.alive ? Math.ceil(u.hp) : '—'}</td></tr>`;
+  const gear = (u) => u === player ? (INV.primary ? INV.primary.def.short : '手槍') : (u.primary ? u.primary.short : '手槍');
+  const row = (u, team) => `<tr class="${team}${u === player ? ' me' : ''}${u.alive ? '' : ' dead'}"><td>${u.name}${isCarrier(u) && team === 'A' ? ' ◆' : ''}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td><td class="n">${u.heads || 0}</td><td class="n">${u.alive ? Math.ceil(u.hp) : '—'}</td><td class="n">${team === 'A' ? '$' + (u.money || 0) : ''}</td><td>${team === 'A' && u.alive ? gear(u) : ''}</td></tr>`;
   const A = [player].concat(bots.filter((b) => b.active && b.team === 'A')).sort((a, b) => b.kills - a.kills);
   const B = bots.filter((b) => b.active && b.team === 'B').sort((a, b) => b.kills - a.kills);
-  $('board').innerHTML = `<table><tr><th>我方 ${ROUND.score.A}</th><th class="n">殺</th><th class="n">死</th><th class="n">爆頭</th><th class="n">血</th></tr>${A.map((u) => row(u, 'A')).join('')}
-    <tr class="gap"><td colspan="5"></td></tr><tr><th>敵方 ${ROUND.score.B}</th><th class="n">殺</th><th class="n">死</th><th class="n">爆頭</th><th class="n">血</th></tr>${B.map((u) => row(u, 'B')).join('')}</table>`;
+  const side = (t) => (t === ROUND.atk ? '攻' : '守');
+  const hd = `<th class="n">殺</th><th class="n">死</th><th class="n">爆頭</th><th class="n">血</th>`;
+  $('board').innerHTML = `<table><tr><th>我方（${side('A')}）${ROUND.score.A}</th>${hd}<th class="n">錢</th><th>武器</th></tr>${A.map((u) => row(u, 'A')).join('')}
+    <tr class="gap"><td colspan="7"></td></tr><tr><th>敵方（${side('B')}）${ROUND.score.B}</th>${hd}<th></th><th></th></tr>${B.map((u) => row(u, 'B')).join('')}</table>`;
 }
 let boardT = 0;
 function hudMatch(dt) {
@@ -47,9 +56,10 @@ function hudMatch(dt) {
   if (!m) { $('board').hidden = true; $('spec').hidden = true; return; }
   const clk = $('clk');
   if (ROUND.phase === 'freeze') { clk.textContent = fmtClock(ROUND.t); clk.className = 'frz'; }
+  else if (BOMB.state === 'planted') { clk.textContent = fmtClock(BOMB.t); clk.className = 'bomb'; }
   else if (ROUND.phase === 'live') { clk.textContent = fmtClock(ROUND.t); clk.className = ROUND.t < 15 ? 'low' : ''; }
   else clk.className = '';
-  $('rnd').textContent = ROUND.phase === 'freeze' ? '準備' : `第 ${ROUND.num} 回合`;
+  $('rnd').textContent = ROUND.phase === 'freeze' ? '準備・購買' : BOMB.state === 'planted' ? `炸彈在 ${BOMB.site} 點` : `第 ${ROUND.num} 回合・${ROUND.atk === 'A' ? '攻' : '守'}`;
   $('scA').textContent = ROUND.score.A; $('scB').textContent = ROUND.score.B;
   pips($('pipsA'), 'A'); pips($('pipsB'), 'B');
   const showBoard = $('bBoard').classList.contains('on') || ROUND.phase === 'end';
@@ -84,17 +94,42 @@ function hudUpdate(dt) {
   const hp = Math.ceil(player.hp);
   const specOn = !!game.specBot; $('hp').hidden = specOn; $('ammo').hidden = specOn;
   if (hp !== lastHp) { lastHp = hp; $('hpN').textContent = hp; $('hpI').style.width = hp + '%'; $('hp').classList.toggle('low', hp < 30); }
-  if (W.ammo * 1000 + W.reserve !== lastAmmo) { lastAmmo = W.ammo * 1000 + W.reserve; $('ammoN').textContent = W.ammo; $('ammoR').textContent = '/ ' + W.reserve; $('ammo').classList.toggle('low', W.ammo <= 6); }
+  if (W.isNade) { if (lastAmmo !== -2) { lastAmmo = -2; $('ammoN').textContent = INV[INV.nade]; $('ammoR').textContent = ''; $('ammo').classList.remove('low'); } }
+  else if (W.ammo * 1000 + W.reserve !== lastAmmo) { lastAmmo = W.ammo * 1000 + W.reserve; $('ammoN').textContent = W.ammo; $('ammoR').textContent = '/ ' + W.reserve; $('ammo').classList.toggle('low', W.ammo <= 6); }
   drawRadar(dt); hudMatch(dt);
   if (bannerT > 0) { bannerT -= dt; if (bannerT < 0.4) $('banner').style.opacity = Math.max(0, bannerT / 0.4); if (bannerT <= 0) $('banner').hidden = true; }
   if (player.kills !== lastK) { lastK = player.kills; $('sK').textContent = player.kills; }
   if (player.deaths !== lastD) { lastD = player.deaths; $('sD').textContent = player.deaths; }
   if (player.heads !== lastH) { lastH = player.heads; $('sH').textContent = player.heads; }
   $('rl').hidden = !(W.reloadT > 0);
-  if (W.reloadT > 0) $('rlB').style.width = ((1 - W.reloadT / RIFLE.reload) * 100).toFixed(0) + '%';
+  if (W.reloadT > 0) $('rlB').style.width = ((1 - W.reloadT / WP.reload) * 100).toFixed(0) + '%';
+  hudGear(dt);
   $('bAds').classList.toggle('on', player.ads);
   $('bCrouch').classList.toggle('on', player.crouch);
   $('bAuto').classList.toggle('on', !!S.autoFire);
+}
+// 裝備、金錢、裝彈拆彈、狙擊鏡、閃光、煙
+let lastGear = '';
+function hudGear(dt) {
+  const m = game.mode === 'match';
+  $('money').hidden = !m || !!game.specBot;
+  if (m) { $('moneyN').textContent = '$ ' + (player.money || 0); $('bombIco').hidden = !INV.bomb || !player.alive; $('kitIco').hidden = !INV.kit || !player.alive; }
+  if (cashT > 0) { cashT -= dt; if (cashT < 0.5) $('cash').style.opacity = Math.max(0, cashT * 2); }
+  const nm = W.isNade ? NADES[INV.nade].name : WP.name;
+  const nh = NADE_ORDER.filter((k) => INV[k] > 0).map((k) => NADES[k].short[0] + INV[k]).join(' ');
+  const key = nm + '|' + nh;
+  if (key !== lastGear) { lastGear = key; $('wName').textContent = nm; $('nadeH').textContent = nh; }
+  // 裝彈／拆彈：按鈕和進度條
+  const act = useAction();
+  const ub = $('bUse'); ub.hidden = !act; if (act) { ub.textContent = act === 'plant' ? '按住裝彈' : '按住拆彈'; ub.classList.toggle('down', !!INPUT.use); }
+  const pr = useProgress(); $('useBox').hidden = !(pr > 0);
+  if (pr > 0) { $('useT').textContent = (act === 'plant' ? '裝彈中' : '拆彈中') + '…'; $('useB').style.width = (pr * 100).toFixed(0) + '%'; }
+  else if (act && !isTouch && player.alive) { $('useBox').hidden = false; $('useT').textContent = act === 'plant' ? '按住 E 裝彈' : '按住 E 拆彈'; $('useB').style.width = '0%'; }
+  $('bBuy').hidden = !buyOpen() || !$('buy').hidden;
+  $('bNade').classList.toggle('on', W.isNade); $('bNade').style.opacity = NADE_ORDER.some((k) => INV[k] > 0) ? '' : '.4';
+  $('scope').hidden = !(WP.scope && !W.isNade && player.alive && player.adsT > 0.85);
+  const fl = player.flashT > 0 ? clamp(player.flashT / 1.2, 0, 1) : 0; $('flashOv').style.opacity = fl.toFixed(3);
+  $('smokeOv').style.opacity = (smokeAtCamera() * 0.85).toFixed(3);
 }
 function showDead(by, head) {
   $('deadBy').textContent = '被「' + by + '」' + (head ? '爆頭' : '擊倒');
@@ -142,6 +177,9 @@ function radarMap() {
     const b = BOXES[i]; c.fillStyle = b.max[1] > 1.5 ? 'rgba(230,220,200,.75)' : 'rgba(200,190,170,.45)';
     c.fillRect((b.min[0] + 37) * 4, (27 - b.max[2]) * 4, (b.max[0] - b.min[0]) * 4, (b.max[2] - b.min[2]) * 4);
   }
+  // 包點：黃色框＋字
+  c.strokeStyle = 'rgba(255,196,60,.8)'; c.lineWidth = 3; c.fillStyle = 'rgba(255,196,60,.9)'; c.font = 'bold 30px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const s of Object.values(SITES)) { c.strokeRect((s.x0 + 37) * 4, (27 - s.z1) * 4, (s.x1 - s.x0) * 4, (s.z1 - s.z0) * 4); c.fillText(s.id, (s.cx + 37) * 4, (27 - s.cz) * 4); }
   return cv;
 }
 function drawRadar(dt) {
@@ -165,6 +203,13 @@ function drawRadar(dt) {
     const rx = (dx * c - my * sn) * s, ry = (dx * sn + my * c) * s, d = Math.hypot(rx, ry), lim = W2 / 2 - 6;
     const kx = d > lim ? rx / d * lim : rx, ky = d > lim ? ry / d * lim : ry;
     rctx.fillStyle = ally ? '#5fd8ee' : '#ff4a3d'; rctx.beginPath(); rctx.arc(W2 / 2 + kx, W2 / 2 + ky, ally ? 4.5 : 5, 0, Math.PI * 2); rctx.fill();
+    if (ally && isCarrier(b)) { rctx.strokeStyle = '#ff9a3d'; rctx.lineWidth = 2.5; rctx.stroke(); }
+  }
+  // 炸彈：掉在地上（攻方看得到）、裝好了（大家都看得到）
+  if (game.mode === 'match' && (BOMB.state === 'planted' || (BOMB.state === 'dropped' && ROUND.atk === player.team))) {
+    const dx = BOMB.pos.x - p.x, my = -(BOMB.pos.z - p.z), c = Math.cos(th), sn = Math.sin(th);
+    let rx = (dx * c - my * sn) * s, ry = (dx * sn + my * c) * s; const d = Math.hypot(rx, ry), lim = W2 / 2 - 6; if (d > lim) { rx = rx / d * lim; ry = ry / d * lim; }
+    rctx.fillStyle = BOMB.state === 'planted' && (game.t * 3 % 1) < 0.5 ? '#ff3020' : '#ff9a3d'; rctx.fillRect(W2 / 2 + rx - 5, W2 / 2 + ry - 4, 10, 8);
   }
   // 視野扇形與北方標記
   rctx.fillStyle = 'rgba(255,179,71,.14)'; rctx.beginPath(); rctx.moveTo(W2 / 2, W2 / 2);

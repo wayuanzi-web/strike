@@ -12,7 +12,7 @@ const player = {
   dealt: 0, dealtHits: 0, taken: {},              // 這條命的傷害統計
 };
 function eyePos(out) { const p = player.body.pos; return out.set(p.x, p.y + player.eye, p.z); }
-function spawnPlayer(fixed) {
+function spawnPlayer(fixed, keep) {
   // 出生點：對戰時由回合指定；練習時挑離機器人遠、而且沒有機器人看得到的
   let best = fixed || PLAYER_SPAWNS[0], bd = -1e9;
   if (!fixed) for (const s of PLAYER_SPAWNS) {
@@ -28,7 +28,7 @@ function spawnPlayer(fixed) {
   player.yaw = -Math.PI / 2; player.pitch = 0; player.hp = 100; player.alive = true; player.crouch = false; player.eye = 1.62;
   player.ads = false; player.adsT = 0; INPUT.crouch = false; player.tag = 1; player.punchP = player.punchY = player.punchPV = player.punchYV = 0;
   player.dealt = 0; player.dealtHits = 0; player.taken = {}; player.spawnT = 1.5; player.deadT = 0;   // 重生後 1.5 秒機器人不開槍
-  resetWeapon();
+  resetWeapon(keep);
 }
 function playerSpeed() { return Math.hypot(player.body.vel.x, player.body.vel.z); }
 
@@ -51,7 +51,7 @@ function updatePlayer(dt) {
   if (mh > 1) { mx /= mh; mz /= mh; }
   const mag = Math.min(1, mh);
   const landK = player.landT > 0 ? 1 - player.landT / 0.4 * 0.2 : 1;   // 落地後 0.4 秒慢一點
-  const maxS = RUN_SPEED * (player.crouch ? 0.34 : 1) * (player.ads ? 0.72 : 1) * (reloading() ? 0.9 : 1) * player.tag * landK;
+  const maxS = RUN_SPEED * (player.crouch ? 0.34 : 1) * (player.ads ? 0.72 : 1) * (reloading() ? 0.9 : 1) * player.tag * landK * (W.isNade ? 1.04 : WP.speed) * (plantBusy() ? 0 : 1);
   const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
   let wx = cy * mx - sy * mz, wz = -sy * mx - cy * mz; const wl = Math.hypot(wx, wz);
   if (wl > 1e-4) { wx /= wl; wz /= wl; }
@@ -89,7 +89,7 @@ function updatePlayer(dt) {
   moveBody(b, dt);
   if (!wasGround && b.onGround) {
     player.landT = 0.4; b.vel.x *= 0.8; b.vel.z *= 0.8;
-    W.land = RIFLE.land; viewmodelLand(-vy);
+    W.land = WP.land; viewmodelLand(-vy);
     if (vy < -3) sfx('land', Math.min(1, -vy / 8));
   }
   // 跟機器人互相推開（不會穿過去）
@@ -114,7 +114,7 @@ function surfaceAt(p) {
   return best;
 }
 
-function damagePlayer(dmg, bot, part) {
+function damagePlayer(dmg, bot, part, weapon) {
   if (!player.alive) return;
   player.hp = Math.max(0, player.hp - dmg); player.hurtT = 0.35;
   const t = player.taken[bot.name] || (player.taken[bot.name] = { dmg: 0, hits: 0 }); t.dmg += dmg; t.hits++;
@@ -129,8 +129,10 @@ function damagePlayer(dmg, bot, part) {
     resetTouchState();
     player.alive = false; player.deaths++; player.deathStreak = (player.deathStreak || 0) + 1; player.killer = bot.name;
     player.respawnT = game.mode === 'match' ? Infinity : 3.5;    // 對戰模式：這回合不重生，改觀戰
-    player.ads = false; INPUT.fire = false; bot.kills++; if (part === 'head') bot.heads++;
-    hudFeed(bot.name, '你', part === 'head', 'B', 'A', false);
+    player.ads = false; INPUT.fire = false; INPUT.use = false; player.useT = 0; closeBuy();
+    const w = weapon || bot.wpn || WEAPONS.rifle;
+    if (bot.team !== player.team) { bot.kills++; if (part === 'head') bot.heads++; addMoney(bot, w.reward || 0, '擊殺'); }
+    hudFeed(bot.name, '你', part === 'head', bot.team, 'A', false, w.short);
     showDead(bot.name, part === 'head');
     onUnitDied(player);
   }
