@@ -2,7 +2,12 @@
    全部存在 STATS.prog（跟戰績一起存、一起匯出）。 */
 const LV_MAX = 30;
 function emptyProg() { return { xp: 0, ach: {}, daily: null, skin: 'base', team: 'cyan', c: { kills: 0, sniper: 0, nade: 0 } }; }
-function ensureProg() { STATS.prog = Object.assign(emptyProg(), STATS.prog || {}); STATS.prog.c = Object.assign(emptyProg().c, STATS.prog.c); }
+function ensureProg() {
+  const raw = isObj(STATS.prog) ? STATS.prog : {}, pr = cleanLike(raw, emptyProg());
+  pr.xp = Math.max(0, pr.xp); pr.c = cleanLike(raw.c, emptyProg().c); pr.daily = isObj(raw.daily) ? raw.daily : null;
+  for (const k in pr.ach) if (typeof pr.ach[k] !== 'string' && pr.ach[k] !== true) delete pr.ach[k];
+  STATS.prog = pr;
+}
 ensureProg();
 const P = () => STATS.prog;
 // 等級：第 n 級升 n+1 級要 250 + 50n 經驗
@@ -66,7 +71,10 @@ const PROG = { dateOverride: null };
 function today() { if (PROG.dateOverride) return PROG.dateOverride; const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function ensureDaily() {
-  const day = today(); if (P().daily && P().daily.date === day) return P().daily;
+  const day = today(), cur = P().daily;
+  // 每日挑戰要 3 項、每項都是這個版本認得的（別的版本匯出的代碼可能有不認得的），不然重抽
+  const okItem = (it) => isObj(it) && DAILY.some((x) => x.id === it.id) && typeof it.p === 'number' && isFinite(it.p) && (it.map === undefined || MAPS[it.map]);
+  if (cur && cur.date === day && Array.isArray(cur.items) && cur.items.length === 3 && cur.items.every(okItem)) return cur;
   let h = hashStr('strike' + day); const pick = []; const pool = DAILY.slice();
   while (pick.length < 3) { h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0; const t = pool.splice(h % pool.length, 1)[0]; pick.push(t); }
   P().daily = { date: day, items: pick.map((t) => ({ id: t.id, p: 0, done: false, map: t.id === 'win_map' ? MAP_ORDER[h % MAP_ORDER.length] : undefined })) };
@@ -87,8 +95,9 @@ function progEvent(ev, d = {}) {
   const m = game.mode, c = P().c;
   if (m === 'tutorial' && ev !== 'tutorial') return;
   if (ev === 'kill') {
-    if (m === 'practice') addXP(2, '練習擊殺');
-    else { addXP(m === 'match' ? 10 : 6, '擊殺'); if (d.head) addXP(5, '爆頭'); }
+    // 練習可以免費拿任何槍、敵人不太會反擊：只給一點經驗，不算成就和每日挑戰
+    if (m === 'practice') { addXP(2, '練習擊殺'); unlock('first_kill'); return; }
+    addXP(m === 'match' ? 10 : 6, '擊殺'); if (d.head) addXP(5, '爆頭');
     c.kills++; if (d.w && d.w.id === 'sniper') c.sniper++; if (d.w && (d.w.id === 'he' || d.w.id === 'molotov')) c.nade++;
     unlock('first_kill');
     if (d.w && d.w.id === 'deagle' && d.head) unlock('deagle_head');
@@ -218,10 +227,9 @@ function parseCode(code) {
   try { const d = JSON.parse(json); if (d.v !== 1 || !d.stats) return { err: '不認得的代碼版本' }; return { data: d }; } catch (e) { return { err: '代碼內容讀不出來' }; }
 }
 function applyImport(d) {
-  STATS = Object.assign(emptyStats(), d.stats); STATS.modes = Object.assign(emptyStats().modes, STATS.modes); ensureProg(); saveStats();
-  if (d.settings) { Object.assign(S, d.settings); saveSettings(); syncSettingsUI(); applyHand(); }
+  STATS = cleanStats(d.stats); ensureProg(); ensureDaily(); saveStats();
+  if (isObj(d.settings)) { Object.assign(S, cleanLike(d.settings, DEFAULTS)); saveSettings(); syncSettingsUI(); applyHand(); }
   applyCosmetics(); syncMenuLevel();
-$('kc').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); killcamStop(); });
 }
 
 // ---------- 成長畫面 ----------
@@ -240,7 +248,7 @@ function renderProg() {
 function openProg() { renderProg(); lbRender(); $('pgCode').value = ''; $('pgMsg').textContent = ''; $('prog').hidden = false; }
 function closeProg() { $('prog').hidden = true; syncMenuLevel(); }
 function syncMenuLevel() { const L = levelOf(P().xp); $('mLv').textContent = `${L.lv} 級`; $('mXp').style.width = (L.need ? L.into / L.need * 100 : 100) + '%'; const D = ensureDaily(); $('mDaily').textContent = `每日挑戰 ${D.items.filter((x) => x.done).length}/3`; }
-let importArm = -1e9;
+let importArm = -1e9, importCode = '';
 onTap($('bProg'), openProg); onTap($('pgX'), closeProg);
 onTap($('pgExport'), () => { const c = exportCode(); $('pgCode').value = c; $('pgMsg').textContent = `代碼 ${c.length} 字，已選起來；按「複製」或長按自己複製，到新手機的這裡貼上按「匯入」。`; try { $('pgCode').select(); } catch (e) { /* 略過 */ } });
 onTap($('pgCopy'), () => { const c = $('pgCode').value || exportCode(); $('pgCode').value = c;
@@ -250,7 +258,9 @@ onTap($('pgImport'), () => {
   const r = parseCode($('pgCode').value);
   if (r.err) { $('pgMsg').textContent = r.err; importArm = -1e9; return; }
   // 按兩次才匯入（會蓋掉這台手機的戰績）
-  if (performance.now() - importArm > 15000) { importArm = performance.now(); const L = levelOf(r.data.stats.prog ? r.data.stats.prog.xp : 0); $('pgMsg').textContent = `代碼正確：${L.lv} 級、${r.data.stats.matches || 0} 場對戰。再按一次「匯入」會蓋掉這台手機現在的紀錄。`; return; }
+  const codeNow = $('pgCode').value.replace(/\s+/g, '');
+  if (performance.now() - importArm > 15000 || codeNow !== importCode) { importArm = performance.now(); importCode = codeNow;   // 換了代碼就要重新確認
+    const xp0 = isObj(r.data.stats.prog) ? +r.data.stats.prog.xp || 0 : 0, L = levelOf(Math.max(0, xp0)); $('pgMsg').textContent = `代碼正確：${L.lv} 級、${+r.data.stats.matches || 0} 場對戰。再按一次「匯入」會蓋掉這台手機現在的紀錄。`; return; }
   applyImport(r.data); importArm = -1e9; renderProg(); $('pgMsg').textContent = '匯入完成！'; sfx('win', 0.5);
 });
 

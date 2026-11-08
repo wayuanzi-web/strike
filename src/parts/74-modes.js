@@ -190,7 +190,7 @@ function endMode() {
   ov('overC', kind === 'range' ? `練槍場紀錄：最快平均 ${M.bestMs || '—'} 毫秒、最高命中率 ${M.bestAcc ? Math.round(M.bestAcc * 100) + '%' : '—'}（${M.n} 次）`
     : `${MODE_NAME[kind]}：${M.n} 場 ${M.w} 勝`);
   overXpLine();
-  $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy();
+  $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy(); overClean();
   if (pointerLocked()) document.exitPointerLock();
   for (const b of bots) if (b.dummy) { b.alive = false; b.g.visible = false; }
 }

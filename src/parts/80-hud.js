@@ -232,3 +232,5 @@ function drawRadar(dt) {
   // 自己：朝上的三角形
   rctx.fillStyle = '#ffb347'; rctx.beginPath(); rctx.moveTo(W2 / 2, W2 / 2 - 8); rctx.lineTo(W2 / 2 - 6, W2 / 2 + 6); rctx.lineTo(W2 / 2 + 6, W2 / 2 + 6); rctx.closePath(); rctx.fill();
 }
+// 結算畫面出來時：收掉陣亡卡、擊殺鏡頭、暫停鍵和購買鍵（不然會蓋在結算卡上、按了也沒反應）
+function overClean() { $('dead').hidden = true; KC.on = false; $('kc').hidden = true; $('bPause').hidden = true; hid($('bBuy'), true); hid($('bRadio'), true); }

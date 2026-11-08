@@ -23,8 +23,24 @@ function angDiff(a, b) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; wh
 // ---------- 設定（存在這台手機的瀏覽器裡，讀不到就用預設） ----------
 const DEFAULTS = { sens: 1.0, adsSens: 0.6, autoFire: true, aimAssist: true, followRecoil: true, difficulty: 'normal', quality: 'auto', sound: true, showFps: false, map: 'dawn', lefty: false, btnScale: '1', vibrate: true,
   adsMode: 'toggle', crouchMode: 'toggle', curve: 'linear', joyMode: 'float', runLock: true, gyro: 'off', gyroSens: 1.0, gyroInv: false, killcam: true, soundViz: false, captions: false, palette: 'default', nick: '', lbOn: false, lbId: '', lbUrl: '', layout: null };
+// 讀進來的資料（localStorage、匯入代碼）照預設值的型別清一遍：型別不對就用預設，免得一個壞值讓遊戲開不起來
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+function cleanLike(v, def) {
+  if (typeof def === 'number') return typeof v === 'number' && isFinite(v) ? v : def;
+  if (typeof def === 'boolean') return typeof v === 'boolean' ? v : def;
+  if (typeof def === 'string') return typeof v === 'string' ? v.slice(0, 200) : def;
+  if (Array.isArray(def)) return Array.isArray(v) ? v.filter(isObj) : def.slice();
+  if (def === null) return isObj(v) ? v : null;
+  if (isObj(def)) {
+    const out = {}, src = isObj(v) ? v : {}, keys = Object.keys(def);
+    if (!keys.length) { for (const k in src) if (src[k] != null && (isObj(src[k]) || typeof src[k] !== 'object')) out[k] = src[k]; return out; }   // {}：像各地圖、各武器、成就這種表
+    for (const k of keys) out[k] = cleanLike(src[k], def[k]);
+    return out;
+  }
+  return v === undefined ? def : v;
+}
 const S = Object.assign({}, DEFAULTS);
-try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assign(S, JSON.parse(raw)); } catch (e) { /* 私密瀏覽或被擋，就用預設 */ }
+try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assign(S, cleanLike(JSON.parse(raw), DEFAULTS)); } catch (e) { /* 私密瀏覽或被擋，就用預設 */ }
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）

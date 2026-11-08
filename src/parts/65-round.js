@@ -142,6 +142,6 @@ function showMatchOver() {
   statMatchEnd(win, ROUND.score.A, ROUND.score.B, !!(mvp && mvp.me));
   $('overC').textContent = `生涯：${STATS.matches} 場 ${STATS.wins} 勝（勝率 ${pct(STATS.wins, STATS.matches)}）· 擊殺 ${STATS.kills}`;
   overXpLine();
-  $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy();
+  $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy(); overClean();
   if (pointerLocked()) document.exitPointerLock();
 }

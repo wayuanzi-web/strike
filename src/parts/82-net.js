@@ -40,6 +40,7 @@ function newPeer() {
   const pc = new RTCPeerConnection({ iceServers: NET.iceServers });
   pc.addEventListener('connectionstatechange', () => {
     const s = pc.connectionState; netStatus();
+    if (NET.pc !== pc) return;   // 舊的連線（重建房間後）關掉時不要連新的一起關
     if ((s === 'failed' || s === 'disconnected' || s === 'closed') && NET.state !== 'idle') netLost(s === 'failed' ? '連不上（這兩個網路可能不能直連，換 Wi-Fi 再試）' : '連線中斷');
   });
   NET.pc = pc; return pc;
@@ -49,7 +50,7 @@ function wireChannels(rel, fast) {
   const onmsg = (e) => { try { netRecv(JSON.parse(e.data)); } catch (err) { /* 收到看不懂的就丟掉 */ } };
   rel.onmessage = onmsg; fast.onmessage = onmsg;
   rel.onopen = () => { NET.state = 'linked'; NET.lastRecv = performance.now(); netSend({ t: 'hi', name: NET.name, v: BUILD }); netStatus(); sfx('ping', 0.6); };
-  rel.onclose = () => { if (NET.state !== 'idle') netLost('對方離開了'); };
+  rel.onclose = () => { if (NET.rel === rel && NET.state !== 'idle') netLost('對方離開了'); };   // 只理會現在這條通道
   if (rel.readyState === 'open') rel.onopen();   // 加入的那邊收到通道時可能已經開好了
 }
 async function netHost() {
@@ -63,12 +64,15 @@ async function netJoin(offerCode) {
   const offer = await unpackCode(offerCode, 'DSO1'); if (!offer) return { err: '邀請碼不對（應該是 DSO1 開頭）' };
   const pc = newPeer(); NET.role = 'guest'; NET.state = 'answer';
   const ch = {}; pc.ondatachannel = (e) => { ch[e.channel.label] = e.channel; if (ch.rel && ch.fast) wireChannels(ch.rel, ch.fast); };
-  await pc.setRemoteDescription(offer); await pc.setLocalDescription(await pc.createAnswer()); await gathered(pc);
+  try { await pc.setRemoteDescription(offer); await pc.setLocalDescription(await pc.createAnswer()); }
+  catch (e) { netClose(); return { err: '邀請碼內容壞掉了，請朋友重新建立房間再傳一次' }; }
+  await gathered(pc);
   netStatus(); return { code: await packCode('DSA1', pc.localDescription) };
 }
 async function netAccept(answerCode) {
   const ans = await unpackCode(answerCode, 'DSA1'); if (!ans) return '回覆碼不對（應該是 DSA1 開頭）';
   if (!NET.pc || NET.role !== 'host') return '請先建立房間';
+  if (NET.state === 'linked' || NET.state === 'playing') return '已經連上了，不用再貼';
   try { await NET.pc.setRemoteDescription(ans); } catch (e) { return '這個回覆碼不是這個房間的'; }
   NET.state = 'connecting'; netStatus(); return '';
 }
@@ -87,17 +91,22 @@ function netLost(why) {
 function netRecv(m) {
   NET.lastRecv = performance.now();
   if (m.t === 'hi') { NET.peer = String(m.name || '對手').slice(0, 12); netStatus(); }
-  else if (m.t === 'start') startDuel(m.map, m.goal, false);
+  else if (m.t === 'start') {
+    // 只有在好友對戰畫面或對戰結算時才接受「開始」，不然正在打練習的人會被直接拉進去
+    if (!$('duel').hidden || (game.mode === 'duel' && game.state !== 'play')) startDuel(m.map, m.goal, false); else netSend({ t: 'busy' });
+  } else if (m.t === 'busy') {
+    if (game.mode === 'duel' && NET.on) { NET.on = false; NET.state = 'linked'; backToMenu(); openDuelUI(); netStatus(`${NET.peer} 不在對戰畫面，等他按「好友對戰」回來再按開始`); }
+  } else if (m.t === 'end') { if (game.mode === 'duel') endDuel(!!m.win, true); return; }
   else if (m.t === 'ping') netSend({ t: 'pong', k: m.k });
   else if (m.t === 'pong') NET.rtt = Math.round(performance.now() - m.k);
-  else if (!NET.on || game.mode !== 'duel') return;
+  else if (game.mode !== 'duel' || (!NET.on && m.t !== 'x')) return;   // 結束後還是要收對方的陣亡（同時互殺時分數才會對）
   const b = NET.remote; if (!b) return;
   if (m.t === 's') {   // 對手的狀態（每秒 30 次）
     if (m.q < (NET.lastQ || 0)) return; NET.lastQ = m.q;
     NET.buf.push({ at: performance.now(), p: m.p, y: m.y, c: m.c }); if (NET.buf.length > 20) NET.buf.shift();
     if (m.w && (!b.wpn || b.wpn.id !== m.w) && WEAPONS[m.w]) { if (WEAPONS[m.w].slot === 'primary') { b.primary = WEAPONS[m.w]; b.secondary = null; } else { b.primary = null; b.secondary = WEAPONS[m.w]; } botArm(b); }
     b.hp = m.h; b.reloadT = m.r ? 0.5 : 0; if (m.r) b.wpn.reload = Math.max(b.wpn.reload, 0.5);
-    NET.theirK = m.k;
+    NET.theirK = Math.max(NET.theirK, m.k | 0);   // 延遲時舊封包帶的舊分數不要蓋掉新的
     if (!m.a && b.alive) { b.alive = false; b.hp = 0; b.deadT = 0; b.fallDir = 1; b.deathKind = 'fwd'; b.respawnT = Infinity; }   // 自己炸死自己之類
     if (m.a && !b.alive) { const s = m.p; botSpawn(b, s[0], s[2]); b.phys.pos.y = s[1]; b.respawnT = Infinity; b.blindT = 999; }
   } else if (m.t === 'f') {   // 對手開槍：曳光、槍口火光、槍聲
@@ -114,7 +123,7 @@ function netRecv(m) {
       if (m.by === 'me') { NET.myK = m.k; player.kills = m.k; if (m.p === 'head') player.heads++; hudFeed('你', NET.peer, m.p === 'head', 'A', 'B', true, WEAPONS[m.w] || NADES[m.w]); hudHit(m.p === 'head' ? 'kill head' : 'kill'); sfx('kill'); statKill(WEAPONS[m.w] || NADES[m.w], m.p === 'head'); }
       onUnitDied(b);
     }
-  } else if (m.t === 'end') endDuel(!!m.win, true);
+  }
 }
 // 我打中對手：把傷害傳過去（對方扣血、判斷死亡）
 function netHitRemote(b, dmg, part, w) {
@@ -174,11 +183,13 @@ function startDuel(mapId, goal, iAmHost) {
 }
 function endDuel(iWon, fromPeer) {
   if (!NET.on && !fromPeer) return;
+  // 兩邊同時打死對方、同時到目標：我這邊已經判輸，對方也判他自己輸 → 平手
+  if (!NET.on && game.state === 'over') { if (iWon && $('overT').textContent === '落敗') { $('overT').textContent = '平手'; $('overT').className = 'lose'; $('overS').textContent = `${NET.myK} : ${NET.theirK}`; } return; }
   NET.on = false; game.state = 'over';
   $('overT').textContent = iWon ? '勝利' : '落敗'; $('overT').className = iWon ? 'win' : 'lose';
   $('overS').textContent = `${NET.myK} : ${NET.theirK}`; $('overM').textContent = `好友對戰：你 vs ${NET.peer}`;
   $('overY').textContent = `你：${player.kills} 殺 · ${player.deaths} 死 · ${player.heads} 爆頭`; $('overC').textContent = '想再打一場：按「再來一場」，等對方也按。';
-  overXpLine(); $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy();
+  overXpLine(); $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy(); overClean();
   if (pointerLocked()) document.exitPointerLock();
   NET.state = 'linked';
 }
@@ -208,6 +219,7 @@ onTap($('duelX'), () => { closeDuelUI(); if (NET.state !== 'linked') { netClose(
 onTap($('duelHost'), async () => { nickOk(); $('duelSt').textContent = '產生邀請碼中…'; $('duelMine').value = await netHost(); $('duelMineL').textContent = '你的邀請碼（傳給朋友）'; netStatus(); });
 onTap($('duelJoin'), async () => {
   nickOk(); const code = $('duelTheirs').value;
+  if (/^DSO1/.test(code.trim()) && NET.role === 'host' && code.trim() === $('duelMine').value.trim()) { $('duelSt').textContent = '這是你自己的邀請碼，要貼的是朋友傳回來的回覆碼（DSA1 開頭）'; return; }
   if (/^DSA1/.test(code.trim())) { const e = await netAccept(code); $('duelSt').textContent = e || '連線中…'; return; }   // 開房的人貼回覆碼
   $('duelSt').textContent = '產生回覆碼中…'; const r = await netJoin(code);
   if (r.err) { $('duelSt').textContent = r.err; return; }

@@ -79,7 +79,11 @@ document.addEventListener('pointermove', (e) => {
   if (!ED.on || e.pointerId !== ED.pid || !ED.sel) return;
   e.preventDefault(); e.stopPropagation();
   const L = ensureEntry(ED.sel), W0 = window.innerWidth, H0 = window.innerHeight;
-  const x = clamp(e.clientX + ED.dx, 20, W0 - 20) / W0, y = clamp(e.clientY + ED.dy, 20, H0 - 20) / H0;
+  // 整顆按鈕都要留在畫面內（算半徑，不只算中心），也不能躲到上面的編輯列底下（不然再也點不到）
+  const el = ED.sel === 'joy' ? null : $(ED.sel), rc = el && el.getBoundingClientRect(), r = Math.max(20, rc ? Math.max(rc.width, rc.height) / 2 : 60 * (S.btnScale || 1));
+  const px = clamp(e.clientX + ED.dx, r, W0 - r), bar = $('edit').getBoundingClientRect();
+  const under = px + r > bar.left && px - r < bar.right, top = under ? bar.bottom + r + 4 : r;
+  const x = px / W0, y = clamp(e.clientY + ED.dy, Math.min(top, H0 - r), H0 - r) / H0;
   L.x = +(S.lefty ? 1 - x : x).toFixed(4); L.y = +y.toFixed(4);
   applyLayout();
 }, true);

@@ -7,7 +7,9 @@ function emptyStats() {
     modes: { dm: { n: 0, w: 0, best: 0 }, koth: { n: 0, w: 0 }, range: { n: 0, bestMs: 0, bestAcc: 0 } } };
 }
 let STATS = emptyStats();
-try { const raw = localStorage.getItem(STATS_KEY); if (raw) { STATS = Object.assign(emptyStats(), JSON.parse(raw)); STATS.modes = Object.assign(emptyStats().modes, STATS.modes); } } catch (e) { /* 讀不到就從零開始 */ }
+// 讀進來的戰績照 emptyStats 的樣子清一遍（prog 另外在 76-progress 清）
+function cleanStats(d) { const out = cleanLike(d, emptyStats()); out.prog = isObj(d) && isObj(d.prog) ? d.prog : undefined; return out; }
+try { const raw = localStorage.getItem(STATS_KEY); if (raw) STATS = cleanStats(JSON.parse(raw)); } catch (e) { /* 讀不到就從零開始 */ }
 // 死鬥、搶點、練槍場的紀錄（不算進對戰的勝率）
 function statModeEnd(kind, win, r) {
   const M = STATS.modes[kind]; M.n++; if (win) M.w = (M.w || 0) + 1;

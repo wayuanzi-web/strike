@@ -14,7 +14,8 @@ const degPerPx = () => 180 / Math.max(320, Math.min(window.innerWidth, window.in
 const VERT_K = 0.8;   // 上下拖比左右慢一點，手機上下距離短，容易拉過頭
 
 // 左手模式：搖桿在右半邊、轉視角在左半邊，按鈕左右對調
-const inJoyZone = (x) => (S.lefty ? x > window.innerWidth * 0.55 : x < window.innerWidth * 0.45);
+// 搖桿區在搖桿那一側（左手模式、或自訂把搖桿拖到右邊都跟著換邊）
+const inJoyZone = (x) => { const w = window.innerWidth, left = joyHome()[0] < w / 2; return left ? x < w * 0.45 : x > w * 0.55; };
 function applyHand() {
   document.documentElement.style.setProperty('--bs', S.btnScale || 1); document.body.classList.toggle('lefty', !!S.lefty);
   for (const el of touchEl.querySelectorAll('.tb')) {
@@ -58,7 +59,7 @@ touchEl.addEventListener('pointerdown', (e) => {
     placeJoyBase(); joyEl.className = 'on'; moveJoy(x, y);
   } else if (!inJoyZone(x)) {
     if (!player.alive && game.mode === 'match') nextSpectate();
-    T.lookers.set(e.pointerId, { x, y }); if (T.lookId === null) T.lookId = e.pointerId; updateLooking();
+    T.lookers.set(e.pointerId, { x, y, t: performance.now() }); if (T.lookId === null) T.lookId = e.pointerId; updateLooking();
   }
   try { touchEl.setPointerCapture(e.pointerId); } catch (err) { /* 有些瀏覽器不支援，照樣能用 */ }
 });
@@ -84,7 +85,8 @@ touchEl.addEventListener('pointermove', (e) => {
   if (e.pointerId === T.joyId) { moveJoy(e.clientX, e.clientY); return; }
   const l = T.lookers.get(e.pointerId); if (!l) return;
   // 好幾根手指都在右半邊時，只有最先按的那根在轉；它放開後下一根接手
-  if (e.pointerId === T.lookId) lookBy(e.clientX - l.x, e.clientY - l.y);
+  // 開火鍵也拖著在轉、而且比這根先按：讓開火鍵轉就好（不然兩根一起轉，速度變兩倍）
+  if (e.pointerId === T.lookId && !(T.fireId !== null && T.fireT < l.t)) lookBy(e.clientX - l.x, e.clientY - l.y);
   l.x = e.clientX; l.y = e.clientY;
 });
 function touchEnd(e) {
@@ -113,12 +115,14 @@ function lookBy(dx, dy, now) {
 const bFire = $('bFire');
 bFire.addEventListener('pointerdown', (e) => {
   e.preventDefault(); e.stopPropagation(); audioInit(); INPUT.mode = 'touch';
-  T.fireId = e.pointerId; T.fx = e.clientX; T.fy = e.clientY; INPUT.fire = true; updateLooking(); bFire.classList.add('down');
+  T.fireId = e.pointerId; T.fireT = performance.now(); T.fx = e.clientX; T.fy = e.clientY; INPUT.fire = true; updateLooking(); bFire.classList.add('down');
   try { bFire.setPointerCapture(e.pointerId); } catch (err) { /* 略過 */ }
 });
 bFire.addEventListener('pointermove', (e) => {
   if (e.pointerId !== T.fireId) return;
-  lookBy(e.clientX - T.fx, e.clientY - T.fy); T.fx = e.clientX; T.fy = e.clientY;
+  const lk = T.lookId !== null && T.lookers.get(T.lookId);
+  if (!(lk && lk.t < T.fireT)) lookBy(e.clientX - T.fx, e.clientY - T.fy);   // 右邊已經有一根先在轉，開火鍵就只開火
+  T.fx = e.clientX; T.fy = e.clientY;
 });
 function fireUp(e) { if (e.pointerId !== T.fireId) return; T.fireId = null; INPUT.fire = false; updateLooking(); bFire.classList.remove('down'); }
 bFire.addEventListener('pointerup', fireUp); bFire.addEventListener('pointercancel', fireUp); bFire.addEventListener('lostpointercapture', fireUp);
