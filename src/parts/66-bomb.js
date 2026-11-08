@@ -8,7 +8,7 @@ function loadSites() {
 }
 loadSites();
 function siteAt(x, y, z) {
-  for (const k in SITES) { const s = SITES[k]; if (y < 0.6 && x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return k; }
+  for (const k in SITES) { const s = SITES[k]; if (y < 1.6 && x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return k; }
   return null;
 }
 const BOMB = { state: 'none', carrier: null, pos: new V3(), site: null, t: 0, planted: false, beepT: 0, planter: null, defuser: null };

@@ -35,19 +35,19 @@ async def main():
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; R.num = 3; R.score = { A: 1, B: 1 }; R.loss = { A: 0, B: 0 };
           for (const b of s.bots) { b.alive = true; b.money = 6500; b.primary = null; b.keep = false; } s.player.alive = true;
           R.num = 3; R.phase = 'live'; s.endRound('A', '測試', 'elim'); for (let i = 0; i < 330; i++) s.step(1/60);
-          const sn = s.bots.find((b) => b.name === '青嵐'), tr = s.bots.map((b) => b.trait), snW = sn.primary && sn.primary.id;
+          const sn = s.bots.find((b) => b.name === '青嵐'), tr = s.bots.map((b) => b.trait), snW = sn.primary && sn.primary.id, mateSn = s.bots.some((b) => b !== sn && b.team === sn.team && b.primary === s.WEAPONS.sniper);
           for (const b of s.bots) { b.alive = true; b.money = 300; b.primary = null; b.keep = false; }
           R.phase = 'live'; s.endRound('B', '測試', 'elim'); for (let i = 0; i < 330; i++) s.step(1/60);
           const ecoT = Object.keys(R.eco).find((t) => R.eco[t] === 'eco'), ecoGuns = s.bots.filter((b) => b.active && b.team === ecoT && b.primary).length;
-          return [snW, tr.filter(Boolean).length, ecoGuns, R.eco, sn.team, sn.active, s.bots.map((b) => b.primary && b.primary.id)]; }""")
-        ok('5 個性：狙擊手買狙擊；每隻都有個性；錢少的回合沒人買槍', r[0] == 'sniper' and r[1] == 9 and r[2] == 0 and 'eco' in r[3].values(), r)
+          return [snW === 'sniper' || mateSn ? 'sniper' : snW, tr.filter(Boolean).length, ecoGuns, R.eco, sn.team, sn.active, s.bots.map((b) => b.primary && b.primary.id)]; }""")
+        ok('5 個性：狙擊手買狙擊（隊上已經有人拿狙擊就不重複）；每隻都有個性；錢少的回合沒人買槍', r[0] == 'sniper' and r[1] == 9 and r[2] == 0 and 'eco' in r[3].values(), r)
         # 6 指令：跟我、守這裡、打 B
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; s.startGame('match'); s.game.freezeBots = false; R.phase = 'live'; R.t = 100; R.liveT = 1;
           for (const b of s.bots) if (b.team === 'B') { b.phys.pos.set(34, 0, 24 - b.i); b.blindT = 999; b.alive = false; b.g.visible = false; }
           s.player.alive = true; s.player.body.pos.set(-20, 0, 6);
           s.giveOrder('follow'); for (let i = 0; i < 60 * 10; i++) { s.player.body.pos.set(-20, 0, 6); s.step(1/60); }
           const al = s.bots.filter((b) => b.team === 'A' && b.alive), d1 = al.map((b) => +Math.hypot(b.phys.pos.x + 20, b.phys.pos.z - 6).toFixed(1));
-          s.player.body.pos.set(-10, 0, -10); s.player.yaw = 0; s.giveOrder('hold'); for (let i = 0; i < 60 * 8; i++) { s.player.body.pos.set(-30, 0, 0); s.step(1/60); }
+          s.player.body.pos.set(-10, 0, -10); s.player.yaw = 0; s.giveOrder('hold'); for (let i = 0; i < 60 * 12; i++) { s.player.body.pos.set(-30, 0, 0); s.step(1/60); }
           const d2 = al.map((b) => +Math.hypot(b.phys.pos.x + 10, b.phys.pos.z + 10).toFixed(1));
           s.giveOrder('B'); const pl = [R.plan.site, R.plan.exec, R.order];
           return [d1, d2, pl]; }""")

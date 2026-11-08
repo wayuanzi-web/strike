@@ -17,7 +17,7 @@ const STD_SPAWN = {
 const MAPS = {
   // ---------- 1. 曙光倉區：破曉的貨櫃倉庫區 ----------
   dawn: {
-    id: 'dawn', name: '曙光倉區', sub: '破曉・倉庫與貨櫃場', floor: 'floor',
+    id: 'dawn', name: '曙光倉區', sub: '破曉・倉庫與貨櫃場', floor: 'floor', defEdge: 1.25,
     theme: { sun: [0.82, 0.22, 0.28], sunColor: '#ffc792', sunI: 2.5, hemi: ['#c4d0ea', '#8a6e56', 1.45], fog: ['#d9c2b0', 45, 190], exposure: 1.0,
       sky: { zen: '#3f6fa6', mid: '#a9bad6', hor: '#ffc79a', low: '#6b6168', warm: '#ffdba8' }, skyline: 'industrial', skyTop: '#a7a2ad', skyBot: '#6b6772', amb: 'harbor' },
     build() {
@@ -167,7 +167,7 @@ const MAPS = {
   },
   // ---------- 4. 烈日工地：蓋到一半的兩層樓、天橋、鷹架平台、墊高的 B 點 ----------
   site: {
-    id: 'site', name: '烈日工地', sub: '午後・兩層樓、天橋與鷹架', floor: 'floor', defEdge: 0.85, koth: [0, -10],
+    id: 'site', name: '烈日工地', sub: '午後・兩層樓、天橋與鷹架', floor: 'floor', defEdge: 1.3, koth: [0, -10],
     theme: { sun: [0.45, 0.7, -0.35], sunColor: '#fff0d6', sunI: 2.6, hemi: ['#cfdff0', '#9a8a70', 1.5], fog: ['#d6d2c6', 60, 230], exposure: 1.0,
       sky: { zen: '#3a76c0', mid: '#9cc0e6', hor: '#ebe4d4', low: '#8a8478', warm: '#fff2cc' }, skyline: 'rail', skyTop: '#b4b9c2', skyBot: '#7a7e86', amb: 'harbor' },
     build() {

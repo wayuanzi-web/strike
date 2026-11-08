@@ -25,8 +25,8 @@ async def main():
           s.player.body.pos.set(12, 0, -20); s.player.yaw = -Math.PI / 2; for (let i = 0; i < 60 * 2.5; i++) { s.step(1/60); s.INPUT.mz = 1; } const y2 = s.player.body.pos.y;
           s.INPUT.mz = 0; return [+y1.toFixed(2), +y2.toFixed(2)]; }""")
         ok('2 你走得上二樓（3 公尺）和 B 點平台（1.2 公尺）', r[0] > 2.9 and abs(r[1] - 1.2) < 0.05, r)
-        r = await ev("""() => { const s = window.__strike, M = s.getMap(); return [s.MAP_ORDER.length, M.name, document.querySelectorAll('#mapSel button').length]; }""")
-        ok('3 選單有四張地圖', r[0] == 4 and r[2] == 4, r)
+        r = await ev("""() => { const s = window.__strike, M = s.getMap(); return [s.MAP_ORDER.length, M.name, document.querySelectorAll('#mapSel button').length, s.siteAt(24, 1.2, -19), s.siteAt(24, 3, 16)]; }""")
+        ok('3 選單有四張地圖；B 點墊高平台上可以裝彈、二樓高度不算包點', r[0] == 4 and r[2] == 4 and r[3] == 'B' and r[4] is None, r)
         for n, c, i in res: print('PASS' if c else 'FAIL', n, i)
         print('ERRORS', [e for e in errors if '404' not in e])
         await browser.close()

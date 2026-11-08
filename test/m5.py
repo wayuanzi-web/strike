@@ -17,7 +17,7 @@ async def main():
         await page.tap('#perfBench')
         await page.wait_for_function("() => !window.__strike.PERF.bench && !document.getElementById('perf').hidden", timeout=240000)
         r = await page.evaluate("() => { const s = window.__strike; return [s.PERF.results.map(x => [x.id, x.s.med, x.s.n, x.draws]), s.getMap().id, document.getElementById('menu').hidden, document.getElementById('perfT').textContent.includes('跑分（每張地圖'), Object.keys(s.PERF.mapLoads).length]; }")
-        ok('2 跑分三張地圖都有結果、回到原本地圖與選單、報告列出跑分', len(r[0]) == 3 and all(x[2] > 20 for x in r[0]) and r[1] == 'dawn' and r[2] is False and r[3] and r[4] >= 3, r)
+        ok('2 跑分每張地圖都有結果、回到原本地圖與選單、報告列出跑分', len(r[0]) == 4 and all(x[2] > 20 for x in r[0]) and r[1] == 'dawn' and r[2] is False and r[3] and r[4] >= 3, r)
         await page.screenshot(path=str(OUT / 'm5_perf.png'))
         # 3 複製報告
         await page.tap('#perfCopy'); await page.wait_for_timeout(300)
