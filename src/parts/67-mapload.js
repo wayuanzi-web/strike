@@ -4,6 +4,7 @@ function switchMap(id) {
   const t0 = performance.now();
   clearNades(); resetBomb();
   setMapData(id);
+  SUN_DIR.fromArray(MAP.theme.sun).normalize();   // 先換太陽方向再烘光影（以前用到上一張地圖的太陽）
   rebuildMapMeshes(); applyTheme();
   buildNav(); loadSites(); loadTeamSpawns(); buildSiteMarks();
   radarBase = null; bakeIndex();

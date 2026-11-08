@@ -77,7 +77,7 @@ function defenderCall(pos) {
   }
 }
 function onBombPlanted() {
-  ROUND.retake = null;
+  ROUND.retake = null; soundCue('plant', null, `${BOMB.site} 點`);
   for (const b of bots) if (b.active && b.alive && (b.state === 'hold' || b.state === 'patrol' || b.state === 'search')) { b.state = 'patrol'; b.path = null; b.goalTag = null; b.holdObj = false; }
 }
 // 每一步：攻方什麼時候開始衝、守方回防什麼時候一起進
@@ -219,7 +219,7 @@ function botObjective(b, dt) {
     if (isCarrier(b) && siteAt(p.x, p.y, p.z)) { b.state = 'plant'; b.useT = 0; return; }
     if (b.objT <= 0) { b.objT = 1.5; setPath(b, g.x, g.z); }
   } else if (g.kind === 'defuse') {
-    if (d < 1.4 && Math.abs(p.y - BOMB.pos.y) < 1.2) { b.state = 'defuse'; b.useT = 0; b.useNeed = b.kit ? DEFUSE_KIT : DEFUSE_TIME; return; }
+    if (d < 1.4 && Math.abs(p.y - BOMB.pos.y) < 1.2) { if (b.team !== player.team) soundCue('defuse'); b.state = 'defuse'; b.useT = 0; b.useNeed = b.kit ? DEFUSE_KIT : DEFUSE_TIME; return; }
     if (b.objT <= 0) { b.objT = 1.5; if (d < 4) { b.path = [[g.x, g.z, g.y || 0]]; b.pi = 0; } else setPath(b, g.x, g.z, g.y); }
   } else if (g.kind === 'hold') {
     b.state = 'hold'; b.holdT = 999; b.holdYaw = g.yaw; b.holdCrouch = Math.random() < (hasTrait(b, 'sniper') || hasTrait(b, 'anchor') ? 0.6 : 0.35); b.holdObj = true; b.holdCheck = game.t + 0.4;

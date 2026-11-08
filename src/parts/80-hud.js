@@ -172,6 +172,7 @@ function pickSeg(seg, b) {
     if (k === 'lefty' || k === 'btnScale') applyHand();
     if (k === 'joyMode' || k === 'runLock') { INPUT.runLock = false; setJoyIdle(); }
     if (k === 'gyro' && S.gyro !== 'off') askGyro();
+    if (k === 'palette') applyPalette();
   }
 }
 
@@ -212,7 +213,7 @@ function drawRadar(dt) {
     const dx = b.phys.pos.x - p.x, my = -(b.phys.pos.z - p.z), c = Math.cos(th), sn = Math.sin(th);
     const rx = (dx * c - my * sn) * s, ry = (dx * sn + my * c) * s, d = Math.hypot(rx, ry), lim = W2 / 2 - 6;
     const kx = d > lim ? rx / d * lim : rx, ky = d > lim ? ry / d * lim : ry;
-    rctx.fillStyle = ally ? '#5fd8ee' : '#ff4a3d'; rctx.beginPath(); rctx.arc(W2 / 2 + kx, W2 / 2 + ky, ally ? 4.5 : 5, 0, Math.PI * 2); rctx.fill();
+    rctx.fillStyle = ally ? pal().radarA : pal().radarE; rctx.beginPath(); rctx.arc(W2 / 2 + kx, W2 / 2 + ky, ally ? 4.5 : 5, 0, Math.PI * 2); rctx.fill();
     if (ally && isCarrier(b)) { rctx.strokeStyle = '#ff9a3d'; rctx.lineWidth = 2.5; rctx.stroke(); }
   }
   // 炸彈：掉在地上（攻方看得到）、裝好了（大家都看得到）

@@ -6,7 +6,7 @@
 :root {
   color-scheme: dark;
   --ink: #0e141d; --ink-2: #16202c; --panel: rgba(14, 20, 29, .86); --line: rgba(255, 228, 190, .22);
-  --bone: #f3ece0; --mute: #a9b0ba;
+  --bone: #f3ece0; --mute: #a9b0ba; --ally: #7fe9f0; --enemy: #ff8f80;
   --dawn: #ffb347; --dawn-lt: #ffd9a0; --dawn-ink: #2a1600;
   --hurt: #ff4a3d; --head: #ff6b3d; --ok: #8fe3b0;
   --f-title: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
@@ -60,7 +60,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 #feed { position: absolute; top: calc(var(--st) + var(--u) * 2); right: calc(var(--sr) + var(--u) * 3); display: grid; gap: 3px; justify-items: end; font-size: calc(var(--u) * 3); }
 #feed p { margin: 0; background: var(--panel); padding: calc(var(--u) * .5) calc(var(--u) * 1.6); border-radius: 3px; transition: opacity .4s; }
 #feed p.mine { box-shadow: inset 0 0 0 1px var(--dawn); }
-#feed .you { color: var(--dawn); } #feed .bot { color: #ff8f80; } #feed .ally { color: #7fe9f0; } #feed .hs { color: var(--head); font-family: var(--f-num); font-weight: 800; margin: 0 .3em; }
+#feed .you { color: var(--dawn); } #feed .bot { color: var(--enemy); } #feed .ally { color: var(--ally); } #feed .hs { color: var(--head); font-family: var(--f-num); font-weight: 800; margin: 0 .3em; }
 #radar { position: absolute; left: calc(var(--sl) + var(--u) * 3); top: calc(var(--st) + var(--u) * 16); width: calc(var(--u) * 26); height: calc(var(--u) * 26);
   border-radius: 50%; background: rgba(10,16,24,.55); box-shadow: 0 0 0 1px rgba(255,228,190,.25); }
 #fps { position: absolute; top: calc(var(--st) + var(--u) * 42); left: calc(var(--sl) + var(--u) * 3); font: 600 max(11px, calc(var(--u) * 2.8)) var(--f-num); color: var(--ok); background: var(--panel); padding: 1px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; }
@@ -155,17 +155,17 @@ body.match #dead { background: none; }
 #mtop { position: absolute; top: calc(var(--st) + var(--u) * 2); left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 2px; font-family: var(--f-num); }
 #mtop > div { background: var(--panel); display: flex; align-items: center; gap: calc(var(--u) * 1.4); padding: calc(var(--u) * .6) calc(var(--u) * 2); }
 #mtop .tm b { font-size: calc(var(--u) * 6); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-#mtop .a { border-radius: 4px 0 0 4px; } #mtop .a b { color: #7fe9f0; } #mtop .b { border-radius: 0 4px 4px 0; } #mtop .b b { color: #ff8f80; }
+#mtop .a { border-radius: 4px 0 0 4px; } #mtop .a b { color: var(--ally); } #mtop .b { border-radius: 0 4px 4px 0; } #mtop .b b { color: var(--enemy); }
 #mtop .clk { flex-direction: column; gap: 0; min-width: calc(var(--u) * 15); justify-content: center; }
 #mtop .clk strong { font-size: calc(var(--u) * 5); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 #mtop .clk strong.low { color: var(--hurt); } #mtop .clk strong.frz { color: var(--dawn); }
 #mtop .clk small { font-family: var(--f-body); font-size: max(10px, calc(var(--u) * 2.2)); color: var(--mute); }
 .pips { display: flex; gap: 3px; } .pips i { width: calc(var(--u) * 1.6); height: calc(var(--u) * 3.4); border-radius: 2px; background: currentColor; opacity: .9; }
-.pips i.dead { opacity: .18; } .a .pips { color: #7fe9f0; } .b .pips { color: #ff8f80; }
+.pips i.dead { opacity: .18; } .a .pips { color: var(--ally); } .b .pips { color: var(--enemy); }
 #banner { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); text-align: center; display: grid; gap: calc(var(--u) * 1); pointer-events: none; transition: opacity .4s; }
 #banner strong { font-family: var(--f-title); font-weight: 900; font-size: calc(var(--u) * 10); letter-spacing: .12em; color: var(--bone); text-shadow: 0 2px 12px rgba(0,0,0,.6); }
 #banner span { font-size: max(12px, calc(var(--u) * 3.4)); color: var(--bone); text-shadow: 0 1px 6px rgba(0,0,0,.7); letter-spacing: .06em; }
-#banner.win strong { color: #7fe9f0; } #banner.lose strong { color: #ff8f80; }
+#banner.win strong { color: var(--ally); } #banner.lose strong { color: var(--enemy); }
 #bBoard { position: absolute; left: calc(var(--sl) + var(--u) * 3 + max(44px, calc(var(--u) * 11)) + 8px); top: calc(var(--st) + var(--u) * 2.4); width: max(44px, calc(var(--u) * 11)); height: max(44px, calc(var(--u) * 11));
   border-radius: 6px; background: var(--panel); display: grid; place-items: center; z-index: 5; }
 #bBoard svg { width: 52%; height: 52%; stroke: var(--bone); stroke-width: 2.2; fill: none; stroke-linecap: round; }
@@ -175,13 +175,13 @@ body.match #dead { background: none; }
 #board table { width: 100%; border-collapse: collapse; font-size: max(12px, calc(var(--u) * 3)); font-variant-numeric: tabular-nums; }
 #board th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 6px; font-size: max(11px, calc(var(--u) * 2.5)); }
 #board td { padding: 3px 6px; border-top: 1px solid rgba(255,255,255,.06); } #board td.n { text-align: right; }
-#board tr.A td:first-child { color: #7fe9f0; } #board tr.B td:first-child { color: #ff8f80; } #board tr.me td { color: var(--dawn); font-weight: 700; }
+#board tr.A td:first-child { color: var(--ally); } #board tr.B td:first-child { color: var(--enemy); } #board tr.me td { color: var(--dawn); font-weight: 700; }
 #board tr.dead td { opacity: .45; } #board .gap td { border: 0; height: 6px; }
 #spec { position: absolute; left: 50%; bottom: calc(var(--sb) + var(--u) * 13); transform: translateX(-50%); background: var(--panel); padding: calc(var(--u) * 1) calc(var(--u) * 3);
   border-radius: 4px; font-size: max(12px, calc(var(--u) * 3)); white-space: nowrap; }
-#spec b { color: #7fe9f0; }
+#spec b { color: var(--ally); }
 #over .card { justify-items: center; text-align: center; width: min(100%, 520px); }
-#overT { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 12); letter-spacing: .15em; } #overT.win { color: #7fe9f0; } #overT.lose { color: #ff8f80; }
+#overT { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 12); letter-spacing: .15em; } #overT.win { color: var(--ally); } #overT.lose { color: var(--enemy); }
 #overS { font-family: var(--f-num); font-weight: 800; font-size: calc(var(--u) * 9); line-height: 1; }
 #over p { margin: 0; color: var(--mute); font-size: max(13px, calc(var(--u) * 3.2)); }
 #rotate { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; align-content: center; gap: 18px; background: var(--ink); text-align: center; padding: 24px; }
@@ -248,7 +248,7 @@ body.match #dead { background: none; }
 #stats ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; } #stats li { display: flex; justify-content: space-between; font-size: max(12px, calc(var(--u) * 3)); }
 #stats li span { color: var(--mute); } #stats table { width: 100%; border-collapse: collapse; font-size: max(12px, calc(var(--u) * 2.8)); font-variant-numeric: tabular-nums; }
 #stats th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 4px; } #stats td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.06); }
-#stats tr.w td:nth-child(3) { color: #7fe9f0; } #stats tr.l td:nth-child(3) { color: #ff8f80; }
+#stats tr.w td:nth-child(3) { color: var(--ally); } #stats tr.l td:nth-child(3) { color: var(--enemy); }
 #touch .tb { scale: var(--bs, 1); }
 #bRadio { position: absolute; left: calc(var(--sl) + var(--u) * 3 + (max(44px, calc(var(--u) * 11)) + 8px) * 2); top: calc(var(--st) + var(--u) * 15); height: max(40px, calc(var(--u) * 10)); padding: 0 calc(var(--u) * 2.4);
   border-radius: 6px; background: rgba(40,90,140,.85); color: #fff; font-weight: 800; font-size: max(13px, calc(var(--u) * 3)); z-index: 5; }
@@ -280,7 +280,7 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 #toast.lv { background: var(--dawn); color: #1a1208; }
 #kc { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding-bottom: calc(var(--sb) + var(--u) * 6);
   box-shadow: inset 0 0 0 4px rgba(255,90,60,.55); background: linear-gradient(180deg, rgba(0,0,0,.25), transparent 18%, transparent 80%, rgba(0,0,0,.45)); }
-#kc b { color: #ff8f80; letter-spacing: .2em; font-size: max(13px, calc(var(--u) * 3.4)); } #kc span { font-size: max(18px, calc(var(--u) * 5)); font-weight: 800; } #kc small { color: var(--mute); }
+#kc b { color: var(--enemy); letter-spacing: .2em; font-size: max(13px, calc(var(--u) * 3.4)); } #kc span { font-size: max(18px, calc(var(--u) * 5)); font-weight: 800; } #kc small { color: var(--mute); }
 #prog { z-index: 9; } #prog .card { width: min(100%, 900px); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
 #prog h3 small { color: var(--mute); font-weight: 400; margin-left: .5em; font-size: .8em; }
 .pglv { display: flex; align-items: center; gap: calc(var(--u) * 3); } .pglv strong { font-family: var(--f-num); font-size: calc(var(--u) * 12); color: var(--dawn-lt); line-height: 1; } .pglv > div { display: grid; gap: 4px; flex: 1; } .pb.big { width: 100%; height: 10px; }
@@ -290,6 +290,13 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 .pga { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; } .pga li { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); display: grid; gap: 2px; opacity: .55; } .pga li.done { opacity: 1; border-color: var(--dawn); } .pga small { color: var(--mute); }
 #pgCode { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); color: var(--bone); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; user-select: text; -webkit-user-select: text; }
 #overX { color: var(--dawn-lt); } #overX small { color: var(--mute); }
+#xh.tick { animation: xhTick .14s ease-out; } @keyframes xhTick { 0% { scale: 1.22; } 100% { scale: 1; } }
+#sv { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+#sv i { position: absolute; left: calc(var(--u) * -6); top: calc(var(--u) * -6); width: calc(var(--u) * 12); height: calc(var(--u) * 12); border-radius: 50%;
+  border: 3px solid transparent; border-top-color: rgba(255,255,255,.75); transform-origin: 50% 50%; }
+#sv i.step { border-top-color: color-mix(in srgb, var(--enemy) 80%, white); } #sv i.step.near { border-width: 5px; } #sv i.shot { border-top-color: #fff; width: calc(var(--u) * 16); height: calc(var(--u) * 16); left: calc(var(--u) * -8); top: calc(var(--u) * -8); }
+#cap { position: absolute; left: 50%; bottom: calc(var(--sb) + var(--u) * 24); transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+#cap p { margin: 0; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,.6); color: var(--bone); font-size: max(12px, calc(var(--u) * 2.9)); font-weight: 700; }
 #perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
 #bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
 #glLost { z-index: 20; }
@@ -307,6 +314,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div id="dirs"></div>
     <div id="xh"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="d"></i></div>
     <div id="hm"><i></i><i></i><i></i><i></i></div>
+    <div id="sv"></div><div id="cap"></div>
     <div id="mtop" hidden><div class="tm a"><b id="scA">0</b><span class="pips" id="pipsA"></span></div><div class="clk"><strong id="clk">1:55</strong><small id="rnd">第 1 回合</small></div><div class="tm b"><span class="pips" id="pipsB"></span><b id="scB">0</b></div></div>
     <div id="banner" hidden><strong id="bnT"></strong><span id="bnS"></span></div>
     <div id="board" hidden></div>
@@ -389,6 +397,9 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <div class="opt"><span>陀螺儀方向</span><div class="seg" data-k="gyroInv"><button data-v="0">正常</button><button data-v="1">反向</button></div></div></div>
         <div class="opt"><span>按鈕大小</span><div class="seg" data-k="btnScale"><button data-v="0.85">小</button><button data-v="1">中</button><button data-v="1.15">大</button></div></div>
         <div class="opt"><span>震動</span><div class="seg" data-k="vibrate"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>敵我配色</span><div class="seg" data-k="palette"><button data-v="default">預設（青／橘）</button><button data-v="cb">色盲友善（藍／黃）</button><button data-v="hc">高對比</button></div></div>
+        <div class="opt"><span>聲音方向提示</span><div class="seg" data-k="soundViz"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>音效字幕</span><div class="seg" data-k="captions"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>擊殺鏡頭</span><div class="seg" data-k="killcam"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>

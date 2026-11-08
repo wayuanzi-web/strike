@@ -349,16 +349,85 @@ function bakeVertex(px, py, pz, n, tu, tv) {
   return [sun, clamp(1 - occ / tot * 1.5, 0.15, 1)];
 }
 
+// ---------- 光照貼圖：每個方塊面在一張圖集裡有一塊，每格算日照與環境光遮蔽（取代以前把面切細、存在頂點上） ----------
+// 密度依地圖大小自動調（每公尺約 3–5 格，總共約 14 萬格）；邊緣多留一圈避免取樣滲色；圖集用線性內插，影子邊比頂點版銳利。
+const LM = { tex: null, size: [0, 0], density: 0, texels: 0, ms: 0 };
+function bakeTexel(px, py, pz, n, tu, tv) {
+  const ox = px + n[0] * 0.03, oy = py + n[1] * 0.03, oz = pz + n[2] * 0.03;
+  let sun = 0;
+  const nd = n[0] * SUN_DIR.x + n[1] * SUN_DIR.y + n[2] * SUN_DIR.z;
+  if (nd > 0.01) {
+    const len = Math.min(70, Math.max(1, (7 - oy) / SUN_DIR.y));
+    for (let k = 0; k < 2; k++) {   // 兩條略錯開的射線：影子邊只有一點點柔
+      const j = SUN_JIT[k * 2]; let dx = SUN_DIR.x + j[0] * SUN_DIR.z, dy = SUN_DIR.y + j[1], dz = SUN_DIR.z - j[0] * SUN_DIR.x;
+      const l = Math.hypot(dx, dy, dz); if (bakeRay(ox, oy, oz, dx / l, dy / l, dz / l, len) < 0) sun += 0.5;
+    }
+  }
+  let occ = 0, tot = 0;
+  for (let k = 0; k < AO_DIRS.length; k += 2) {   // 環境光遮蔽：一半的方向就夠（之後還會模糊）
+    const d = AO_DIRS[k], dx = tu[0] * d[0] + tv[0] * d[1] + n[0] * d[2], dy = tu[1] * d[0] + tv[1] * d[1] + n[1] * d[2], dz = tu[2] * d[0] + tv[2] * d[1] + n[2] * d[2];
+    const t = bakeRay(ox, oy, oz, dx, dy, dz, 1.4);
+    if (t >= 0) occ += d[3] * (1 - t / 1.4) * (1 - t / 1.4) + d[3] * 0.25;
+    tot += d[3] * 1.25;
+  }
+  return [sun, clamp(1 - occ / tot * 1.5, 0.15, 1)];
+}
+// 把每個面放進圖集（依高度排成一列一列），回傳每個面的位置
+function packFaces(faces, density) {
+  const W = 1024; let x = 0, y = 0, rowH = 0;
+  const order = faces.map((f, i) => i).sort((a, b) => faces[b].th - faces[a].th);
+  for (const i of order) {
+    const f = faces[i]; f.tw = Math.max(1, Math.round(f.lu * density)); f.th = Math.max(1, Math.round(f.lv * density));
+    const w = f.tw + 2, h = f.th + 2;
+    if (x + w > W) { x = 0; y += rowH; rowH = 0; }
+    f.ax0 = x; f.ay0 = y; x += w; rowH = Math.max(rowH, h);
+  }
+  return [W, y + rowH];
+}
+function bakeLightmap(faces) {
+  const t0 = performance.now();
+  let area = 0; for (const f of faces) area += f.lu * f.lv;
+  let density = clamp(Math.sqrt(140000 / Math.max(1, area)), 2.5, 5);
+  for (const f of faces) f.th = Math.max(1, Math.round(f.lv * density));
+  let [W, H] = packFaces(faces, density);
+  while (H > 1024 && density > 1.5) { density *= 0.9; for (const f of faces) f.th = Math.max(1, Math.round(f.lv * density)); [W, H] = packFaces(faces, density); }
+  H = Math.min(1024, 1 << Math.ceil(Math.log2(Math.max(H, 1))));
+  const data = new Uint8Array(W * H * 4), tmp = [];
+  let texels = 0;
+  for (const f of faces) {
+    const { b, ax, ua, va, n, tu, tv, plane, lu, lv, tw, th } = f;
+    // 先算這個面自己的格子，再輕輕模糊環境光遮蔽（3×3），最後寫進圖集（外圍一圈複製邊緣）
+    tmp.length = 0;
+    for (let j = 0; j < th; j++) for (let i = 0; i < tw; i++) {
+      const p = [0, 0, 0]; p[ax] = plane; p[ua] = b.min[ua] + lu * (i + 0.5) / tw; p[va] = b.min[va] + lv * (j + 0.5) / th;
+      tmp.push(bakeTexel(p[0], p[1], p[2], n, tu, tv)); texels++;
+    }
+    const at = (i, j) => tmp[clamp(j, 0, th - 1) * tw + clamp(i, 0, tw - 1)];
+    for (let j = -1; j <= th; j++) for (let i = -1; i <= tw; i++) {
+      const c = at(i, j); let ao = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) ao += at(i + di, j + dj)[1];
+      const o = ((f.ay0 + 1 + j) * W + (f.ax0 + 1 + i)) * 4;
+      data[o] = Math.round(c[0] * 255); data[o + 1] = Math.round(ao / 9 * 255); data[o + 2] = 0; data[o + 3] = 255;
+    }
+  }
+  if (LM.tex) LM.tex.dispose();
+  const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat);
+  tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.flipY = false; tex.needsUpdate = true;
+  const fl = faces.find((f) => f.b === BOXES[0] && f.ax === 1);   // 地板那一面（測試用）
+  Object.assign(LM, { data, floor: fl && { ax0: fl.ax0, ay0: fl.ay0, tw: fl.tw, th: fl.th, x0: fl.b.min[0], z0: fl.b.min[2], lu: fl.lu, lv: fl.lv }, tex, size: [W, H], density: +density.toFixed(2), texels, ms: Math.round(performance.now() - t0) });
+  MAP_UNI.uLM.value = tex;
+  return [W, H];
+}
+
 // ---------- 建地圖網格：依材質分組，每組一次繪製 ----------
-const MAP_UNI = { uFlash: { value: new THREE.Vector4(0, 0, 0, 0) } };
+const MAP_UNI = { uFlash: { value: new THREE.Vector4(0, 0, 0, 0) }, uLM: { value: null } };
 function patchMapMaterial(mat, wear, grime, chip = false) {
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uFlash = MAP_UNI.uFlash;
+    sh.uniforms.uFlash = MAP_UNI.uFlash; sh.uniforms.uLM = MAP_UNI.uLM;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec2 aLight; attribute vec3 aLocal; attribute vec3 aSize;\nvarying vec2 vLight; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLight = aLight; vWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vN0 = normal; vLoc = aLocal; vSz = aSize;');
+      .replace('#include <common>', '#include <common>\nattribute vec2 aLight; attribute vec2 aLm; attribute vec3 aLocal; attribute vec3 aSize;\nvarying vec2 vLight; varying vec2 vLm; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLight = aLight; vLm = aLm; vWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vN0 = normal; vLoc = aLocal; vSz = aSize;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec4 uFlash;\nvarying vec2 vLight; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
+      .replace('#include <common>', '#include <common>\nuniform vec4 uFlash; uniform sampler2D uLM;\nvarying vec2 vLight; varying vec2 vLm; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
       .replace('#include <map_fragment>', `#include <map_fragment>
       {
         vec3 an = abs(vN0);
@@ -373,8 +442,9 @@ function patchMapMaterial(mat, wear, grime, chip = false) {
         diffuseColor.rgb *= 1.0 - grime * ${grime.toFixed(2)} * step(an.y, 0.5);
       }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-        reflectedLight.directDiffuse *= vLight.x;
-        reflectedLight.indirectDiffuse *= mix(0.42, 1.0, vLight.y);
+        vec2 L = vLm.x < 0.0 ? vLight : texture2D(uLM, vLm).rg;   // 方塊用光照貼圖，裝飾用頂點上的值
+        reflectedLight.directDiffuse *= L.x;
+        reflectedLight.indirectDiffuse *= mix(0.42, 1.0, L.y);
         reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.08, 0.05, 0.03) * (1.0 - smoothstep(0.0, 2.0, vWp.y));
         { float fd = distance(vWp, uFlash.xyz);
           reflectedLight.directDiffuse += diffuseColor.rgb * vec3(1.0, 0.7, 0.4) * uFlash.w * 2.2 / (1.0 + fd * fd * 0.5); }`);
@@ -388,7 +458,8 @@ function buildMapMeshes(aniso) {
   const t1 = performance.now();
   bakeIndex();
   const groups = {};
-  const G = (m) => groups[m] || (groups[m] = { P: [], N: [], C: [], U: [], L: [], O: [], Z: [], I: [] });
+  const G = (m) => groups[m] || (groups[m] = { P: [], N: [], C: [], U: [], L: [], M: [], O: [], Z: [], I: [] });
+  const lmFaces = [];   // 方塊的面：先收集，烘好光照貼圖再算貼圖座標
   const col = new THREE.Color();
   const BOUND = { x0: -37, x1: 37, z0: -27, z1: 27 };
   // 一個面：axis 法線軸（0/1/2）、sign 正負、u/v 兩個面內軸
@@ -407,13 +478,13 @@ function buildMapMeshes(aniso) {
       if (b === BOXES[0] && ax !== 1) continue;
       const plane = sg > 0 ? b.max[ax] : b.min[ax];
       const lu = size[ua], lv = size[va];
-      const cell = decor ? 99 : b === BOXES[0] ? 0.5 : ax === 1 ? 1.0 : (size[1] > 5 ? 0.8 : 0.5);
-      const nu = Math.max(1, Math.ceil(lu / cell)), nv = Math.max(1, Math.ceil(lv / cell));
+      const nu = 1, nv = 1;   // 一個面兩個三角形（光影在光照貼圖裡）
       const n = [0, 0, 0]; n[ax] = sg;
       const tu = [0, 0, 0]; tu[ua] = 1; const tv = [0, 0, 0]; tv[va] = 1;
       const start = g.P.length / 3;
       let faceL = null;
       if (decor) { const c = [0, 0, 0]; c[ax] = plane; c[ua] = b.min[ua] + lu / 2; c[va] = b.min[va] + lv / 2; faceL = bakeVertex(c[0], c[1], c[2], n, tu, tv); }
+      else lmFaces.push({ b, ax, ua, va, n, tu, tv, plane, lu, lv, g, start });
       for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
         const p = [0, 0, 0]; p[ax] = plane; p[ua] = b.min[ua] + lu * i / nu; p[va] = b.min[va] + lv * j / nv;
         g.P.push(p[0], p[1], p[2]); g.N.push(n[0], n[1], n[2]);
@@ -427,7 +498,7 @@ function buildMapMeshes(aniso) {
           u = hu * scale * (ax === 0 && sg > 0 || ax === 2 && sg < 0 ? -1 : 1); v = mat === 'container' && ax !== 1 ? (p[1] - b.min[1]) / 2.6 : hv * scale;
         }
         g.U.push(u, v);
-        g.L.push(...(faceL || bakeVertex(p[0], p[1], p[2], n, tu, tv)));
+        g.L.push(...(faceL || [1, 1])); g.M.push(-1, -1);
         g.O.push(p[0] - b.min[0], p[1] - b.min[1], p[2] - b.min[2]); g.Z.push(size[0], size[1], size[2]);
       }
       // 三角形要朝外（逆時針）：依法線方向決定繞向
@@ -439,6 +510,14 @@ function buildMapMeshes(aniso) {
       }
     }
   }
+  // 烘光照貼圖，填每個方塊面四個角的貼圖座標
+  const [LW, LH] = bakeLightmap(lmFaces);
+  for (const f of lmFaces) {
+    for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) {
+      const k = (f.start + j * 2 + i) * 2;
+      f.g.M[k] = (f.ax0 + 1 + i * f.tw) / LW; f.g.M[k + 1] = (f.ay0 + 1 + j * f.th) / LH;
+    }
+  }
   const SETTINGS = { concrete: [0.5, 0.25], brick: [0.35, 0.3], floor: [0.0, 0.0], container: [0.9, 0.2], wood: [0.7, 0.2], metal: [0.6, 0.25], plaster: [0.35, 0.4], cobble: [0, 0], gravel: [0, 0] };
   const meshes = [];
   for (const [m, g] of Object.entries(groups)) {
@@ -448,6 +527,7 @@ function buildMapMeshes(aniso) {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(g.C, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.U, 2));
     geo.setAttribute('aLight', new THREE.Float32BufferAttribute(g.L, 2));
+    geo.setAttribute('aLm', new THREE.Float32BufferAttribute(g.M, 2));
     geo.setAttribute('aLocal', new THREE.Float32BufferAttribute(g.O, 3));
     geo.setAttribute('aSize', new THREE.Float32BufferAttribute(g.Z, 3));
     geo.setIndex(g.I); geo.computeBoundingSphere();

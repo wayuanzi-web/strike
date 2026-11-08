@@ -483,14 +483,15 @@ function playBuf(buf, vol, o = {}) {
   if (o.lp && o.lp < 17000) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; node.connect(f); node = f; }
   const g = AC.createGain(); g.gain.value = vol; node.connect(g); node = g;
   if (o.pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = o.pan; node.connect(p); node = p; }
-  node.connect(master); s.start(AC.currentTime + (o.delay || 0));
+  node.connect(master); if (REV.send && o.rev !== false) node.connect(REV.send);   // 殘響
+  s.start(AC.currentTime + (o.delay || 0));
 }
 function noise(dur, freq, q, vol, type = 'lowpass', at = 0, pan = 0) {
   const t = AC.currentTime + at, src = AC.createBufferSource(); src.buffer = noiseBuf;
   const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
   const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   src.connect(f); f.connect(g);
-  if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(master); } else g.connect(master);
+  if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(master); if (REV.send) p.connect(REV.send); } else { g.connect(master); if (REV.send) g.connect(REV.send); }
   src.start(t, Math.random() * 0.4); src.stop(t + dur + 0.02);
 }
 function tone(freq, dur, vol, type = 'square', at = 0, slide = 0) {
@@ -501,6 +502,7 @@ function tone(freq, dur, vol, type = 'square', at = 0, slide = 0) {
 }
 let shotI = 0;
 function sfx(kind, vol = 1, o = {}) {
+  if (window.__sfxLog) window.__sfxLog.push(kind);   // 測試用
   if (!AC || !S.sound || vol < 0.02) return;
   if (kind === 'shot') {
     // 每把槍用同一組槍聲換音高、音量（手槍尖、狙擊低沉、霰彈多一層低頻）
@@ -525,7 +527,9 @@ function sfx(kind, vol = 1, o = {}) {
   else if (kind === 'cash') { tone(1568, 0.06, 0.07, 'triangle'); tone(2093, 0.12, 0.07, 'triangle', 0.05); }
   else if (kind === 'plant') { noise(0.05, 2000, 5, 0.3, 'bandpass'); tone(1400, 0.05, 0.05, 'square', 0.02); } else if (kind === 'hit') { if (BUF.hit) playBuf(BUF.hit, 0.8); else tone(1500, 0.05, 0.18, 'square'); }
   else if (kind === 'head') { if (BUF.head) playBuf(BUF.head, 0.75, { rate: 1 }); else { tone(2100, 0.05, 0.2, 'square'); tone(2800, 0.06, 0.14, 'square', 0.03); } }
-  else if (kind === 'kill') { tone(880, 0.06, 0.09, 'triangle'); tone(1320, 0.1, 0.09, 'triangle', 0.05); }
+  else if (kind === 'kill') { tone(880, 0.06, 0.09, 'triangle'); tone(1320, 0.1, 0.09, 'triangle', 0.05); tone(120, 0.12, 0.22, 'sine', 0, 55); }   // 兩聲高音＋一聲低沉的確認
+  else if (kind === 'headkill') { tone(2600, 0.05, 0.08, 'square'); tone(1760, 0.18, 0.08, 'triangle', 0.04); noise(0.05, 5200, 2, 0.25, 'highpass'); }
+  else if (kind === 'dink') { tone(3300, 0.2, 0.09, 'sine'); tone(4900, 0.12, 0.05, 'sine'); noise(0.012, 5000, 10, 0.4, 'bandpass'); }
   else if (kind === 'hurt') { noise(0.12, 300, 1, 0.8); tone(90, 0.12, 0.3, 'sine'); }
   else if (kind === 'magout') { noise(0.05, 1800, 3, 0.4, 'bandpass'); noise(0.04, 900, 2, 0.3, 'bandpass', 0.05); }
   else if (kind === 'magin') { noise(0.05, 2500, 4, 0.5, 'bandpass'); noise(0.04, 3200, 4, 0.45, 'bandpass', 0.07); noise(0.03, 1600, 3, 0.4, 'bandpass', 0.28); }

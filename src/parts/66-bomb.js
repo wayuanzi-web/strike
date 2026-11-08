@@ -88,7 +88,7 @@ function updateBomb(dt) {
   if (BOMB.state === 'planted') {
     BOMB.t -= dt; BOMB.beepT -= dt;
     const led = bombMesh.userData.led;
-    if (BOMB.beepT <= 0) { BOMB.beepT = lerp(0.12, 1.0, clamp(BOMB.t / BOMB_TIME, 0, 1)); sfx('beep', 1, { pos: BOMB.pos }); led.visible = true; led.userData.t = 0.08; }
+    if (BOMB.beepT <= 0) { BOMB.beepT = lerp(0.12, 1.0, clamp(BOMB.t / BOMB_TIME, 0, 1)); sfx('beep', 1, { pos: BOMB.pos }); if (BOMB.t < 15) soundCue('beep', BOMB.pos, `剩 ${Math.ceil(BOMB.t)} 秒`); led.visible = true; led.userData.t = 0.08; }
     else if ((led.userData.t -= dt) <= 0) led.visible = false;
     if (BOMB.t <= 0 && ROUND.phase === 'live') explodeBomb();
   } else if (BOMB.state === 'dropped') {

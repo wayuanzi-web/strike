@@ -64,8 +64,10 @@ function makeBotModel(team) {
   const upper = new THREE.Group(); body.add(upper);       // 蹲下時上身整個往下移（不壓扁）
   upper.add(new THREE.Mesh(mergeParts(parts), mat));
   const fl = new THREE.Sprite(BOT_FLASH_MAT); fl.position.copy(BOT_MUZZLE); fl.scale.set(0.32, 0.32, 1); fl.visible = false; upper.add(fl);
-  const gunM = new THREE.Mesh(BOT_GUNS.rifle.geo, mat); upper.add(gunM);
-  return { g, body, legL, legR, fl, upper, mat, gunM };
+  // 槍掛在手的位置（換彈、丟投擲物、裝彈拆彈時繞這裡轉）
+  const gunP = new THREE.Group(); gunP.position.set(0.16, 1.3, -0.3); upper.add(gunP);
+  const gunM = new THREE.Mesh(BOT_GUNS.rifle.geo, mat); gunM.position.set(-0.16, -1.3, 0.3); gunP.add(gunM);
+  return { g, body, legL, legR, fl, upper, mat, gunM, gunP };
 }
 // 隊友頭上的名牌（CS 也會顯示隊友名字），隔牆也看得到
 function nameTag(text) {
@@ -88,7 +90,7 @@ function makeBot(name, team) {
     stuckT: 0, lastP: new V3(), deadT: 0, respawnT: 0, boxes: newBoxes(), walk: 0, searchT: 0, spottedT: 0,
   };
   b.body = b.phys;   // 物理身體：玩家程式用 bot.body，機器人程式用 bot.phys，是同一個
-  b.gunM = mdl.gunM; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.kit = false;
+  b.gunM = mdl.gunM; b.gunP = mdl.gunP; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.kit = false;
   b.wpn = WEAPONS.rifle; b.mag = 30; b.reloadT = 0; b.blindT = 0; b.useT = 0;
   b.baseTeam = team;
   if (team === 'A') { b.tag = nameTag(name); b.g.add(b.tag); }
@@ -277,13 +279,16 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
   const byPlayer = attacker === player, w = weapon || (byPlayer ? WP : attacker.wpn) || WEAPONS.rifle;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.deaths++; b.fallDir = Math.sign(Math.random() - 0.5);
+    // 倒法：正面爆頭往後倒、打腳往前跪倒、其它隨機（往前、側倒、轉半圈）
+    const front = dir && (dir.x * -Math.sin(b.yaw) + dir.z * -Math.cos(b.yaw)) < 0;
+    b.deathKind = part === 'head' && front ? 'back' : part === 'legs' ? 'fwd' : pick(['fwd', 'side', 'spin', front ? 'back' : 'fwd']);
     b.respawnT = modeRespawnTime();
     SHOOT_TOKENS.delete(b);
     const enemy = attacker !== b && attacker.team !== b.team;
     if (byPlayer) {
       player.kills++; player.deathStreak = 0; if (part === 'head') player.heads++;
       if (game.mode !== 'match') W.reserve = Math.min(WP.reserve, W.reserve + 15);
-      hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head'); statKill(w, part === 'head');
+      hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head'); statKill(w, part === 'head'); hitFeedback('kill', b, part === 'head');
     } else if (enemy) { attacker.kills++; if (part === 'head') attacker.heads++; }
     if (enemy) roundKill(attacker);
     if (enemy) addMoney(attacker, w.reward || 0, '擊殺');
@@ -291,8 +296,9 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
     if (typeof onUnitDied === 'function') onUnitDied(b);
     return;
   }
-  if (byPlayer) { hudHit(part === 'head' ? 'head' : 'hit'); sfx(part === 'head' ? 'head' : 'hit'); }
+  if (byPlayer) { hudHit(part === 'head' ? 'head' : 'hit'); sfx(part === 'head' ? 'head' : 'hit'); hitFeedback('hit', b, part === 'head', b.helmet !== false && b.armor > 0); }
   // 中彈硬直：準度變差、連發中斷，先打中的人佔優勢
+  b.hitPart = part; b.hitSide = dir ? Math.sign(dir.x * -Math.cos(b.yaw) - dir.z * -Math.sin(b.yaw)) || 1 : 1;   // 中彈部位、從哪一側
   b.flinchT = part === 'head' ? 0.6 : 0.35; b.tagT = 1.5; b.hitAnim = part === 'head' ? 0.2 : 0.15; b.hitHead = part === 'head'; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
   if (b.hp < 55 && (b.coverUsed || 0) < 2 && b.state === 'combat' && Math.random() < 0.75) { if (seekCover(b, attacker)) return; }
   // 被打到：轉頭面向攻擊者，過去找
@@ -340,9 +346,15 @@ function updateBot(b, dt) {
   const p = b.phys.pos, D = botDiff(b);
   if (!b.alive) {
     b.deadT += dt; b.respawnT -= dt;
-    const k = Math.min(1, b.deadT / 0.45);
-    b.g.rotation.set(0, b.yaw, 0); b.g.rotateX(k * k * 1.57 * (b.fallDir > 0 ? 1 : -1)); b.g.rotateZ(k * 0.15 * b.fallDir);
-    b.g.position.set(p.x, p.y + 0.12 * k, p.z);
+    // 倒地：先膝蓋一軟往下沉（0.2 秒），接著倒下，最後輕輕彈一下
+    const t = b.deadT, kd = b.deathKind || 'fwd', sink = Math.min(1, t / 0.22), f = clamp((t - 0.12) / 0.5, 0, 1), e = f * f * (3 - 2 * f);
+    const bounce = t > 0.62 ? Math.exp(-(t - 0.62) * 8) * Math.sin((t - 0.62) * 28) * 0.06 : 0;
+    b.g.rotation.set(0, b.yaw + (kd === 'spin' ? e * 1.2 * b.fallDir : 0), 0);
+    if (kd === 'side') b.g.rotateZ((e * 1.5 + bounce) * b.fallDir); else b.g.rotateX((e * 1.55 + bounce) * (kd === 'back' ? -1 : 1));
+    b.g.position.set(p.x, p.y + 0.1 * e, p.z);
+    b.upper.position.y = -0.35 * sink * (1 - e * 0.7); b.bodyGroup.rotation.set(0, 0, 0);
+    if (b.gunP) b.gunP.rotation.x = -0.9 * e;
+    b.legL.userData.knee.rotation.x = -1.3 * sink * (1 - e * 0.5); b.legR.userData.knee.rotation.x = -1.0 * sink * (1 - e * 0.5);
     if (game.mode !== 'match' && ((b.deadT > 3.6 && !inPlayerView(b)) || b.deadT > 6)) b.g.visible = false;   // 對戰模式屍體留到回合結束
     b.fl.visible = false; if (b.tag) b.tag.visible = false;
     if (b.respawnT <= 0) respawnBot(b);
@@ -537,9 +549,18 @@ function updateBot(b, dt) {
   const sw = Math.sin(b.walk) * Math.min(1, sp / 3) * 0.6;
   if (b.hitAnim > 0) b.hitAnim -= dt;
   const lean = clamp((b.phys.vel.x * Math.cos(b.yaw) - b.phys.vel.z * Math.sin(b.yaw)) * -0.03, -0.12, 0.12);
-  b.bodyGroup.rotation.set(Math.max(0, b.hitAnim || 0) * (b.hitHead ? 1.6 : 1.0), 0, lean);
+  // 中彈：頭往後仰、身體被打的那側往後轉、打腳身子一沉
+  const ha = Math.max(0, b.hitAnim || 0) / 0.2;
+  b.bodyGroup.rotation.set(ha * (b.hitPart === 'head' ? 0.32 : b.hitPart === 'body' ? 0.18 : -0.1), ha * (b.hitPart === 'body' ? 0.35 * b.hitSide : 0), lean);
+  b.bodyGroup.position.y = b.hitPart === 'legs' ? -0.12 * ha : 0;
+  // 動作：換彈（槍往下壓、身體前傾）、丟投擲物（手往前甩）、裝彈拆彈（槍朝下、彎腰）
+  let gx = 0, lean2 = 0; const thr = game.t - (b.thrownAt || -9);
+  if (b.reloadT > 0) { const k = Math.sin(clamp(1 - b.reloadT / b.wpn.reload, 0, 1) * Math.PI); gx = -0.75 * k; lean2 = 0.1 * k; }
+  else if (b.state === 'plant' || b.state === 'defuse') { gx = -1.15; lean2 = 0.28; }
+  else if (thr < 0.5) { const t = thr / 0.5; gx = t < 0.3 ? 0.8 * t / 0.3 : 0.8 - 1.4 * (t - 0.3) / 0.7; lean2 = 0.2 * Math.sin(t * Math.PI); }
+  b.gunP.rotation.x = lerp(b.gunP.rotation.x, gx, 1 - Math.exp(-16 * dt)); b.upper.rotation.x = lerp(b.upper.rotation.x, lean2, 1 - Math.exp(-10 * dt));
   // 腳步聲（離聽的人 30 公尺內聽得到，有方位）
-  if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(camera.position) < 30) sfx('step', b.team === 'A' ? 0.5 : 0.9, { pos: p, surface: surfaceAt(p) }); } }
+  if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(camera.position) < 30) { sfx('step', b.team === 'A' ? 0.5 : 0.9, { pos: p, surface: surfaceAt(p) }); if (b.team !== player.team) soundCue('step', p); } } }
   if (b.flashT > 0) { b.flashT -= dt; b.fl.visible = true; b.fl.material.rotation = Math.random() * 6; const fs = rand(0.26, 0.38); b.fl.scale.set(fs, fs, 1); } else b.fl.visible = false;
   if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; b.litC = bakeRay(p.x, p.y + 1.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
   b.ck = lerp(b.ck, b.phys.crouched ? 1 : 0, 1 - Math.exp(-15 * dt));
@@ -598,7 +619,7 @@ function botShoot(b, tg, dist, D) {
     let hitU = null, hitPart = null;
     if (!forceMiss) for (const u of enemiesOf(b.team)) { const h = rayBody(_be, _bd, u.boxes, t); if (h) { t = h.t; hitU = u; hitPart = h.part; } }
     const end = _end.copy(_be).addScaledVector(_bd, t);
-    if (k < 2) spawnTracer(mz, end, b.team === 'B' ? '#ff9a6a' : '#9fe6ff', 0.018, hitU === player);
+    if (k < 2) spawnTracer(mz, end, b.team === player.team ? pal().tracerA : pal().tracerE, 0.018, hitU === player);
     if (hitU) {
       let dmg = hitDamage(w, hitPart, t, hitU);
       if (hitU === player) { if (hitPart === 'head') dmg *= D.headMul / 4; dmg *= D.dmg * 0.9; }
@@ -616,6 +637,7 @@ function botShoot(b, tg, dist, D) {
     } else damageBot(u, e.dmg, e.part, _bd.clone(), b, w);
   }
   sfx('botshot', 1, { pos: b.phys.pos, w });
+  if (b.team !== player.team) soundCue('shot', b.phys.pos);
   muzzleLight(mz, 1.0);
   b.flashT = 0.05; b.firedAt = game.t;
   botsHearShot(b.phys.pos, b.team);
