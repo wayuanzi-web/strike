@@ -1,0 +1,25 @@
+// 排行榜 Worker 單元測試：node test/lb-test.mjs
+import worker from '../server/leaderboard-worker.js';
+import { fakeKV } from './lb-fake.mjs';
+const env = { LB: fakeKV(), ALLOWED_ORIGINS: 'https://wayuanzi-web.github.io' };
+const res = []; const ok = (n, c, i = '') => res.push([n, !!c, i]);
+const post = async (body, ip = '1.1.1.1') => { const r = await worker.fetch(new Request('https://x/submit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip, Origin: 'https://wayuanzi-web.github.io' }, body: JSON.stringify(body) }), env); return [r.status, await r.json(), r.headers.get('Access-Control-Allow-Origin')]; };
+const top = async (b, id = '') => (await (await worker.fetch(new Request(`https://x/top?board=${b}&id=${id}`), env)).json());
+const R = (avgMs, hit = 25, acc = 0.7) => ({ avgMs, hit, acc, heads: 3 });
+let r = await post({ board: 'range', id: 'aaaaaaaa1', nick: '阿明', score: R(520) });
+ok('1 合理的練槍場成績收下、排第 1、CORS 只開給遊戲網址', r[0] === 200 && r[1].rank === 1 && r[2] === 'https://wayuanzi-web.github.io', r);
+const bad = [[R(90), '反應太快'], [R(500, 31), '打倒超過 30'], [R(500, 10), '打倒太少'], [R(500, 25, 1.5), '命中率超過 100%'], [{ avgMs: 'x' }, '不是數字']];
+const st = []; for (const [s] of bad) st.push((await post({ board: 'range', id: 'bbbbbbbb2', nick: '小華', score: s }))[0]);
+ok('2 不合理的分數都被擋（422）', st.every((x) => x === 422), st);
+r = await post({ board: 'career', id: 'cccccccc3', nick: '阿強', score: { matches: 5, wins: 5 } }); const r2 = await post({ board: 'career', id: 'cccccccc3', nick: '阿強', score: { matches: 20, wins: 25 } });
+ok('3 生涯：不到 10 場、勝場比場數多都不收', r[0] === 422 && r2[0] === 422, [r[0], r2[0]]);
+await post({ board: 'range', id: 'dddddddd4', nick: '小美', score: R(450) }); await post({ board: 'range', id: 'aaaaaaaa1', nick: '阿明', score: R(600) });
+let t = await top('range', 'aaaaaaaa1');
+ok('4 排序：反應快的在前；同一個人只留最好的一筆（變差不覆蓋）', t.top.map((e) => e.nick).join() === '小美,阿明' && t.top[1].avgMs === 520 && t.top[1].me && !t.top[0].me && t.myRank === 2, t);
+ok('5 排行榜不回傳玩家編號、不回傳 IP', t.top.every((e) => !('id' in e) && !('ip' in e)), Object.keys(t.top[0]));
+r = await post({ board: 'range', id: 'eeeeeeee5', nick: 'fuck you', score: R(500) }); const r3 = await post({ board: 'range', id: 'eeeeeeee5', nick: '<b>x', score: R(500) });
+ok('6 暱稱：髒話不收、HTML 符號拿掉', r[0] === 400 && r3[0] === 200 && (await top('range')).top.some((e) => e.nick === 'bx'), [r[0], r3[0]]);
+let last = 0; for (let k = 0; k < 25; k++) last = (await post({ board: 'range', id: 'ffffffff6', nick: '洗分', score: R(800) }, '9.9.9.9'))[0];
+ok('7 同一個 IP 一小時最多 20 次', last === 429, last);
+const keys = [...env.LB.m.keys()]; ok('8 KV 裡只有排行榜和上傳計數；IP 只出現在計數的鑰匙裡、1 小時自動刪掉', keys.every((k) => k.startsWith('board:') || k.startsWith('rl:')) && [...env.LB.m.entries()].filter(([k]) => k.startsWith('rl:')).every(([, v]) => v.exp > 0), keys);
+for (const [n, c, i] of res) console.log(c ? 'PASS' : 'FAIL', n, c ? '' : JSON.stringify(i));

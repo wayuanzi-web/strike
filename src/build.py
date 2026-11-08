@@ -20,6 +20,11 @@ js_files = sorted(parts.glob('*.js'))
 js = '\n'.join(p.read_text(encoding='utf8') for p in js_files)
 BUILD = time.strftime('%Y%m%d-%H%M')
 js = js.replace('__BUILD__', BUILD)   # 版本標記（效能報告會帶上）
+# 排行榜伺服器網址（server/README.md 部署好之後，在 server/lb-url.txt 寫上網址；沒有就不顯示排行榜）
+LBF = root.parent / 'server' / 'lb-url.txt'
+LB_URL = LBF.read_text(encoding='utf8').strip() if LBF.exists() else ''
+js = js.replace('__LB_URL__', LB_URL)
+
 web_path = root / 'webparts' / '90-web.js'
 web_js = web_path.read_text(encoding='utf8') if web_path.exists() else ''
 

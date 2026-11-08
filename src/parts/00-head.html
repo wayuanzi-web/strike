@@ -302,6 +302,9 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 #duel input, #duel textarea { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); color: var(--bone); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 14px; user-select: text; -webkit-user-select: text; }
 #duel textarea { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; }
 #duelSt { color: var(--dawn-lt); font-weight: 700; }
+.lbl { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 4px; } .lbl li { display: grid; grid-template-columns: 2.5em 1fr auto; gap: 8px; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,.04); }
+.lbl li.me { outline: 1px solid var(--dawn); } .lbl li b { color: var(--dawn-lt); font-family: var(--f-num); } .lbl small { color: var(--mute); } #pgLb [data-board].on { border-color: var(--dawn); }
+#prog .opt, #prog .dl { color: var(--bone); }
 #perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
 #bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
 #glLost { z-index: 20; }
@@ -460,6 +463,12 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <section><h3>外觀・槍的塗裝<small>（手上的槍）</small></h3><div class="sks" id="pgSkin"></div>
       <h3>外觀・隊友外框色<small>（隊友身上的光）</small></h3><div class="sks" id="pgTeam"></div></section>
     <section><h3>成就 <small id="pgAchN"></small></h3><ul class="pga" id="pgAch"></ul></section>
+    <section id="pgLb" hidden><h3>排行榜</h3>
+      <div class="row"><button class="btn" data-board="range">練槍場最快</button><button class="btn" data-board="career">生涯勝率</button></div>
+      <ol class="lbl" id="lbList"></ol><p class="mnote" id="lbMine"></p>
+      <label class="dl"><span>上榜暱稱</span><input id="lbNick" maxlength="12" placeholder="其他人會看到"></label>
+      <div class="opt"><span>練槍場打完自動上傳</span><div class="seg" data-k="lbOn"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+      <div class="row"><button class="btn" id="lbCareer">上傳生涯戰績</button></div><p class="mnote" id="lbMsg">只會送出暱稱、隨機玩家編號和分數。</p></section>
     <section><h3>換手機<small>（戰績、等級、成就、設定一起帶走，不用帳號）</small></h3>
       <textarea id="pgCode" rows="3" placeholder="在舊手機按「匯出代碼」，把代碼貼到這裡再按「匯入」" spellcheck="false"></textarea>
       <div class="row"><button class="btn" id="pgExport">匯出代碼</button><button class="btn" id="pgCopy">複製</button><button class="btn" id="pgImport">匯入</button></div><p class="mnote" id="pgMsg"></p></section>

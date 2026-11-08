@@ -237,7 +237,7 @@ function renderProg() {
   $('pgSkin').innerHTML = sw(SKINS, 'skin', P().skin); $('pgTeam').innerHTML = sw(TEAMC, 'team', P().team);
   for (const b of $('prog').querySelectorAll('.sk')) onTap(b, () => { if (equipCosmetic(b.dataset.kind, b.dataset.id)) { sfx('cash'); renderProg(); } });
 }
-function openProg() { renderProg(); $('pgCode').value = ''; $('pgMsg').textContent = ''; $('prog').hidden = false; }
+function openProg() { renderProg(); lbRender(); $('pgCode').value = ''; $('pgMsg').textContent = ''; $('prog').hidden = false; }
 function closeProg() { $('prog').hidden = true; syncMenuLevel(); }
 function syncMenuLevel() { const L = levelOf(P().xp); $('mLv').textContent = `${L.lv} 級`; $('mXp').style.width = (L.need ? L.into / L.need * 100 : 100) + '%'; const D = ensureDaily(); $('mDaily').textContent = `每日挑戰 ${D.items.filter((x) => x.done).length}/3`; }
 let importArm = -1e9;

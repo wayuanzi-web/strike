@@ -1,0 +1,10 @@
+name = "strike-lb"
+main = "leaderboard-worker.js"
+compatibility_date = "2024-09-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://wayuanzi-web.github.io"
+
+[[kv_namespaces]]
+binding = "LB"
+id = "<把 npx wrangler kv namespace create LB 產生的 id 貼在這裡>"
