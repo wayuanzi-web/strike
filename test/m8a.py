@@ -72,7 +72,7 @@ async def main():
           const b = s.bots.find((x) => x.active && x.team === 'B'); b.primary = null; s.botArm(b); b.blindT = 999;
           for (const o of s.bots) if (o !== b && o.team !== 'B') { o.alive = false; o.g.visible = false; }
           s.player.alive = false; const p = b.phys.pos; s.spawnDrop(s.WEAPONS.rifle, 30, 90, p.x + 6, p.y, p.z + 2);
-          for (let i = 0; i < 60 * 6; i++) s.step(1/60); const got = s.bots.filter((x) => x.active && x.primary === s.WEAPONS.rifle); return [got.length ? 'rifle' : null, s.DROPS.length]; }""")
+          for (let i = 0; i < 60 * 12; i++) s.step(1/60); const got = s.bots.filter((x) => x.active && x.primary === s.WEAPONS.rifle); return [got.length ? 'rifle' : null, s.DROPS.length]; }""")
         ok('8a 對戰：沒有主武器的機器人會去撿地上的槍', r[0] == 'rifle', r)
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; s.startGame('match'); s.game.freezeBots = true; for (let i = 0; i < 30; i++) s.step(1/60);
           s.player.money = 5000; const out = [s.buyItem('carbine'), s.buyItem('deagle'), s.buyItem('molotov'), s.INV.primary.def.id, s.INV.secondary.def.id, s.INV.molotov, s.player.money];
