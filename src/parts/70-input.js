@@ -153,7 +153,7 @@ tapBtn('bCrouch', () => { if (S.crouchMode === 'hold') { INPUT.crouch = true; HO
   let tm = null, longDone = false;
   tapBtn('bSwap', (el) => {
     el.classList.add('down'); longDone = false; clearTimeout(tm);
-    tm = setTimeout(() => { longDone = true; el.classList.remove('down'); buzz(20); if (!playerDropGun() && INV.bomb) playerDropBomb(); }, 550);
+    tm = setTimeout(() => { longDone = true; el.classList.remove('down'); buzz(20); if (!playerDropGun() && INV.bomb) playerDropBomb(); }, 850);   // 長按 0.85 秒丟槍（0.55 秒太容易誤觸）
   }, false, (el) => { clearTimeout(tm); el.classList.remove('down'); if (!longDone) swapWeapon(); });
 })();
 tapBtn('bNade', () => cycleNade());

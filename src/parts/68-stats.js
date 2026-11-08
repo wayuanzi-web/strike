@@ -53,13 +53,13 @@ function renderStats() {
   const s = STATS, kd = s.deaths ? (s.kills / s.deaths).toFixed(2) : s.kills ? s.kills.toFixed(2) : '—';
   const DIFF_NAME = { easy: '簡單', normal: '普通', hard: '困難' };
   const big = [['場數', s.matches], ['勝率', pct(s.wins, s.matches)], ['擊殺', s.kills], ['K/D', kd], ['爆頭率', pct(s.heads, s.kills)], ['命中率', pct(s.hits, s.shots)]];
-  const small = [['勝／敗', `${s.wins}／${s.losses}`], ['回合', `${s.roundsW}：${s.roundsL}`], ['陣亡', s.deaths], ['裝彈', s.plants], ['拆彈', s.defuses], ['最有價值', s.mvp], ['單場最多擊殺', s.bestKills], ['練習擊殺', s.practiceKills],
+  const small = [['勝／敗', `${s.wins}／${s.losses}`], ['回合勝／敗', `${s.roundsW}／${s.roundsL}`], ['陣亡', s.deaths], ['裝彈', s.plants], ['拆彈', s.defuses], ['MVP 次數', s.mvp], ['單場最多擊殺', s.bestKills], ['練習擊殺', s.practiceKills],
     ['死鬥', `${s.modes.dm.n} 場・${s.modes.dm.w} 次第一・最多 ${s.modes.dm.best || 0} 殺`], ['搶點', `${s.modes.koth.n} 場 ${s.modes.koth.w} 勝`], ['練槍場最快平均', s.modes.range.bestMs ? s.modes.range.bestMs + ' 毫秒' : '—'], ['練槍場最高命中率', s.modes.range.bestAcc ? Math.round(s.modes.range.bestAcc * 100) + '%' : '—']];
   const maps = MAP_ORDER.map((id) => { const m = s.maps[id] || { played: 0, won: 0 }; return `<li><b>${MAPS[id].name}</b><span>${m.played} 場・勝率 ${pct(m.won, m.played)}</span></li>`; }).join('');
   const wk = Object.entries(s.weapons).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<li><b>${k}</b><span>${n} 殺</span></li>`).join('') || '<li><span>還沒有</span></li>';
   const rec = s.recent.map((r) => `<tr class="${r.win ? 'w' : 'l'}"><td>${r.t}</td><td>${(MAPS[r.map] || { name: r.map }).name}</td><td>${r.win ? '勝' : '敗'} ${r.a}:${r.b}</td><td>${r.k}／${r.d}／${r.h}</td><td>${DIFF_NAME[r.diff] || ''}</td></tr>`).join('');
   $('statBody').innerHTML = `<div class="sbig">${big.map(([k, v]) => `<div><strong>${v}</strong><small>${k}</small></div>`).join('')}</div>
-    <div class="ssmall">${small.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}</div>
+    <div class="ssmall">${small.map(([k, v]) => `<div${String(v).length > 10 ? ' class="wide"' : ''}><small>${k}</small><b>${v}</b></div>`).join('')}</div>
     <div class="scols"><section><h3>地圖</h3><ul>${maps}</ul></section><section><h3>武器擊殺</h3><ul>${wk}</ul></section></div>
     <section><h3>最近 10 場</h3>${rec ? `<table><tr><th>時間</th><th>地圖</th><th>結果</th><th>殺／死／爆頭</th><th>難度</th></tr>${rec}</table>` : '<p class="mnote">還沒打過對戰。</p>'}</section>`;
 }

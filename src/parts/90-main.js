@@ -92,7 +92,7 @@ function syncMenuHints() {
 function backToMenu() {
   if (game.mode === 'duel' && NET.on) netSend({ t: 'end', win: true });   // 中途離開算對方贏
   clearNades(); resetBomb(); closeBuy(); leaveMode(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints(); syncMenuLevel(); KC.on = false; $('kc').hidden = true;
-  closeRadio(); hid($('bRadio'), true); hid($('bBuy'), true);
+  closeRadio(); hid($('bRadio'), true); hid($('bBuy'), true); tgl(document.body, 'specOn', false);
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   player.alive = false; $('menu').hidden = false;

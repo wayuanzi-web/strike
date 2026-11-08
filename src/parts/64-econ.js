@@ -39,12 +39,12 @@ function cantBuy(it) {
   if (it.id === 'vest' && INV.vest && INV.armor >= 100) return '已經有了';
   if (it.id === 'helm' && INV.helmet && INV.armor >= 100) return '已經有了';
   if (it.id === 'kit' && INV.kit) return '已經有了';
-  if (!freeBuy() && (player.money || 0) < shopPrice(it, player)) return '錢不夠';
+  if (!freeBuy() && (player.money || 0) < shopPrice(it, player)) return '錢不夠 $' + shopPrice(it, player);   // 看得到價錢才能規劃要存多少
   return '';
 }
 function buyItem(id) {
   const it = SHOP.find((x) => x.id === id); if (!it || !buyOpen()) return false;
-  const why = cantBuy(it); if (why) { hudTip(why, 1); return false; }
+  const why = cantBuy(it); if (why) { hudTip(why.startsWith('錢不夠') ? `錢不夠（要 $${shopPrice(it, player)}，你有 $${player.money || 0}）` : why, 1.2); return false; }
   if (!freeBuy()) player.money -= shopPrice(it, player);
   if (it.w) { const old = INV[it.w.slot]; if (old && old.def !== WEAPONS.pistol && game.mode === 'match') { stashCur(); const p = player.body.pos; spawnDrop(old.def, old.ammo, old.reserve, p.x, p.y, p.z); } giveWeapon(it.w, true); }
   else if (it.n) { INV[it.id]++; }
@@ -72,12 +72,18 @@ function autoBuy() {
 const buyEl = $('buy');
 function renderBuy() {
   if (buyEl.hidden) return;
-  $('buyMoney').textContent = freeBuy() ? '練習模式：免費' : '$ ' + (player.money || 0);
+  buyHead();
   for (const b of buyEl.querySelectorAll('[data-buy]')) {
     const it = SHOP.find((x) => x.id === b.dataset.buy), why = cantBuy(it);
-    b.disabled = !!why; b.querySelector('em').textContent = why || '$ ' + shopPrice(it, player);
+    b.disabled = !!why; b.querySelector('em').textContent = why || (freeBuy() ? '免費' : '$ ' + shopPrice(it, player));
     b.classList.toggle('own', why === '已經有了' || why === '帶滿了');
   }
+}
+// 購買選單上方：錢＋還能買幾秒（選單會蓋住畫面上的倒數）
+function buyHead() {
+  const left = game.mode === 'match' ? (ROUND.phase === 'freeze' ? ROUND.t : null) : null;
+  const t = (freeBuy() ? (game.mode === 'tutorial' ? '教學：免費' : '練習：免費') : '$ ' + (player.money || 0)) + (left != null ? `　準備時間還有 ${Math.ceil(left)} 秒` : '');
+  const el = $('buyMoney'); if (hv(el, 't', t)) el.textContent = t;
 }
 function buildBuyMenu() {
   const g = $('buyGrid'); g.innerHTML = '';

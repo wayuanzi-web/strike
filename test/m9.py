@@ -13,8 +13,8 @@ async def main():
         # 1 等級公式
         r = await ev("() => { const s = window.__strike; return [s.levelOf(0), s.levelOf(299), s.levelOf(300), s.levelOf(300 + 350), s.levelOf(1e9).lv]; }")
         ok('1 等級：1 級升 2 級要 300 經驗、2 升 3 要 350，最高 30 級', r[0]['lv'] == 1 and r[1]['lv'] == 1 and r[2]['lv'] == 2 and r[3]['lv'] == 3 and r[4] == 30, r)
-        # 2 真的打：練習擊殺給經驗、第一滴血成就、重手槍爆頭成就
-        r = await ev("""() => { const s = window.__strike; s.startGame('practice'); s.game.freezeBots = true; const b = s.bots.find((x) => x.active);
+        # 2 真的打（死鬥；練習的擊殺不算成就）：擊殺給經驗、第一滴血成就、重手槍爆頭成就
+        r = await ev("""() => { const s = window.__strike; s.startGame('dm'); s.game.freezeBots = true; const b = s.bots.find((x) => x.active);
           const x0 = s.STATS().prog.xp; s.damageBot(b, 200, 'head', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.deagle);
           return [s.STATS().prog.xp - x0, Object.keys(s.STATS().prog.ach), document.getElementById('toast').hidden, document.getElementById('toast').textContent]; }""")
         ok('2 擊殺給經驗、解鎖「第一滴血」「一槍斃命」、跳出提示', r[0] >= 2 and 'first_kill' in r[1] and 'deagle_head' in r[1] and r[2] is False, r)
@@ -33,7 +33,7 @@ async def main():
           s.STATS().prog.daily = null; const a2 = s.ensureDaily().items.map((x) => x.id); P.dateOverride = '2026-11-09'; const b = s.ensureDaily().items.map((x) => x.id);
           // 換成一定會有「爆頭 8 次」的挑戰來測進度
           s.STATS().prog.daily = { date: '2026-11-09', items: [{ id: 'head', p: 0, done: false }, { id: 'k_smg', p: 0, done: false }, { id: 'dm', p: 0, done: false }] };
-          const x0 = s.STATS().prog.xp; s.startGame('practice'); s.game.freezeBots = true;
+          const x0 = s.STATS().prog.xp; s.startGame('dm'); s.game.freezeBots = true;
           for (let k = 0; k < 8; k++) { const t = s.bots.find((x) => x.active && x.alive); t.respawnT = 99; s.damageBot(t, 200, 'head', t.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); if (!s.bots.some((x) => x.active && x.alive)) for (const z of s.bots) if (z.active) { z.alive = true; z.hp = 100; } }
           const it = s.STATS().prog.daily.items; P.dateOverride = null;
           return [a, a2, b, it[0].p, it[0].done, it[1].p, s.STATS().prog.xp - x0]; }""")

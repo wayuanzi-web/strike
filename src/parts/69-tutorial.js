@@ -27,7 +27,8 @@ function tutDummy(at) {
 }
 const TUT_STEPS = [
   { title: '移動', text: () => isKb() ? 'WASD 移動，走到黃色光柱' : '左手按住螢幕左半邊拖曳移動（推到底是跑），走到黃色光柱',
-    start() { TUT.target.copy(tutSpot(8, 13, false)); }, done: () => Math.hypot(player.body.pos.x - TUT.target.x, player.body.pos.z - TUT.target.z) < 1.8 },
+    start() { TUT.target.copy(tutSpot(8, 13, false)); const p = player.body.pos; player.yaw = Math.atan2(-(TUT.target.x - p.x), -(TUT.target.z - p.z)); },   // 轉視角第 2 步才教：第 1 步先讓光柱在正前方
+    done: () => Math.hypot(player.body.pos.x - TUT.target.x, player.body.pos.z - TUT.target.z) < 1.8 },
   { title: '轉視角', text: () => isKb() ? '移動滑鼠轉視角，把準星對準光柱' : '右手在螢幕右半邊拖曳轉視角，把準星對準光柱',
     start() { const p = player.body.pos, a = player.yaw + Math.PI * 0.8; TUT.target.set(p.x - Math.sin(a) * 9, 0, p.z - Math.cos(a) * 9); },
     done() { const p = player.body.pos, want = Math.atan2(-(TUT.target.x - p.x), -(TUT.target.z - p.z)); return Math.abs(angDiff(player.yaw, want)) < 0.14; } },
@@ -37,10 +38,10 @@ const TUT_STEPS = [
     start() { W.ammo = Math.min(W.ammo, 6); }, done: () => W.reloadT > 0 },
   { title: '蹲下、跳', text: () => isKb() ? '按 C 蹲下，再按空白鍵跳' : '按蹲鍵（再按一次站起來），再按跳鍵（往上的箭頭）',
     start() { TUT.crouched = TUT.jumped = false; }, done() { if (player.crouch) TUT.crouched = true; if (!player.body.onGround) TUT.jumped = true; return TUT.crouched && TUT.jumped; } },
-  { title: '開鏡打遠靶', text: () => isKb() ? '按右鍵開鏡（放大、比較準），打倒遠處的靶子' : '按開鏡鍵（十字圈）放大、比較準，打倒遠處的靶子',
+  { title: '開鏡打遠靶', text: () => isKb() ? '按右鍵開鏡（放大、比較準），打倒遠處的靶子' : '按「開鏡」鍵（望遠鏡圖示）放大、比較準，打倒遠處的靶子',
     start() { tutDummy(tutSpot(18, 30, true)); TUT.adsKill = false; },
     done() { if (TUT.dummy && !TUT.dummy.alive) { if (player.adsT > 0.5 || TUT.adsWas) return true; tutDummy(TUT.dummy.phys.pos.clone()); hudTip('要開鏡再打喔', 1.5); } TUT.adsWas = player.adsT > 0.5; return false; } },
-  { title: '換槍', text: () => isKb() ? '按 2 或 Q 拿出手槍，再按 1 換回步槍' : '按「換槍」拿出手槍，再按一次換回步槍',
+  { title: '換槍', text: () => isKb() ? '按 2 或 Q 拿出手槍，再按 1 換回步槍' : '按「換槍」拿出手槍，再按一次換回步槍（按住不放會把手上的槍丟掉）',
     start() { TUT.pistol = false; }, done() { if (INV.cur === 'secondary') TUT.pistol = true; return TUT.pistol && INV.cur === 'primary'; } },
   { title: '丟手榴彈', text: () => isKb() ? '按 G 拿出手榴彈，按左鍵丟出去（往上看會丟比較遠）' : '按「投擲」拿出手榴彈，按開火鍵丟出去（往上看會丟比較遠）',
     start() { INV.he = 1; TUT.thrown = false; }, done() { if (nadesLive.length) TUT.thrown = true; return TUT.thrown && INV.he === 0; } },
@@ -65,10 +66,10 @@ function tutNext() {
   $('tutN').textContent = `${TUT.i + 1} / ${TUT_STEPS.length}`; $('tutT').textContent = st.title; $('tutX').textContent = st.text();
 }
 function tutFinish() {
-  TUT.on = false; beacon.visible = false; $('tut').hidden = true;
+  TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutArrow').hidden = true;
   STATS.tutorialDone = true; saveStats(); resetBomb(); progEvent('tutorial');
   hudBanner('教學完成！', '可以開始對戰了', 3, 'win'); sfx('win');
-  $('tutDone').hidden = false; resetTouchState();
+  $('tutDone').hidden = false; resetTouchState(); closeBuy(); overClean(); $('touch').hidden = true;
   if (pointerLocked()) document.exitPointerLock();
 }
 function updateTutorial(dt) {
@@ -80,6 +81,12 @@ function updateTutorial(dt) {
   const tg = TUT.dummy && TUT.dummy.alive && (TUT.i === 2 || TUT.i === 5) ? TUT.dummy.phys.pos : (TUT.i === 0 || TUT.i === 1 || TUT.i === 9) ? TUT.target : null;
   beacon.visible = !!tg && TUT.okT === 0;
   if (tg) { beacon.position.set(tg.x, 3.5, tg.z); beacon.material.opacity = 0.25 + 0.15 * Math.sin(game.t * 4); }
+  // 光柱在畫面外：畫面邊緣出現箭頭指方向（第 2 步本來就是要你自己轉過去，也一樣給箭頭）
+  const ar = $('tutArrow'), p = player.body.pos;
+  if (tg && TUT.okT === 0) {
+    const want = Math.atan2(-(tg.x - p.x), -(tg.z - p.z)), rel = angDiff(player.yaw, want), half = camera.fov * DEG * camera.aspect / 2 * 0.8;
+    ar.hidden = Math.abs(rel) < half; if (!ar.hidden) { ar.className = rel > 0 ? 'l' : 'r'; ar.textContent = rel > 0 ? '◀ 光柱在這邊' : '光柱在這邊 ▶'; }
+  } else ar.hidden = true;
   if (TUT.t > 0.4 && TUT.okT === 0) $('tutX').textContent = st.text();   // 換了操作方式（觸控／鍵盤）說明跟著換
   if (TUT.okT > 0) { TUT.okT += dt; if (TUT.okT > 0.9) tutNext(); return; }
   if (st.done()) { TUT.okT = 0.001; sfx('go'); $('tutX').textContent = '✓ 很好！'; }

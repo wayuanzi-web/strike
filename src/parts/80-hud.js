@@ -64,11 +64,11 @@ function hudMatch(dt) {
   $('rnd').textContent = ROUND.phase === 'freeze' ? '準備・購買' : BOMB.state === 'planted' ? `炸彈在 ${BOMB.site} 點` : `第 ${ROUND.num} 回合・${ROUND.atk === 'A' ? '攻' : '守'}`;
   $('scA').textContent = ROUND.score.A; $('scB').textContent = ROUND.score.B;
   pips($('pipsA'), 'A'); pips($('pipsB'), 'B');
-  const showBoard = $('bBoard').classList.contains('on') || ROUND.phase === 'end';
+  const showBoard = $('bBoard').classList.contains('on');   // 回合結束不自動打開（會蓋住回合結果橫幅），要看就按住計分板鍵
   $('board').hidden = !showBoard;
   if (showBoard && (boardT -= dt) <= 0) { boardT = 0.25; drawBoard(); }
   const sp = !player.alive && ROUND.phase !== 'over' ? spectateTarget() : null;
-  $('spec').hidden = !sp; if (sp) $('specN').textContent = sp.name + `（${Math.ceil(sp.hp)}）`;
+  $('spec').hidden = !sp || killcamActive(); if (sp) $('specN').textContent = sp.name + `（${Math.ceil(sp.hp)}）`;
 }
 function hudTip(text, sec = 2.5) { const t = $('tip'); t.textContent = text; t.hidden = false; t.style.opacity = 1; tipT = sec; }
 
@@ -94,7 +94,8 @@ function hudUpdate(dt) {
   const feedE = $('feed'); if (feedE.childElementCount) for (const p of [...feedE.children]) { const t = +p.dataset.t - dt; p.dataset.t = t; if (t < 0.5) p.style.opacity = Math.max(0, t * 2); if (t <= 0) p.remove(); }
   if (tipT > 0) { tipT -= dt; if (tipT < 0.5) $('tip').style.opacity = Math.max(0, tipT * 2); if (tipT <= 0) $('tip').hidden = true; }
   const hp = Math.ceil(player.hp);
-  const specOn = !!game.specBot; hid($('hp'), specOn); hid($('ammo'), specOn);
+  const specOn = !!game.specBot, deadNow = !player.alive && game.state === 'play'; hid($('hp'), specOn); hid($('ammo'), specOn || deadNow);
+  tgl(document.body, 'specOn', deadNow && game.mode !== 'tutorial');
   const ar = INV.vest ? Math.ceil(INV.armor || 0) : 0, arE = $('ar');
   if (ar !== +arE.dataset.v || arE.classList.contains('helm') !== !!INV.helmet) { arE.dataset.v = ar; arE.hidden = !ar; $('arN').textContent = ar; arE.classList.toggle('helm', !!INV.helmet); }
   if (hp !== lastHp) { lastHp = hp; $('hpN').textContent = hp; $('hpI').style.width = hp + '%'; $('hp').classList.toggle('low', hp < 30); }
@@ -131,6 +132,7 @@ function hudGear(dt) {
   else if (act && !isTouch && player.alive) { ubox = true; $('useT').textContent = act === 'plant' ? '按住 E 裝彈' : '按住 E 拆彈'; $('useB').style.width = '0%'; }
   hid($('useBox'), !ubox);
   hid($('bBuy'), !buyOpen() || !$('buy').hidden);
+  if (!$('buy').hidden) buyHead();
   hid($('bRadio'), !(m && player.alive && game.state === 'play') || !$('radio').hidden);
   tgl($('bNade'), 'on', W.isNade); sty($('bNade'), 'opacity', NADE_ORDER.some((k) => INV[k] > 0) ? '' : '.4');
   hid($('scope'), !(WP.scope && !W.isNade && player.alive && player.adsT > 0.85));
@@ -233,4 +235,4 @@ function drawRadar(dt) {
   rctx.fillStyle = '#ffb347'; rctx.beginPath(); rctx.moveTo(W2 / 2, W2 / 2 - 8); rctx.lineTo(W2 / 2 - 6, W2 / 2 + 6); rctx.lineTo(W2 / 2 + 6, W2 / 2 + 6); rctx.closePath(); rctx.fill();
 }
 // 結算畫面出來時：收掉陣亡卡、擊殺鏡頭、暫停鍵和購買鍵（不然會蓋在結算卡上、按了也沒反應）
-function overClean() { $('dead').hidden = true; KC.on = false; $('kc').hidden = true; $('bPause').hidden = true; hid($('bBuy'), true); hid($('bRadio'), true); }
+function overClean() { tgl(document.body, 'specOn', false); $('dead').hidden = true; KC.on = false; $('kc').hidden = true; $('bPause').hidden = true; hid($('bBuy'), true); hid($('bRadio'), true); }

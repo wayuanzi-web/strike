@@ -164,7 +164,8 @@ body.match #dead { background: none; }
 .pips i.dead { opacity: .18; } .a .pips { color: var(--ally); } .b .pips { color: var(--enemy); }
 #banner { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); text-align: center; display: grid; gap: calc(var(--u) * 1); pointer-events: none; transition: opacity .4s; }
 #banner strong { font-family: var(--f-title); font-weight: 900; font-size: calc(var(--u) * 10); letter-spacing: .12em; color: var(--bone); text-shadow: 0 2px 12px rgba(0,0,0,.6); }
-#banner span { font-size: max(12px, calc(var(--u) * 3.4)); color: var(--bone); text-shadow: 0 1px 6px rgba(0,0,0,.7); letter-spacing: .06em; }
+#banner span { font-size: max(12px, calc(var(--u) * 3.4)); color: var(--bone); text-shadow: 0 1px 3px #000, 0 0 10px rgba(0,0,0,.9); letter-spacing: .06em; background: rgba(8,12,18,.45); padding: 2px 10px; border-radius: 4px; }
+.sticky-head { position: sticky; top: 0; z-index: 2; background: rgb(24,32,43); padding: 6px 0; }
 #banner.win strong { color: var(--ally); } #banner.lose strong { color: var(--enemy); }
 #bBoard { position: absolute; left: calc(var(--sl) + var(--u) * 3 + max(44px, calc(var(--u) * 11)) + 8px); top: calc(var(--st) + var(--u) * 2.4); width: max(44px, calc(var(--u) * 11)); height: max(44px, calc(var(--u) * 11));
   border-radius: 6px; background: var(--panel); display: grid; place-items: center; z-index: 5; }
@@ -243,13 +244,22 @@ body.match #dead { background: none; }
 .sbig { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; } .sbig div { background: rgba(255,255,255,.05); border-radius: 6px; padding: 8px; display: grid; justify-items: center; }
 .sbig strong { font-family: var(--f-num); font-size: calc(var(--u) * 7); color: var(--dawn-lt); line-height: 1; } .sbig small, .ssmall small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); }
 .ssmall { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px 14px; } .ssmall div { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.06); padding: 3px 0; }
-.ssmall b { font-family: var(--f-num); }
+.ssmall b { font-family: var(--f-num); text-align: right; } .ssmall small { white-space: nowrap; margin-right: 8px; }
+.ssmall div.wide { grid-column: span 2; }   /* 死鬥、搶點這種長的值佔兩格，不要把標籤擠成直排 */
+#stats section + section, .scols + section { margin-top: 14px; }
 .scols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } #stats h3 { margin: 0 0 6px; font-size: max(13px, calc(var(--u) * 3.2)); color: var(--mute); }
 #stats ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; } #stats li { display: flex; justify-content: space-between; font-size: max(12px, calc(var(--u) * 3)); }
 #stats li span { color: var(--mute); } #stats table { width: 100%; border-collapse: collapse; font-size: max(12px, calc(var(--u) * 2.8)); font-variant-numeric: tabular-nums; }
 #stats th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 4px; } #stats td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.06); }
 #stats tr.w td:nth-child(3) { color: var(--ally); } #stats tr.l td:nth-child(3) { color: var(--enemy); }
 #touch .tb { scale: var(--bs, 1); }
+#tutArrow { position: absolute; top: 45%; z-index: 4; padding: 6px 12px; border-radius: 6px; background: rgba(255,214,90,.9); color: #1a1408; font-weight: 800; font-size: max(13px, calc(var(--u) * 3.2)); pointer-events: none; animation: tutPulse 1s ease-in-out infinite; }
+#tutArrow.l { left: calc(var(--sl) + var(--u) * 4); } #tutArrow.r { right: calc(var(--sr) + var(--u) * 4); }
+@keyframes tutPulse { 50% { opacity: .55; } }
+.tb .tbl { position: absolute; bottom: 12%; font-style: normal; font-size: max(9px, calc(var(--u) * 2.1)); font-weight: 700; color: rgba(243,236,224,.8); pointer-events: none; }
+.tb:has(.tbl) svg { translate: 0 -12%; }
+/* 陣亡觀戰、擊殺鏡頭：操作按鈕都收起來（按右邊換人比較好按）；暫停鍵在 #touch 外面不受影響 */
+body.specOn #touch .tb, body.specOn #joy { visibility: hidden; }
 #bRadio { position: absolute; left: calc(var(--sl) + var(--u) * 3 + (max(44px, calc(var(--u) * 11)) + 8px) * 2); top: calc(var(--st) + var(--u) * 15); height: max(40px, calc(var(--u) * 10)); padding: 0 calc(var(--u) * 2.4);
   border-radius: 6px; background: rgba(40,90,140,.85); color: #fff; font-weight: 800; font-size: max(13px, calc(var(--u) * 3)); z-index: 5; }
 #radio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 7; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: min(90vw, 520px); }
@@ -276,7 +286,7 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 #bnS { white-space: pre-line; }
 .pb { display: inline-block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; vertical-align: middle; } .pb i { display: block; height: 100%; background: var(--dawn); border-radius: 3px; }
 .mlv { display: flex; align-items: center; gap: calc(var(--u) * 2); flex-wrap: wrap; } .mlv b { font-family: var(--f-num); color: var(--dawn-lt); } .mlv .pb { width: calc(var(--u) * 22); } .mlv small { color: var(--mute); }
-#toast { position: absolute; right: max(12px, var(--sr)); top: calc(var(--st) + var(--u) * 22); z-index: 12; max-width: 46vw; background: var(--panel); border: 1px solid var(--dawn); color: var(--bone); padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: max(12px, calc(var(--u) * 3)); pointer-events: none; }
+#toast { position: absolute; left: 50%; transform: translateX(-50%); top: calc(var(--st) + var(--u) * 2); z-index: 12; max-width: 70vw; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,.45); background: var(--panel); border: 1px solid var(--dawn); color: var(--bone); padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: max(12px, calc(var(--u) * 3)); pointer-events: none; }
 #toast.lv { background: var(--dawn); color: #1a1208; }
 #kc { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding-bottom: calc(var(--sb) + var(--u) * 17);
   box-shadow: inset 0 0 0 4px rgba(255,90,60,.55); background: linear-gradient(180deg, rgba(0,0,0,.25), transparent 18%, transparent 80%, rgba(0,0,0,.45)); }
@@ -343,9 +353,9 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   </div>
   <div id="touch" hidden>
     <div id="joy"><div id="joyK"></div></div>
-    <button class="tb" id="bAds" aria-label="開鏡"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></button>
+    <button class="tb" id="bAds" aria-label="開鏡"><svg viewBox="0 0 24 24"><path d="M2 10.5h11v3H2zM13 9l3-2h3v10h-3l-3-2z"/><circle cx="20.5" cy="12" r="1"/></svg><i class="tbl">開鏡</i></button>
     <button class="tb" id="bFire" aria-label="開火"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/></svg></button>
-    <button class="tb" id="bCrouch" aria-label="蹲下"><svg viewBox="0 0 24 24"><path d="M5 20h14M8 20l2-6h4l2 6M12 14v-3M9 8.5a3 3 0 1 0 6 0 3 3 0 1 0-6 0"/></svg></button>
+    <button class="tb" id="bCrouch" aria-label="蹲下"><svg viewBox="0 0 24 24"><path d="M5 20h14M8 20l2-6h4l2 6M12 14v-3M9 8.5a3 3 0 1 0 6 0 3 3 0 1 0-6 0"/></svg><i class="tbl">蹲</i></button>
     <button class="tb" id="bJump" aria-label="跳"><svg viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></svg></button>
     <button class="tb" id="bReload" aria-label="換彈"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
     <button class="tb" id="bAuto" aria-label="自動開火開關">自動<br>開火</button>
@@ -358,6 +368,13 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <div id="menu" class="ov" hidden>
     <div class="card">
       <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>炸彈模式：攻方裝炸彈、守方拆彈，回合之間用賺來的錢買槍。</p></div>
+      <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
+      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
+      <div class="row modes"><small>更多模式</small><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
+      <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
+      <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
+      <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button></div>
+      <div class="install" id="installBox" hidden><span id="installT"></span><button class="btn" id="bInstall" hidden>安裝到主畫面</button></div>
       <ul class="help help-t">
         <li><b>左半邊</b>按住拖：移動，推到底是跑</li>
         <li><b>右半邊</b>拖曳：轉視角</li>
@@ -372,14 +389,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <li><b>1／2／Q</b>換槍　<b>G</b>投擲物　<b>B</b>購買　<b>E</b>按住裝彈／拆彈</li>
         <li><b>Z</b>指令輪盤　<b>5–9</b>跟我／A 點／B 點／守這裡／自由行動</li>
       </ul>
-      <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button></div>
-      <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
-      <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
-      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
-      <div class="row modes"><small>更多模式</small><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
-      <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
-      <div class="install" id="installBox" hidden><span id="installT"></span><button class="btn" id="bInstall" hidden>安裝到主畫面</button></div>
-      <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>
+      <p class="mnote">對戰：你和 4 個隊友（青隊）對上 5 個敵人（赤隊）。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>
     </div>
   </div>
 
@@ -390,7 +400,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <label for="sSens"><span>視角靈敏度</span><input type="range" id="sSens" min="0.3" max="3" step="0.05"><output id="oSens"></output></label>
         <label for="sAds"><span>開鏡靈敏度</span><input type="range" id="sAds" min="0.2" max="1.2" step="0.05"><output id="oAds"></output></label>
         <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>準星跟著後座</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>準星跟著後座力</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>效能</span><div class="row"><button class="btn" id="bPerf">效能報告／跑分</button></div></div>
         <div class="opt"><span>操作手</span><div class="seg" data-k="lefty"><button data-v="0">右手（搖桿在左）</button><button data-v="1">左手（搖桿在右）</button></div></div>
@@ -431,6 +441,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
     <p id="overC"></p><p id="overX"></p>
     <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
+  <div id="tutArrow" hidden></div>
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>
   <div id="tutDone" class="ov" hidden><div class="card"><h2>教學完成</h2><p class="mnote">對戰時：準備時間先買東西；攻方帶炸彈去 A 或 B 點裝，守方守住或拆彈。活下來的人下回合保留裝備。</p>
     <div class="row"><button class="btn go" id="tutMatch">開始對戰</button><button class="btn" id="tutMenu">回選單</button></div></div></div>
@@ -457,7 +468,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   </div></div>
   <div id="toast" hidden></div>
   <div id="kc" hidden><b>擊殺鏡頭</b><span id="kcN"></span><small>點一下跳過</small></div>
-  <div id="prog" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>成長</h2><button class="btn go" id="pgX">好了</button></div>
+  <div id="prog" class="ov" hidden><div class="card"><div class="row sticky-head" style="justify-content:space-between"><h2>成長・成就・外觀</h2><button class="btn go" id="pgX">好了</button></div>
     <div class="pglv"><strong id="pgLv">1</strong><div><small>等級</small><span class="pb big"><i id="pgBar"></i></span><small id="pgXp"></small></div></div>
     <section><h3>每日挑戰<small>（每天午夜換新，完成一個 +150 經驗）</small></h3><ul class="pgd" id="pgDaily"></ul></section>
     <section><h3>外觀・槍的塗裝<small>（手上的槍）</small></h3><div class="sks" id="pgSkin"></div>
