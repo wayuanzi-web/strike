@@ -5,9 +5,10 @@ VIEWS = {
   'dawn': [(-30, 0, -90, 0), (0, 12, -120, 0), (21, 14, 0, -5), (14, -12, -150, -5)],
   'market': [(-30, 0, -90, 2), (-8, -7, -55, 8), (12, 15, -75, -2), (14, -14, -110, -3)],
   'rail': [(-30, 0, -90, 0), (-8, 12, -100, 0), (14, 9, -55, -2), (14, -9, -125, -3)],
+  'site': [(-30, 0, -90, 2), (-16, -9, -60, 10), (0, 18, -70, 4), (12, -10, -125, -2)],
 }
 async def main():
-    ids = sys.argv[1:] or ['dawn', 'market', 'rail']
+    ids = sys.argv[1:] or ['dawn', 'market', 'rail', 'site']
     async with async_playwright() as p:
         browser, page, errors = await open_game(p)
         await page.evaluate("() => { window.__strike.game.manual = true; }")
