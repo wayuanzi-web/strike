@@ -15,7 +15,7 @@ function angDiff(a, b) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; wh
 
 // ---------- 設定（存在這台手機的瀏覽器裡，讀不到就用預設） ----------
 const DEFAULTS = { sens: 1.0, adsSens: 0.6, autoFire: true, aimAssist: true, followRecoil: true, difficulty: 'normal', quality: 'auto', sound: true, showFps: false, map: 'dawn', lefty: false, btnScale: '1', vibrate: true,
-  adsMode: 'toggle', crouchMode: 'toggle', curve: 'linear', joyMode: 'float', runLock: true, gyro: 'off', gyroSens: 1.0, gyroInv: false, layout: null };
+  adsMode: 'toggle', crouchMode: 'toggle', curve: 'linear', joyMode: 'float', runLock: true, gyro: 'off', gyroSens: 1.0, gyroInv: false, killcam: true, layout: null };
 const S = Object.assign({}, DEFAULTS);
 try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assign(S, JSON.parse(raw)); } catch (e) { /* 私密瀏覽或被擋，就用預設 */ }
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }

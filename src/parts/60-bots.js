@@ -5,10 +5,12 @@ const ALLY_NAMES = ['曉鷹', '青嵐', '石竹', '白鷺'];
 const bots = [];                    // 前 5 隻是敵人（B 隊），後 4 隻是隊友（A 隊）；練習模式只用前 4 隻敵人
 const BOT_MAT = new THREE.MeshLambertMaterial({ vertexColors: true });
 // 輪廓光：邊緣加一點光，遠處和陰影裡也看得出人形（隊友偏冷色、敵人偏暖色）
+// 邊緣光：顏色放在 uniform 裡（隊友外框色可以在成長畫面換）
 function patchBotMat(m, rim) {
-  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
-    `outgoingLight += vec3(${rim}) * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.28;\n#include <opaque_fragment>`); };
-  m.customProgramCacheKey = () => 'botrim' + rim; return m;
+  const U = m.userData.rimU = { value: new THREE.Color().setRGB(...rim.split(',').map(Number)) };
+  m.onBeforeCompile = (sh) => { sh.uniforms.uRim = U; sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+    `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.28;\n#include <opaque_fragment>`); };
+  m.customProgramCacheKey = () => 'botrim'; return m;
 }
 const BOT_FLASH_MAT = new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
 const BOT_MUZZLE = new V3(0.16, 1.37, -0.84);
@@ -283,6 +285,7 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
       if (game.mode !== 'match') W.reserve = Math.min(WP.reserve, W.reserve + 15);
       hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head'); statKill(w, part === 'head');
     } else if (enemy) { attacker.kills++; if (part === 'head') attacker.heads++; }
+    if (enemy) roundKill(attacker);
     if (enemy) addMoney(attacker, w.reward || 0, '擊殺');
     hudFeed(attacker === b ? '' : attacker.name, b.name, part === 'head', attacker.team, b.team, byPlayer, w.short);
     if (typeof onUnitDied === 'function') onUnitDied(b);

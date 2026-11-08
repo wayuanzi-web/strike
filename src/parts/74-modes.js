@@ -10,7 +10,7 @@ for (let i = 0; i < 12; i++) TEAM_INTEL['D' + i] = { t: -99, pos: new V3() };
 
 function startMode(kind) {
   game.mode = kind; game.lastMode = kind; MODE.kind = kind; MODE.t = 0; MODE.over = false; MODE.score = { A: 0, B: 0 }; MODE.owner = '';
-  player.team = 'A'; player.kills = player.deaths = player.heads = 0; player.money = 0;
+  player.team = 'A'; player.kills = player.deaths = player.heads = 0; player.money = 0; gainReset();
   setupBots(kind);
   removeZone();
   if (kind === 'koth') { loadTeamSpawns(); MODE.zone = kothZone(); buildZone(); }
@@ -188,6 +188,7 @@ function endMode() {
   const M = STATS.modes[kind];
   ov('overC', kind === 'range' ? `練槍場紀錄：最快平均 ${M.bestMs || '—'} 毫秒、最高命中率 ${M.bestAcc ? Math.round(M.bestAcc * 100) + '%' : '—'}（${M.n} 次）`
     : `${MODE_NAME[kind]}：${M.n} 場 ${M.w} 勝`);
+  overXpLine();
   $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy();
   if (pointerLocked()) document.exitPointerLock();
   for (const b of bots) if (b.dummy) { b.alive = false; b.g.visible = false; }

@@ -14,18 +14,20 @@ function statModeEnd(kind, win, r) {
   if (kind === 'dm') M.best = Math.max(M.best || 0, player.kills);
   if (r && r.hit >= RANGE.n / 2) { if (!M.bestMs || r.avgMs < M.bestMs) M.bestMs = r.avgMs; M.bestAcc = Math.max(M.bestAcc || 0, r.acc); }
   saveStats();
+  progEvent('mode', { kind, win, r });
 }
 function saveStats() { try { localStorage.setItem(STATS_KEY, JSON.stringify(STATS)); } catch (e) { /* 存不了也照玩 */ } }
 // 這場比賽的暫存（打完才寫進生涯）
 const MSTAT = { kills: 0, deaths: 0, heads: 0, shots0: 0, hits0: 0, plants: 0, defuses: 0, weapons: {} };
 function statMatchStart() { Object.assign(MSTAT, { kills: 0, deaths: 0, heads: 0, shots0: W.shots, hits0: W.hits, plants: 0, defuses: 0, weapons: {} }); }
 function statKill(weapon, head) {
+  progEvent('kill', { w: weapon, head });
   if (game.mode === 'match') { MSTAT.kills++; if (head) MSTAT.heads++; const k = (weapon && weapon.short) || '其它'; MSTAT.weapons[k] = (MSTAT.weapons[k] || 0) + 1; }
   else if (game.mode === 'practice') { STATS.practiceKills++; saveStats(); }
 }
 function statDeath() { if (game.mode === 'match') MSTAT.deaths++; }
-function statPlant() { if (game.mode === 'match') MSTAT.plants++; }
-function statDefuse() { if (game.mode === 'match') MSTAT.defuses++; }
+function statPlant() { if (game.mode === 'match') { MSTAT.plants++; progEvent('plant'); } }
+function statDefuse() { if (game.mode === 'match') { MSTAT.defuses++; progEvent('defuse'); } }
 // 比賽打完：寫進生涯
 function statMatchEnd(win, scoreA, scoreB, mvpIsYou) {
   const s = STATS;
@@ -41,6 +43,7 @@ function statMatchEnd(win, scoreA, scoreB, mvpIsYou) {
   s.recent.unshift({ t: `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`, map: MAP.id, a: scoreA, b: scoreB, win, k: MSTAT.kills, d: MSTAT.deaths, h: MSTAT.heads, diff: S.difficulty });
   s.recent = s.recent.slice(0, 10);
   saveStats();
+  progEvent('match', { win, mvp: mvpIsYou, map: MAP.id });
 }
 // ---------- 戰績畫面 ----------
 const pct = (a, b) => (b > 0 ? Math.round(a / b * 100) + '%' : '—');
@@ -64,6 +67,6 @@ function closeStats() { $('stats').hidden = true; }
 onTap($('statX'), closeStats);
 onTap($('statClear'), () => {
   // 按兩次才清除（避免誤觸）
-  if (performance.now() - clearArm > 3000) { clearArm = performance.now(); $('statClear').textContent = '再按一次確定清除'; return; }
-  const done = STATS.tutorialDone; STATS = emptyStats(); STATS.tutorialDone = done; saveStats(); renderStats(); $('statClear').textContent = '已清除'; clearArm = 0;
+  if (performance.now() - clearArm > 3000) { clearArm = performance.now(); $('statClear').textContent = '再按一次清除（等級、成就也會清掉）'; return; }
+  const done = STATS.tutorialDone; STATS = emptyStats(); STATS.tutorialDone = done; ensureProg(); saveStats(); applyCosmetics(); syncMenuLevel(); renderStats(); $('statClear').textContent = '已清除'; clearArm = 0;
 });

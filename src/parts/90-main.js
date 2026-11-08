@@ -57,7 +57,7 @@ function startGame(mode = 'practice') {
   game.lastMode = mode; leaveMode();
   if (mode === 'match') { startMatch(); enterPlay(); openBuy(); return; }
   if (mode === 'dm' || mode === 'koth' || mode === 'range') { startMode(mode); return; }
-  game.mode = 'practice'; setupBots('practice');
+  game.mode = 'practice'; setupBots('practice'); gainReset();
   bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
   spawnPlayer();
   player.kills = player.deaths = player.heads = 0;
@@ -90,7 +90,7 @@ function syncMenuHints() {
   $('firstHint').hidden = !first; $('bTut').classList.toggle('go', first); $('bMatch').classList.toggle('go', !first);
 }
 function backToMenu() {
-  clearNades(); resetBomb(); closeBuy(); leaveMode(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints();
+  clearNades(); resetBomb(); closeBuy(); leaveMode(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints(); syncMenuLevel(); KC.on = false; $('kc').hidden = true;
   closeRadio(); $('bRadio').hidden = true; $('bBuy').hidden = true;
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
   game.mode = 'practice'; setupBots('practice'); bots.filter((b) => b.active).forEach((b, i) => { const s = BOT_SPAWNS[i]; botSpawn(b, s[0], s[1]); });
@@ -165,7 +165,7 @@ function autoQuality() {
   }
 }
 function step(dt) {
-  game.t += dt;
+  game.t += dt; updateToast(dt);
   updateAmbience(dt);
   if (game.state === 'menu') {
     // 選單背景：鏡頭繞著倉庫慢慢轉
@@ -205,14 +205,16 @@ function step(dt) {
   updateWeapon(dt, (INPUT.fire || auto) && player.alive, auto, AIM.dist || 0);
   if (game.mode === 'match') updatePlan();
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);
-  updateNades(dt); updateDrops(dt);
+  updateNades(dt); updateDrops(dt); kcRecord();
   if (game.mode !== 'match' && game.mode !== 'tutorial') updatePlayerUse(dt);   // 撿槍（對戰模式在 updateBomb 裡）
   updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
   // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
   const spec = !player.alive && game.mode === 'match' && player.deadT > 2 ? spectateTarget() : null;
   game.specBot = spec;
-  if (spec) {
+  if (killcamCamera(dt)) {
+    // 擊殺鏡頭接管攝影機
+  } else if (spec) {
     // 觀戰：從隊友眼睛看出去
     const sp = spec.phys.pos; camera.position.set(sp.x, sp.y + spec.phys.h - 0.12, sp.z);
     camera.rotation.set(spec.pitch || 0, spec.yaw, 0);
@@ -221,7 +223,7 @@ function step(dt) {
     camera.rotation.set(player.pitch + (W.rp * VIEW_TRACK + W.vp + player.punchP) * DEG + (player.alive ? 0 : -0.12),
       player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? 0 : 0.25);
   }
-  camera.fov = spec ? BASE_FOV : lerp(BASE_FOV, adsFov, player.adsT); camera.updateProjectionMatrix();
+  if (!killcamActive()) { camera.fov = spec ? BASE_FOV : lerp(BASE_FOV, adsFov, player.adsT); camera.updateProjectionMatrix(); }
   updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt);
   if (!player.alive) {
     const kb = bots.find((b) => b.name === player.killer);
@@ -236,7 +238,7 @@ function step(dt) {
 function render() {
   renderer.info.reset(); renderer.clear();
   const sb = game.specBot, sv = sb && sb.g.visible; if (sb) sb.g.visible = false;   // 觀戰時別看到自己身體的內側
-  renderer.render(scene, camera);
+  if (killcamActive()) killcamRender(() => renderer.render(scene, camera)); else renderer.render(scene, camera);
   if (sb) sb.g.visible = sv;
   if (game.state !== 'menu' && player.alive) { renderer.clearDepth(); renderer.render(vmScene, vmCam); }
 }
@@ -256,4 +258,5 @@ requestAnimationFrame(frame);
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
-  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone };
+  INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
+  levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu };

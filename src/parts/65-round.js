@@ -22,7 +22,7 @@ function resetBotGear(b) { b.primary = null; b.secondary = null; b.vest = b.helm
 function startMatch() {
   game.mode = 'match'; setupBots('match');
   ROUND.score = { A: 0, B: 0 }; ROUND.num = 0; ROUND.over = false; ROUND.history = []; ROUND.atk = 'A'; ROUND.loss = { A: 0, B: 0 }; ROUND.swapped = false; ROUND.log = [];
-  player.kills = player.deaths = player.heads = 0; player.deathStreak = 0; statMatchStart();
+  player.kills = player.deaths = player.heads = 0; player.deathStreak = 0; statMatchStart(); gainReset(); ROUND.pistolW = 0;
   for (const u of matchUnits()) { u.money = ECON.start; u.keep = false; if (u !== player) resetBotGear(u); }
   player.alive = false;
   startRound();
@@ -36,7 +36,7 @@ function startRound() {
   for (const u of matchUnits()) u.keep = !!u.alive && ROUND.num > 0;
   let halftime = false;
   if (ROUND.num === ROUND.half) { swapSides(); halftime = true; }
-  ROUND.num++; ROUND.phase = 'freeze'; ROUND.t = ROUND.freeze; ROUND.liveT = 0;
+  ROUND.num++; ROUND.phase = 'freeze'; ROUND.t = ROUND.freeze; ROUND.liveT = 0; ROUND.rk = {}; ROUND.myK = 0; ROUND.clutch = false;
   SHOOT_TOKENS.clear(); TEAM_INTEL.A.t = TEAM_INTEL.B.t = -99;
   clearNades(); resetBomb();
   const sideOf = (team) => (team === ROUND.atk ? TEAM_SPAWN.atk : TEAM_SPAWN.def);
@@ -76,6 +76,8 @@ function onUnitDied(u) {
   dropBomb(u);
   if (ROUND.phase !== 'live') return;
   const atk = ROUND.atk, def = otherTeam(atk);
+  // 一打多：隊上只剩你、對面還有 2 人以上
+  if (u !== player && u.team === player.team && player.alive && aliveCount(player.team) === 1 && aliveCount(otherTeam(player.team)) >= 2) ROUND.clutch = true;
   if (aliveCount(def) === 0) endRound(atk, '守方全滅', 'elim');
   else if (aliveCount(atk) === 0 && !BOMB.planted) endRound(def, '攻方全滅', 'elim');
 }
@@ -87,6 +89,8 @@ function endRound(winner, reason, kind = 'elim') {
   ROUND.history.push(winner);
   ROUND.log.push({ n: ROUND.num, w: winner, kind, atk: ROUND.atk, site: BOMB.site, planted: BOMB.planted, t: +ROUND.liveT.toFixed(1), tactic: ROUND.plan && ROUND.plan.type, eco: Object.assign({}, ROUND.eco) });
   closeRadio();
+  progEvent('round', { win: winner === player.team, pistol: ROUND.num === 1 || ROUND.num === ROUND.half + 1, clutch: ROUND.clutch && player.alive });
+  const mvp = roundMvp(winner);
   ROUND.over = ROUND.score.A >= ROUND.winTo || ROUND.score.B >= ROUND.winTo;
   // 經濟：勝方每人 3250（炸掉、拆掉 3500）；敗方連敗補助；攻方裝了彈但輸了每人 +800
   const winPay = kind === 'bomb' || kind === 'defuse' ? ECON.winBomb : ECON.win;
@@ -95,7 +99,8 @@ function endRound(winner, reason, kind = 'elim') {
   for (const u of matchUnits()) addMoney(u, u.team === winner ? winPay : losePay, u.team === winner ? '回合勝利' : '回合補助');
   const title = winner === player.team ? '我方獲勝' : '敵方獲勝';
   const halfNote = ROUND.num === ROUND.half && !ROUND.over ? '　下回合換邊' : '';
-  hudBanner(title, reason + `　${ROUND.score.A} : ${ROUND.score.B}` + halfNote, 4.5, winner === player.team ? 'win' : 'lose');
+  hudBanner(title, reason + `　${ROUND.score.A} : ${ROUND.score.B}` + halfNote + (mvp ? `\n回合 MVP：${mvp.name}（${mvp.k} 殺）` : ''), 4.5, winner === player.team ? 'win' : 'lose');
+  ROUND.mvp = mvp;
   sfx(winner === player.team ? 'win' : 'lose');
   closeBuy();
 }
@@ -136,6 +141,7 @@ function showMatchOver() {
   $('overY').textContent = `你：${player.kills} 殺 · ${player.deaths} 死 · ${player.heads} 爆頭`;
   statMatchEnd(win, ROUND.score.A, ROUND.score.B, !!(mvp && mvp.me));
   $('overC').textContent = `生涯：${STATS.matches} 場 ${STATS.wins} 勝（勝率 ${pct(STATS.wins, STATS.matches)}）· 擊殺 ${STATS.kills}`;
+  overXpLine();
   $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy();
   if (pointerLocked()) document.exitPointerLock();
 }

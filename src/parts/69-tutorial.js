@@ -66,7 +66,7 @@ function tutNext() {
 }
 function tutFinish() {
   TUT.on = false; beacon.visible = false; $('tut').hidden = true;
-  STATS.tutorialDone = true; saveStats(); resetBomb();
+  STATS.tutorialDone = true; saveStats(); resetBomb(); progEvent('tutorial');
   hudBanner('教學完成！', '可以開始對戰了', 3, 'win'); sfx('win');
   $('tutDone').hidden = false; resetTouchState();
   if (pointerLocked()) document.exitPointerLock();

@@ -273,6 +273,23 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
   background: rgba(10,15,22,.92); border: 1px solid var(--dawn); border-radius: 10px; padding: 8px 14px; font-size: max(12px, calc(var(--u) * 3)); width: max-content; max-width: calc(100vw - 24px); }
 #edit #edName { grid-column: 1 / -1; color: var(--dawn-lt); }
 #edit label { display: flex; align-items: center; gap: 6px; } #edit input { width: max(90px, calc(var(--u) * 22)); } #edit output { min-width: 3em; }
+#bnS { white-space: pre-line; }
+.pb { display: inline-block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; vertical-align: middle; } .pb i { display: block; height: 100%; background: var(--dawn); border-radius: 3px; }
+.mlv { display: flex; align-items: center; gap: calc(var(--u) * 2); flex-wrap: wrap; } .mlv b { font-family: var(--f-num); color: var(--dawn-lt); } .mlv .pb { width: calc(var(--u) * 22); } .mlv small { color: var(--mute); }
+#toast { position: absolute; right: max(12px, var(--sr)); top: calc(var(--st) + var(--u) * 22); z-index: 12; max-width: 46vw; background: var(--panel); border: 1px solid var(--dawn); color: var(--bone); padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: max(12px, calc(var(--u) * 3)); pointer-events: none; }
+#toast.lv { background: var(--dawn); color: #1a1208; }
+#kc { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding-bottom: calc(var(--sb) + var(--u) * 6);
+  box-shadow: inset 0 0 0 4px rgba(255,90,60,.55); background: linear-gradient(180deg, rgba(0,0,0,.25), transparent 18%, transparent 80%, rgba(0,0,0,.45)); }
+#kc b { color: #ff8f80; letter-spacing: .2em; font-size: max(13px, calc(var(--u) * 3.4)); } #kc span { font-size: max(18px, calc(var(--u) * 5)); font-weight: 800; } #kc small { color: var(--mute); }
+#prog { z-index: 9; } #prog .card { width: min(100%, 900px); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
+#prog h3 small { color: var(--mute); font-weight: 400; margin-left: .5em; font-size: .8em; }
+.pglv { display: flex; align-items: center; gap: calc(var(--u) * 3); } .pglv strong { font-family: var(--f-num); font-size: calc(var(--u) * 12); color: var(--dawn-lt); line-height: 1; } .pglv > div { display: grid; gap: 4px; flex: 1; } .pb.big { width: 100%; height: 10px; }
+.pgd { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; } .pgd li { display: grid; grid-template-columns: 1fr minmax(80px, 30%) 6em; gap: 10px; align-items: center; } .pgd .pb { width: 100%; } .pgd li.done b { color: var(--dawn-lt); } .pgd small { color: var(--mute); text-align: right; }
+.sks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; } .sk { display: grid; justify-items: center; gap: 2px; min-width: 76px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--bone); }
+.sk i { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); } .sk small { color: var(--mute); font-size: 11px; } .sk.on { border-color: var(--dawn); } .sk:disabled { opacity: .45; }
+.pga { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; } .pga li { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); display: grid; gap: 2px; opacity: .55; } .pga li.done { opacity: 1; border-color: var(--dawn); } .pga small { color: var(--mute); }
+#pgCode { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); color: var(--bone); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; user-select: text; -webkit-user-select: text; }
+#overX { color: var(--dawn-lt); } #overX small { color: var(--mute); }
 #perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
 #bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
 #glLost { z-index: 20; }
@@ -339,6 +356,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <li><b>1／2／Q</b>換槍　<b>G</b>投擲物　<b>B</b>購買　<b>E</b>按住裝彈／拆彈</li>
         <li><b>Z</b>指令輪盤　<b>5–9</b>跟我／A 點／B 點／守這裡／自由行動</li>
       </ul>
+      <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button></div>
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
       <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
@@ -371,6 +389,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <div class="opt"><span>陀螺儀方向</span><div class="seg" data-k="gyroInv"><button data-v="0">正常</button><button data-v="1">反向</button></div></div></div>
         <div class="opt"><span>按鈕大小</span><div class="seg" data-k="btnScale"><button data-v="0.85">小</button><button data-v="1">中</button><button data-v="1.15">大</button></div></div>
         <div class="opt"><span>震動</span><div class="seg" data-k="vibrate"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>擊殺鏡頭</span><div class="seg" data-k="killcam"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
@@ -391,7 +410,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div id="buyGrid"></div><p class="mnote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p></div></div>
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
-    <p id="overC"></p>
+    <p id="overC"></p><p id="overX"></p>
     <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>
   <div id="tutDone" class="ov" hidden><div class="card"><h2>教學完成</h2><p class="mnote">對戰時：準備時間先買東西；攻方帶炸彈去 A 或 B 點裝，守方守住或拆彈。活下來的人下回合保留裝備。</p>
@@ -406,5 +425,17 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div id="statBody"></div><p class="mnote">戰績只存在這台裝置的瀏覽器裡。</p></div></div>
   <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadRep"></p><p id="deadT"></p></div></div>
   <div id="rotate" hidden><svg viewBox="0 0 48 48"><rect x="15" y="5" width="18" height="38" rx="3"/><path d="M21 38h6"/></svg><p>請把手機轉成橫向</p><small>破曉突擊只支援橫向畫面</small></div>
+  <div id="toast" hidden></div>
+  <div id="kc" hidden><b>擊殺鏡頭</b><span id="kcN"></span><small>點一下跳過</small></div>
+  <div id="prog" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>成長</h2><button class="btn go" id="pgX">好了</button></div>
+    <div class="pglv"><strong id="pgLv">1</strong><div><small>等級</small><span class="pb big"><i id="pgBar"></i></span><small id="pgXp"></small></div></div>
+    <section><h3>每日挑戰<small>（每天午夜換新，完成一個 +150 經驗）</small></h3><ul class="pgd" id="pgDaily"></ul></section>
+    <section><h3>外觀・槍的塗裝<small>（手上的槍）</small></h3><div class="sks" id="pgSkin"></div>
+      <h3>外觀・隊友外框色<small>（隊友身上的光）</small></h3><div class="sks" id="pgTeam"></div></section>
+    <section><h3>成就 <small id="pgAchN"></small></h3><ul class="pga" id="pgAch"></ul></section>
+    <section><h3>換手機<small>（戰績、等級、成就、設定一起帶走，不用帳號）</small></h3>
+      <textarea id="pgCode" rows="3" placeholder="在舊手機按「匯出代碼」，把代碼貼到這裡再按「匯入」" spellcheck="false"></textarea>
+      <div class="row"><button class="btn" id="pgExport">匯出代碼</button><button class="btn" id="pgCopy">複製</button><button class="btn" id="pgImport">匯入</button></div><p class="mnote" id="pgMsg"></p></section>
+  </div></div>
   <div id="boot">載入中…</div>
 </div>

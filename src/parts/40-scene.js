@@ -80,6 +80,8 @@ function matcapTex(base, hi, rim) {
   x.fillStyle = g; x.fillRect(0, 0, 128, 128);
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+// 塗裝（成長畫面換）：每種材質的底色
+const VM_TINT = { metal: new THREE.Color(1, 1, 1), poly: new THREE.Color(1, 1, 1), cloth: new THREE.Color(1, 1, 1) };
 const VM_MATS = {
   metal: new THREE.MeshMatcapMaterial({ matcap: matcapTex('#5c636c', '#eef3f8', '#6a6258'), vertexColors: true }),
   poly: new THREE.MeshMatcapMaterial({ matcap: matcapTex('#57513f', '#bdb39a', '#5a5242'), vertexColors: true }),
@@ -239,7 +241,7 @@ function updateViewmodelLight(dt) {
   }
   vmLight = lerp(vmLight, updateViewmodelLight.lit || 1, 1 - Math.exp(-4 * dt));
   const f = vmLight + Math.max(0, W.flashT) * 8;
-  for (const m of Object.values(VM_MATS)) m.color.setScalar(f);
+  for (const k in VM_MATS) VM_MATS[k].color.copy(VM_TINT[k]).multiplyScalar(f);   // 塗裝顏色 × 陰影明暗
 }
 function starTexture() {
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
