@@ -6,7 +6,7 @@ const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'co
   wall: 'brick', rust: 'container', teal: 'container', olive: 'container', crate: 'wood', shed: 'metal', dark: 'metal', paint: 'floor', hazard: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
-  wall: '#9a5e4a', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
+  wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
 };
 const DECOR = [];
 function D(x0, z0, x1, z1, y0, y1, c) { DECOR.push({ min: [Math.min(x0, x1), y0, Math.min(z0, z1)], max: [Math.max(x0, x1), y1, Math.max(z0, z1)], c }); }
@@ -77,7 +77,7 @@ function makeTex(w, h, fn, aniso) {
   const c = cv.getContext('2d'), img = c.createImageData(w, h), d = img.data;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x, v = fn(x, y, i);
-    d[i * 4] = clamp(v[0], 0, 1) * 255; d[i * 4 + 1] = clamp(v[1], 0, 1) * 255; d[i * 4 + 2] = clamp(v[2], 0, 1) * 255; d[i * 4 + 3] = 255;
+    d[i * 4] = clamp(v[0], 0, 1) * 255; d[i * 4 + 1] = clamp(v[1], 0, 1) * 255; d[i * 4 + 2] = clamp(v[2], 0, 1) * 255; d[i * 4 + 3] = v.length > 3 ? v[3] * 255 : 255;
   }
   c.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso;
@@ -87,13 +87,13 @@ const g3 = (v) => [v, v, v];
 function buildTextures(aniso) {
   const T = {};
   // 混凝土（4 公尺一張）：明暗起伏、小斑點、水漬、模板螺栓孔、2 公尺一道施工縫
-  { const S = 256, n = fbm(S, 11), st = fbm(S, 23, 2, 3);
+  { const S = 512, n = fbm(S, 11), st = fbm(S, 23, 2, 3);
     T.concrete = makeTex(S, S, (x, y, i) => {
       let v = 0.86 + (n[i] - 0.5) * 0.3;
       if (st[i] > 0.6) v -= (st[i] - 0.6) * 0.5;
       if (hash1(i * 7 + 3) < 0.035) v -= 0.12;
-      const hx = (x % 64) - 32, hy = (y % 64) - 32; if (hx * hx + hy * hy < 5) v -= 0.3;
-      if (y % 128 < 2) v -= 0.12;
+      const hx = (x % 128) - 64, hy = (y % 128) - 64; if (hx * hx + hy * hy < 14) v -= 0.3;
+      if (y % 256 < 3) v -= 0.12;
       return g3(v);
     }, aniso); }
   // 磚牆（2 公尺一張）：每塊磚色差、灰縫、半塊錯開
@@ -107,10 +107,11 @@ function buildTextures(aniso) {
       return mortar ? [v * 1.05, v * 1.0, v * 0.95] : g3(v);
     }, aniso); }
   // 地面（4 公尺一張）：淡淡的起伏、2 公尺伸縮縫、油漬
-  { const S = 512, n = fbm(S, 41, 4, 5), oil = fbm(S, 53, 2, 3);
+  { const S = 512, n = fbm(S, 41, 4, 5), oil = fbm(S, 53, 2, 3), spot = fbm(S, 59, 8, 3);
     T.floor = makeTex(S, S, (x, y, i) => {
       let v = 0.88 + (n[i] - 0.5) * 0.22;
-      if (oil[i] > 0.62) v -= (oil[i] - 0.62) * 0.7;
+      if (oil[i] > 0.7) v -= (oil[i] - 0.7) * 0.45;
+      if (spot[i] > 0.68) v -= (spot[i] - 0.68) * 0.6;
       if (x % 256 < 2 || y % 256 < 2) v -= 0.16;
       if (hash1(i * 13 + 5) < 0.02) v -= 0.08;
       return g3(v);
@@ -123,7 +124,7 @@ function buildTextures(aniso) {
       const s = streak[Math.floor(y / 6) * W2 + x] * (1 - y / H2);
       let rgb = g3(v);
       if (s > 0.55) { const k = (s - 0.55) * 1.6; rgb = [v * (1 - k * 0.2), v * (1 - k * 0.45), v * (1 - k * 0.6)]; }
-      if (chip[i] > 0.66) rgb = [0.62, 0.48, 0.38];
+      if (chip[i] > 0.66) rgb.push(0);   // 第 4 個值當透明度：0＝掉漆露出底漆
       return rgb;
     }, aniso); }
   // 木箱（每個面剛好一張）：外框、斜撐、木紋、木板縫
@@ -211,7 +212,7 @@ function bakeVertex(px, py, pz, n, tu, tv) {
 
 // ---------- 建地圖網格：依材質分組，每組一次繪製 ----------
 const MAP_UNI = { uFlash: { value: new THREE.Vector4(0, 0, 0, 0) } };
-function patchMapMaterial(mat, wear, grime) {
+function patchMapMaterial(mat, wear, grime, chip = false) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uFlash = MAP_UNI.uFlash;
     sh.vertexShader = sh.vertexShader
@@ -227,16 +228,19 @@ function patchMapMaterial(mat, wear, grime) {
         float nz = texture2D(map, vWp.xz * 0.37 + vWp.y * 0.21).r;
         float wear = 1.0 - smoothstep(0.012, 0.045 + nz * 0.07, e);
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.32 + 0.035, wear * ${wear.toFixed(2)});
+        diffuseColor.rgb *= 0.9 + 0.2 * texture2D(map, vMapUv * 6.0).r;
+        ${chip ? 'diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.27, 0.18) * sampledDiffuseColor.r, (1.0 - sampledDiffuseColor.a) * 0.9); diffuseColor.a = 1.0;' : ''}
         float grime = 1.0 - smoothstep(0.0, 0.55 + nz * 0.5, vWp.y);
         diffuseColor.rgb *= 1.0 - grime * ${grime.toFixed(2)} * step(an.y, 0.5);
       }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         reflectedLight.directDiffuse *= vLight.x;
-        reflectedLight.indirectDiffuse *= mix(0.28, 1.0, vLight.y);
+        reflectedLight.indirectDiffuse *= mix(0.42, 1.0, vLight.y);
+        reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.08, 0.05, 0.03) * (1.0 - smoothstep(0.0, 2.0, vWp.y));
         { float fd = distance(vWp, uFlash.xyz);
           reflectedLight.directDiffuse += diffuseColor.rgb * vec3(1.0, 0.7, 0.4) * uFlash.w * 2.2 / (1.0 + fd * fd * 0.5); }`);
   };
-  mat.customProgramCacheKey = () => 'map' + wear + '_' + grime;
+  mat.customProgramCacheKey = () => 'map' + wear + '_' + grime + (chip ? 'c' : '');
 }
 function buildMapMeshes(aniso) {
   const t0 = performance.now();
@@ -268,6 +272,8 @@ function buildMapMeshes(aniso) {
       const n = [0, 0, 0]; n[ax] = sg;
       const tu = [0, 0, 0]; tu[ua] = 1; const tv = [0, 0, 0]; tv[va] = 1;
       const start = g.P.length / 3;
+      let faceL = null;
+      if (decor) { const c = [0, 0, 0]; c[ax] = plane; c[ua] = b.min[ua] + lu / 2; c[va] = b.min[va] + lv / 2; faceL = bakeVertex(c[0], c[1], c[2], n, tu, tv); }
       for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
         const p = [0, 0, 0]; p[ax] = plane; p[ua] = b.min[ua] + lu * i / nu; p[va] = b.min[va] + lv * j / nv;
         g.P.push(p[0], p[1], p[2]); g.N.push(n[0], n[1], n[2]);
@@ -281,7 +287,7 @@ function buildMapMeshes(aniso) {
           u = hu * scale * (ax === 0 && sg > 0 || ax === 2 && sg < 0 ? -1 : 1); v = mat === 'container' && ax !== 1 ? (p[1] - b.min[1]) / 2.6 : hv * scale;
         }
         g.U.push(u, v);
-        g.L.push(...bakeVertex(p[0], p[1], p[2], n, tu, tv));
+        g.L.push(...(faceL || bakeVertex(p[0], p[1], p[2], n, tu, tv)));
         g.O.push(p[0] - b.min[0], p[1] - b.min[1], p[2] - b.min[2]); g.Z.push(size[0], size[1], size[2]);
       }
       // 三角形要朝外（逆時針）：依法線方向決定繞向
@@ -306,7 +312,7 @@ function buildMapMeshes(aniso) {
     geo.setAttribute('aSize', new THREE.Float32BufferAttribute(g.Z, 3));
     geo.setIndex(g.I); geo.computeBoundingSphere();
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, map: tex[m] });
-    const st = SETTINGS[m] || [0.5, 0.2]; patchMapMaterial(mat, st[0], st[1]);
+    const st = SETTINGS[m] || [0.5, 0.2]; patchMapMaterial(mat, st[0], st[1], m === 'container');
     const mesh = new THREE.Mesh(geo, mat); mesh.name = 'map-' + m; mesh.matrixAutoUpdate = false;
     meshes.push(mesh);
   }
@@ -326,7 +332,7 @@ function checkWinding(mesh) {
 
 // ---------- 遠景：牆外的倉庫、龍門吊、煙囪剪影，不再像關在盒子裡 ----------
 function buildSkyline() {
-  const P = [], C = [], I = []; const c = new THREE.Color(), top = new THREE.Color('#8a7a86'), bot = new THREE.Color('#4a4351');
+  const P = [], C = [], I = []; const c = new THREE.Color(), top = new THREE.Color('#a7a2ad'), bot = new THREE.Color('#6b6772');
   const box = (x0, z0, x1, z1, h, y0 = 0) => {
     const s = P.length / 3;
     const v = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0, h, z0], [x1, h, z0], [x1, h, z1], [x0, h, z1]];
@@ -352,7 +358,7 @@ function buildSkyline() {
 function buildSky() {
   const g = new THREE.SphereGeometry(400, 48, 24);
   const pos = g.attributes.position, cols = [];
-  const zen = new THREE.Color('#2a4670'), mid = new THREE.Color('#9b8db3'), hor = new THREE.Color('#ffb27a'), low = new THREE.Color('#5b4e57');
+  const zen = new THREE.Color('#3f6fa6'), mid = new THREE.Color('#a9bad6'), hor = new THREE.Color('#ffc79a'), low = new THREE.Color('#6b6168');
   const warm = new THREE.Color('#ffdba8'), c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i) / 400, x = pos.getX(i) / 400, z = pos.getZ(i) / 400;

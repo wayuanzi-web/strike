@@ -62,7 +62,7 @@ function updateWeapon(dt, wantFire, auto, dist) {
   if (W.reloadT > 0) {
     W.reloadT -= dt;
     if (!W.magIn && W.reloadT < RIFLE.reload * 0.45) { W.magIn = true; sfx('magin'); }
-    if (W.reloadT <= 0) { W.reloadT = 0; const n = Math.min(RIFLE.mag - W.ammo, W.reserve); W.ammo += n; W.reserve -= n; }
+    if (W.reloadT <= 0) { W.reloadT = 0; const n = Math.min(RIFLE.mag - W.ammo, W.reserve); W.ammo += n; W.reserve -= n; if (INPUT.adsQueued) { player.ads = true; INPUT.adsQueued = false; } }
   }
   // 自動開火的點放：中遠距離打 4 發停 0.28 秒，讓花紋與散佈回來；8 公尺內才全自動
   if (auto && dist > 8 && W.autoPause > 0) wantFire = false;
@@ -73,7 +73,7 @@ function updateWeapon(dt, wantFire, auto, dist) {
       startReload();
     } else if (W.cd <= 0) {
       shoot(); W.cd += RIFLE.rate; if (W.cd < 0) W.cd = 0;
-      if (auto && dist > 8 && ++W.autoN >= 4) { W.autoN = 0; W.autoPause = 0.28; }
+      if (auto && dist > 8 && ++W.autoN >= (dist > 25 ? 3 : 4)) { W.autoN = 0; W.autoPause = dist > 25 ? 0.35 : 0.28; }
     }
   } else if (W.cd < 0) W.cd = 0;
   // 後座力：開火中往花紋走；停火後指數＋線性回正（CS 的回正方式）
@@ -110,6 +110,7 @@ function shoot() {
     W.hits++;
     let dmg = RIFLE.dmg * PART_MUL[res.part] * Math.pow(RIFLE.falloff, res.t / 12.7);
     if (res.part !== 'legs') dmg *= RIFLE.armorPen;
+    if (res.part === 'head') dmg *= 0.94;   // 頭盔：25 公尺內爆頭一發倒，更遠就不一定
     player.dealt += Math.min(dmg, Math.max(0, res.bot.hp)); player.dealtHits++;
     damageBot(res.bot, dmg, res.part, _d);
     // 血噴到後面 2.5 公尺內的牆上
@@ -143,10 +144,9 @@ function traceShot(o, d, range) {
   return { t, bot, part, n: bot ? null : (w ? w.n : null) };
 }
 function muzzleWorld(out) {
-  const k = player.adsT;
-  out.set(lerp(0.2, 0, k), lerp(-0.16, -0.06, k), -0.95);
-  camera.updateMatrixWorld();
-  return camera.localToWorld(out);
+  gunRig.updateMatrixWorld(true); camera.updateMatrixWorld();
+  const m = gun.localToWorld(_v3.copy(gun.userData.muzzle)).project(vmCam);
+  return out.set(m.x, m.y, 0.5).unproject(camera).sub(camera.position).normalize().multiplyScalar(1.2).add(camera.position);
 }
 
 // ---------- 拋殼：黃銅小方塊從機匣右側彈出去（手上槍的場景裡） ----------
@@ -174,7 +174,7 @@ function updateShells(dt) {
 
 // ---------- 手上的槍動畫：走路晃、跑步下沉、轉向甩、開火後座、落地下沉、出槍、換彈 ----------
 const VM = { bobT: 0, swayX: 0, swayY: 0, landY: 0, landV: 0 };
-const HIP = new V3(0.2, -0.205, -0.46), ADS = new V3(0, -0.09, -0.2);
+const HIP = new V3(0.2, -0.205, -0.46), ADS = new V3(0, -0.078, -0.3);
 function viewmodelLand(v) { VM.landV -= Math.min(0.5, v * 0.04); }
 function updateViewmodel(dt, lookDX, lookDY) {
   const sp = playerSpeed(), moving = player.body.onGround ? Math.min(1, sp / RUN_SPEED) : 0;
@@ -192,16 +192,18 @@ function updateViewmodel(dt, lookDX, lookDY) {
   // 出槍：從畫面下方抬起來
   if (W.deployT > 0) { const d = W.deployT / 0.6; gunRig.position.y -= d * d * 0.25; gunRig.rotation.x -= d * d * 0.6; }
   // 換彈：槍往下歪、彈匣拔出再插回去
-  const mag = gun.userData.mag;
-  mag.position.y = -0.1; mag.visible = true;
+  const mag = gun.userData.mag, la = gun.userData.leftArm;
+  mag.position.y = -0.1; mag.visible = true; la.position.set(0, 0, 0);
+  gunRig.rotation.x += k * 0.05;
   if (W.reloadT > 0) {
     const p = 1 - W.reloadT / RIFLE.reload, tilt = Math.sin(Math.min(1, p * 1.15) * Math.PI);
     gunRig.rotation.z += tilt * 0.55; gunRig.rotation.x += tilt * 0.25; gunRig.position.y -= tilt * 0.06;
+    if (p > 0.1 && p < 0.62) { const t = Math.sin((p - 0.1) / 0.52 * Math.PI); la.position.set(0.05 * t, -0.08 * t, 0.22 * t); }
     if (p > 0.12 && p < 0.4) mag.position.y = -0.1 - (p - 0.12) / 0.28 * 0.3;
     else if (p >= 0.4 && p < 0.45) mag.visible = false;
     else if (p >= 0.45 && p < 0.56) mag.position.y = -0.1 - (0.56 - p) / 0.11 * 0.25;
   }
   flash.visible = W.flashT > 0;
-  if (flash.visible) { flash.rotation.z = Math.random() * 6.28; const s = rand(0.8, 1.3); flash.scale.set(s, s, 1); }
+  if (flash.visible) { flash.rotation.z = Math.random() * 6.28; const s = rand(0.8, 1.3) * lerp(1, 0.4, player.adsT); flash.scale.set(s, s, 1); }
   updateShells(dt);
 }

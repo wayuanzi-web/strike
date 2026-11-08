@@ -46,7 +46,7 @@ async def main():
         # E 部位倍率：頭 120（一槍死）、身體 30、腳 22.5
         out = []
         for part, y in (('head', 1.66), ('body', 1.2), ('legs', 0.5)):
-            r = await ev(f"""() => {{ T.at(-32, 0.3); T.s.W.bloom = 0; T.s.W.idx = 0; T.s.W.rp = T.s.W.ry = 0; T.s.W.cd = 0; T.s.W.since = 9; T.s.W.deployT = 0; T.bot(0, -25.5, 0.3);
+            r = await ev(f"""() => {{ T.at(-32, 0.3); T.s.W.bloom = 0; T.s.W.idx = 0; T.s.W.rp = T.s.W.ry = 0; T.s.W.cd = 0; T.s.W.since = 9; T.s.W.deployT = 0; T.s.S.autoFire = false; T.bot(0, -25.5, 0.3);
                T.aimAt(-25.5, {y}, 0.3); const before = T.s.bots[0].hp; T.input({{fire: true}}); T.s.step(1/60); T.input({{fire: false}});
                return [before - T.s.bots[0].hp, T.s.bots[0].alive]; }}""")
             out.append((part, r))
@@ -70,10 +70,16 @@ async def main():
         ok('I2 關掉就不會自己開', r == 0, r)
         # J 瞄準輔助：差 3 度、手指在轉視角時被慢慢拉過去
         r = await ev("""() => { T.at(-32, 0.3); T.bot(1, -24.5, 0.3); T.s.S.autoFire = false; T.s.S.aimAssist = true; T.aimAt(-24.5, 1.2, 0.3); T.s.player.yaw += 3 * Math.PI / 180;
-            T.input({looking: true}); const y0 = T.s.player.yaw; T.run(0.3); const pulled = (y0 - T.s.player.yaw) * 180 / Math.PI;
-            T.aimAt(-24.5, 1.2, 0.3); T.s.player.yaw += 3 * Math.PI / 180; T.s.S.aimAssist = false; const y1 = T.s.player.yaw; T.run(0.3); const off = (y1 - T.s.player.yaw) * 180 / Math.PI;
+            T.input({looking: true}); const y0 = T.s.player.yaw; T.run(0.3, () => { T.s.INPUT.fingerMoveT = 0.1; }); const pulled = (y0 - T.s.player.yaw) * 180 / Math.PI;
+            T.aimAt(-24.5, 1.2, 0.3); T.s.player.yaw += 3 * Math.PI / 180; T.s.S.aimAssist = false; const y1 = T.s.player.yaw; T.run(0.3, () => { T.s.INPUT.fingerMoveT = 0.1; }); const off = (y1 - T.s.player.yaw) * 180 / Math.PI;
             T.s.S.aimAssist = true; T.input({looking: false}); T.s.S.autoFire = true; return [pulled, off]; }""")
         ok('J 瞄準輔助會拉、關掉不拉', r[0] > 1.0 and abs(r[1]) < 1e-6, [round(x, 2) for x in r])
+        r = await ev("""() => { T.at(-32, 0.3); T.bot(1, -24.5, 0.3); T.s.S.autoFire = false; T.s.S.aimAssist = true; T.aimAt(-24.5, 1.2, 0.3); T.s.player.yaw += 3 * Math.PI / 180;
+            T.input({looking: true, fingerMoveT: 0}); const y0 = T.s.player.yaw; T.run(0.5); T.input({looking: false}); T.s.S.autoFire = true; return (y0 - T.s.player.yaw) * 180 / Math.PI; }""")
+        ok('J2 手指按著不動時瞄準輔助不拉', abs(r) < 1e-6, round(r, 3))
+        r = await ev("""() => { T.at(-30, -10); const b = T.s.player.body; b.pos.y = 0.8; b.vel.y = 0; b.onGround = false; let pressed = -1, jumped = false;
+            T.run(1.0, (i) => { if (pressed < 0 && !b.onGround && b.pos.y < 0.12) { T.s.INPUT.jump = true; pressed = i; } if (pressed >= 0 && b.vel.y > 1) jumped = true; }); return [pressed, jumped]; }""")
+        ok('C3 落地前按跳會接著跳（緩衝）', r[0] >= 0 and r[1], r)
         # K 機器人：看得到你才開槍、會打中你
         r = await ev("""() => { const s = T.s; s.S.autoFire = false; s.game.freezeBots = false; s.player.hp = 100; s.player.alive = true;
             T.at(-14, 10); for (const b of s.bots) { b.phys.pos.set(30, 0, 24); b.state = 'patrol'; b.path = null; b.waitT = 99; }

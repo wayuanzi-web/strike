@@ -13,16 +13,21 @@ const player = {
 };
 function eyePos(out) { const p = player.body.pos; return out.set(p.x, p.y + player.eye, p.z); }
 function spawnPlayer() {
-  // 出生點挑離機器人最遠的那個
-  let best = PLAYER_SPAWNS[0], bd = -1;
+  // 出生點：離機器人遠、而且沒有機器人看得到
+  let best = PLAYER_SPAWNS[0], bd = -1e9;
   for (const s of PLAYER_SPAWNS) {
-    let d = 1e9; for (const b of bots) if (b.alive) d = Math.min(d, Math.hypot(b.body.pos.x - s[0], b.body.pos.z - s[1]));
-    if (d > bd) { bd = d; best = s; }
+    let d = 1e9, seen = false;
+    for (const b of bots) if (b.alive) {
+      d = Math.min(d, Math.hypot(b.body.pos.x - s[0], b.body.pos.z - s[1]));
+      if (!seen && lineClear(_v1.set(b.body.pos.x, 1.6, b.body.pos.z), _v2.set(s[0], 1.4, s[1]))) seen = true;
+    }
+    const sc = Math.min(d, 40) - (seen ? 50 : 0);
+    if (sc > bd) { bd = sc; best = s; }
   }
   const b = player.body; b.pos.set(best[0], 0, best[1]); b.vel.set(0, 0, 0); b.h = STAND_H; b.onGround = true;
   player.yaw = -Math.PI / 2; player.pitch = 0; player.hp = 100; player.alive = true; player.crouch = false; player.eye = 1.62;
   player.ads = false; player.adsT = 0; INPUT.crouch = false; player.tag = 1; player.punchP = player.punchY = player.punchPV = player.punchYV = 0;
-  player.dealt = 0; player.dealtHits = 0; player.taken = {};
+  player.dealt = 0; player.dealtHits = 0; player.taken = {}; player.spawnT = 1.5;   // 重生後 1.5 秒機器人不開槍
   resetWeapon();
 }
 function playerSpeed() { return Math.hypot(player.body.vel.x, player.body.vel.z); }
@@ -39,6 +44,7 @@ function updatePlayer(dt) {
   player.eye = lerp(player.eye, player.crouch ? 1.05 : 1.62, 1 - Math.exp(-14 * dt));
   if (b.onGround && player.tag < 1) player.tag = Math.min(1, player.tag + 0.45 * dt);
   if (player.landT > 0) player.landT -= dt;
+  if (player.spawnT > 0) player.spawnT -= dt;
 
   let mx = INPUT.mx, mz = INPUT.mz; const mh = Math.hypot(mx, mz);
   if (mh > 1) { mx /= mh; mz /= mh; }
@@ -53,9 +59,11 @@ function updatePlayer(dt) {
     // 摩擦
     const sp = playerSpeed();
     if (sp > 1e-4) {
-      let drop = Math.max(sp, STOP_SPEED) * FRICTION * dt;
+      // 觸控推一點點也能慢慢走：摩擦的下限不超過想走的速度
+      const ctl = INPUT.mode === 'touch' && wish > 0 ? Math.max(sp, Math.min(STOP_SPEED, wish * 0.9)) : Math.max(sp, STOP_SPEED);
+      let drop = ctl * FRICTION * dt;
       // 手機：搖桿放回中間就自動急停（觸控做不到 CS 的反向急停）
-      if (INPUT.mode === 'touch' && mag < 0.15) drop += (30 + 5.2 * sp) * dt;
+      if (INPUT.mode === 'touch' && mag < 0.02) drop += (30 + 5.2 * sp) * dt;
       const ns = Math.max(0, sp - drop) / sp; b.vel.x *= ns; b.vel.z *= ns;
     }
     // 加速
@@ -68,11 +76,13 @@ function updatePlayer(dt) {
     const cur = b.vel.x * wx + b.vel.z * wz, add = Math.min(wish, 0.76) - cur;
     if (add > 0) { const a = Math.min(add, 10 * wish * dt); b.vel.x += a * wx; b.vel.z += a * wz; }
   }
-  if (INPUT.jump) {
-    INPUT.jump = false;
+  // 跳：按下後 0.12 秒內落地就會接著跳（緩衝）；剛走出邊緣 0.08 秒內還能跳（寬限）
+  player.coyote = b.onGround ? 0.08 : (player.coyote || 0) - dt;
+  if (INPUT.jumpT > 0) INPUT.jumpT -= dt;
+  if (INPUT.jumpT > 0 && player.coyote > 0 && b.vel.y <= 0.1) {
     const jv = JUMP_V * (player.landT > 0 ? 0.85 : 1);
-    if (b.onGround && player.crouch && headroom(p.x, p.z, b.r * 0.9, p.y + CROUCH_H, p.y + STAND_H)) { INPUT.crouch = false; player.crouch = false; b.h = STAND_H; }
-    if (b.onGround && !player.crouch) { b.vel.y = jv; b.jumped = true; b.onGround = false; }
+    if (player.crouch && headroom(p.x, p.z, b.r * 0.9, p.y + CROUCH_H, p.y + STAND_H)) { INPUT.crouch = false; player.crouch = false; b.h = STAND_H; }
+    if (!player.crouch) { b.vel.y = jv; b.jumped = true; b.onGround = false; INPUT.jumpT = 0; player.coyote = 0; }
   }
   const wasGround = b.onGround, vy = b.vel.y;
   moveBody(b, dt);
@@ -115,6 +125,7 @@ function damagePlayer(dmg, bot, part) {
   const dx = bot.body.pos.x - player.body.pos.x, dz = bot.body.pos.z - player.body.pos.z;
   hudHurt(angDiff(player.yaw, Math.atan2(-dx, -dz)), dmg);
   if (player.hp <= 0) {
+    resetTouchState();
     player.alive = false; player.deaths++; player.deathStreak = (player.deathStreak || 0) + 1; player.killer = bot.name; player.respawnT = 3.5;
     player.ads = false; INPUT.fire = false;
     hudFeed(bot.name, '你', part === 'head', false);

@@ -3,18 +3,18 @@ const canvas = $('cv');
 // 抗鋸齒只能在建立時決定：省電模式不開（切換畫質後重新整理才會生效）
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: S.quality !== 'eco', powerPreference: 'high-performance', preserveDrawingBuffer: !!window.__STRIKE_TEST });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 renderer.autoClear = false; renderer.info.autoReset = false;
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog('#d6a98d', 40, 175);
+scene.fog = new THREE.Fog('#d9c2b0', 45, 190);
 const BASE_FOV = 75, ADS_FOV = 48;
-const camera = new THREE.PerspectiveCamera(BASE_FOV, 16 / 9, 0.05, 600);
+const camera = new THREE.PerspectiveCamera(BASE_FOV, 16 / 9, 0.08, 600);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
 // 破曉的冷暖對比：環境光偏冷藍、太陽低而暖
-scene.add(new THREE.HemisphereLight('#b4c4e4', '#6a5646', 1.25));
-const sunLight = new THREE.DirectionalLight('#ffb070', 2.9);
+scene.add(new THREE.HemisphereLight('#c4d0ea', '#8a6e56', 1.45));
+const sunLight = new THREE.DirectionalLight('#ffc792', 2.5);
 sunLight.position.copy(SUN_DIR).multiplyScalar(50);
 scene.add(sunLight);
 const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -59,8 +59,8 @@ function mergeParts(parts) {
 // matcap：一張畫好光影的球，貼到槍上就有金屬／塑膠的質感，不用另外打燈
 function matcapTex(base, hi, rim) {
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
-  const g = x.createRadialGradient(46, 38, 3, 64, 64, 64);
-  g.addColorStop(0, hi); g.addColorStop(0.32, base); g.addColorStop(0.82, '#0b0c0f'); g.addColorStop(1, rim);
+  const g = x.createRadialGradient(40, 34, 1, 64, 64, 66);
+  g.addColorStop(0, hi); g.addColorStop(0.14, base); g.addColorStop(0.74, base); g.addColorStop(0.92, '#0b0c0f'); g.addColorStop(1, rim);
   x.fillStyle = g; x.fillRect(0, 0, 128, 128);
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
@@ -80,7 +80,7 @@ const gunRig = new THREE.Group(); gunRig.add(gun); vmScene.add(gunRig);
     partCyl(0.0125, 0.24, 0, 0.018, -0.68, M), partCyl(0.019, 0.075, 0, 0.018, -0.83, D, 6),             // 槍管、消焰器
     partBox(0.008, 0.024, 0.075, 0.017, 0.018, -0.83, '#4a4e55'), partBox(0.008, 0.024, 0.075, -0.017, 0.018, -0.83, '#4a4e55'),
     partBox(0.016, 0.05, 0.02, 0, 0.055, -0.56, M), partBox(0.008, 0.045, 0.012, 0, 0.0675, -0.56, D),     // 準星座、準星
-    partBox(0.04, 0.012, 0.05, 0, 0.066, -0.06, M), partBox(0.01, 0.03, 0.03, -0.014, 0.075, -0.06, D), partBox(0.01, 0.03, 0.03, 0.014, 0.075, -0.06, D),  // 照門
+    partBox(0.04, 0.012, 0.05, 0, 0.066, -0.06, M), partBox(0.005, 0.03, 0.025, -0.014, 0.075, -0.06, D), partBox(0.005, 0.03, 0.025, 0.014, 0.075, -0.06, D),  // 照門
     partBox(0.012, 0.012, 0.05, 0.04, 0.035, -0.04, D),                                                   // 拉機柄
     partBox(0.006, 0.006, 0.07, 0, -0.052, 0.0, M), partBox(0.006, 0.03, 0.006, 0, -0.038, 0.035, M),     // 扳機護弓
     partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.15, '#15171a'),                                             // 拋殼口
@@ -94,16 +94,20 @@ const gunRig = new THREE.Group(); gunRig.add(gun); vmScene.add(gunRig);
   ];
   for (let k = 0; k < 5; k++) { poly.push(partBox(0.074, 0.008, 0.012, 0, 0.02, -0.33 - k * 0.05, P2)); }   // 護木散熱溝
   // 手：手套、袖子（右手握握把、左手托護木）
-  const glove = '#5a5d5e', sleeve = '#ffffff', cuff = '#c8ccc0';
+  const glove = '#5a5d5e', sleeve = '#8a907c', cuff = '#6a7062';
   const cloth = [
     partBox(0.085, 0.09, 0.34, 0.035, -0.135, 0.22, sleeve, 0.35), partBox(0.095, 0.1, 0.05, 0.035, -0.105, 0.07, cuff, 0.35),
     partBox(0.065, 0.075, 0.09, 0.012, -0.085, 0.03, glove, -0.3), partBox(0.06, 0.02, 0.05, -0.02, -0.06, -0.02, glove),
+  ];
+  // 左手（托護木）單獨一個，換彈時會伸去拿彈匣
+  const left = [
     partBox(0.085, 0.09, 0.38, -0.08, -0.115, -0.32, sleeve, 0.35, 0.55), partBox(0.095, 0.1, 0.05, -0.04, -0.07, -0.43, cuff, 0.35, 0.55),
     partBox(0.08, 0.05, 0.1, -0.005, -0.045, -0.47, glove), partBox(0.03, 0.06, 0.09, 0.035, -0.01, -0.47, glove),
   ];
   gun.add(new THREE.Mesh(mergeParts(metal), VM_MATS.metal));
   gun.add(new THREE.Mesh(mergeParts(poly), VM_MATS.poly));
   gun.add(new THREE.Mesh(mergeParts(cloth), VM_MATS.cloth));
+  const leftArm = new THREE.Mesh(mergeParts(left), VM_MATS.cloth); gun.add(leftArm); gun.userData.leftArm = leftArm;
   // 彈匣（換彈時會動，單獨一個）：往前彎的長條
   const mag = new THREE.Mesh(mergeParts([partProfile([[0.035, 0.08], [-0.035, 0.08], [-0.07, -0.1], [0.002, -0.112]], 0.042, 0, '#ffffff')]), VM_MATS.metal);
   mag.position.set(0, -0.1, -0.2); gun.add(mag); gun.userData.mag = mag;
@@ -154,7 +158,7 @@ function updateTracers(dt) {
   for (const t of tracers) {
     if (!t.m.visible) continue;
     t.d += t.speed * dt;
-    const head = Math.min(t.d, t.dist), tail = Math.max(0, head - t.len);
+    const head = Math.min(t.d, t.dist), tail = Math.max(0, t.d - t.len);   // 尾巴用沒截斷的距離算，打到牆後會整條收進牆裡
     if (tail >= t.dist - 0.01) { t.m.visible = false; continue; }
     t.m.position.copy(t.from).addScaledVector(t.dir, head);
     t.m.scale.z = Math.max(0.01, head - tail);
@@ -168,12 +172,14 @@ function updateTracers(dt) {
 const decalTex = (function () {
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
   const g = c.createRadialGradient(32, 32, 2, 32, 32, 30);
-  g.addColorStop(0, 'rgba(10,10,12,1)'); g.addColorStop(0.3, 'rgba(25,24,26,.95)'); g.addColorStop(0.55, 'rgba(50,46,44,.5)'); g.addColorStop(1, 'rgba(60,55,50,0)');
+  g.addColorStop(0, 'rgba(12,10,10,1)'); g.addColorStop(0.3, 'rgba(30,27,26,.9)'); g.addColorStop(0.58, 'rgba(45,41,38,.35)'); g.addColorStop(1, 'rgba(50,45,42,0)');
   c.fillStyle = g; c.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(cv);
 })();
 const DECALS = 120;
-const decals = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.13, 0.13),
-  new THREE.MeshBasicMaterial({ map: decalTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), DECALS);
+const decals = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.17, 0.17),
+  new THREE.MeshBasicMaterial({ map: decalTex, transparent: true, depthWrite: false, toneMapped: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), DECALS);
+decalTex.colorSpace = THREE.SRGBColorSpace;
 decals.count = 0; decals.frustumCulled = false; scene.add(decals);
 for (let i = 0; i < DECALS; i++) decals.setColorAt(i, new THREE.Color(1, 1, 1));
 let decalI = 0;
@@ -219,7 +225,7 @@ function updatePuffs(dt) {
 // ---------- 音效：用合成的，不載檔案。第一次點畫面才能出聲 ----------
 
 // ---------- 彈孔顏色：一般彈孔是深色，血跡是暗紅、比較大 ----------
-const _white = new THREE.Color(1, 1, 1), _blood = new THREE.Color('#7a1510');
+const _white = new THREE.Color(1, 1, 1), _blood = new THREE.Color('#8a1a12');
 function addBloodSplat(p, n) { addDecal(p, n, 4.2, _blood); }
 
 // ---------- 火花：命中金屬、頭盔時的亮點，一個 Points 只花一次繪製 ----------
@@ -267,7 +273,7 @@ const SHADOW_YAW = Math.atan2(-SUN_DIR.x, -SUN_DIR.z);
 function updateBlobShadows() {
   let n = 0;
   for (const b of bots) {
-    if (!b.g.visible) continue;
+    if (!b.g.visible || !b.alive) continue;
     const p = b.phys.pos, lit = b.lit === undefined ? 1 : b.lit;
     _q.setFromAxisAngle(_yAxis, SHADOW_YAW);
     _s1.set(0.75, 1, 2.2 * lit + 0.9 * (1 - lit));

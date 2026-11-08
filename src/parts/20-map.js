@@ -90,10 +90,16 @@ function buildNav() {
     }
   }
 }
+// 最近的路點，而且要能直接走過去（貼著牆時，牆另一邊的點不算）
 function nearestNode(x, z) {
-  let best = null, bd = 1e9;
-  for (const n of NAV.nodes) { if (!n.ok || !n.nb.length) continue; const d = (n.x - x) ** 2 + (n.z - z) ** 2; if (d < bd) { bd = d; best = n; } }
-  return best;
+  let best = null, bd = 1e9, fall = null, fd = 1e9;
+  for (const n of NAV.nodes) {
+    if (!n.ok || !n.nb.length) continue;
+    const d = (n.x - x) ** 2 + (n.z - z) ** 2;
+    if (d < fd) { fd = d; fall = n; }
+    if (d < bd && d < 64 && sweepFree(x, z, n.x, n.z, 0.3)) { bd = d; best = n; }
+  }
+  return best || fall;
 }
 // A*：回傳一串 [x,z]，再把走得直通的中間點拉掉
 function findPath(sx, sz, tx, tz) {

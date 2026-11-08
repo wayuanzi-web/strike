@@ -77,13 +77,15 @@ function syncSettingsUI() {
 $('sSens').addEventListener('input', (e) => { S.sens = +e.target.value; saveSettings(); syncSettingsUI(); });
 $('sAds').addEventListener('input', (e) => { S.adsSens = +e.target.value; saveSettings(); syncSettingsUI(); });
 for (const seg of document.querySelectorAll('.seg')) {
-  seg.addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
+  for (const btn of seg.children) onTap(btn, () => pickSeg(seg, btn));
+}
+function pickSeg(seg, b) {
+  {
     const k = seg.dataset.k, cur = S[k];
     S[k] = typeof cur === 'boolean' ? b.dataset.v === '1' : b.dataset.v;
     saveSettings(); syncSettingsUI();
     if (k === 'quality') applySize();
-  });
+  }
 }
 
 // ---------- 雷達：以你為中心、跟著你轉；敵人在你看得到或剛開槍的 1.5 秒內才出現紅點 ----------
@@ -121,6 +123,11 @@ function drawRadar(dt) {
     const kx = d > lim ? rx / d * lim : rx, ky = d > lim ? ry / d * lim : ry;
     rctx.fillStyle = '#ff4a3d'; rctx.beginPath(); rctx.arc(W2 / 2 + kx, W2 / 2 + ky, 5, 0, Math.PI * 2); rctx.fill();
   }
+  // 視野扇形與北方標記
+  rctx.fillStyle = 'rgba(255,179,71,.14)'; rctx.beginPath(); rctx.moveTo(W2 / 2, W2 / 2);
+  rctx.arc(W2 / 2, W2 / 2, W2 / 2 - 2, -Math.PI / 2 - 0.65, -Math.PI / 2 + 0.65); rctx.closePath(); rctx.fill();
+  const nx = W2 / 2 + Math.sin(-th + Math.PI) * (W2 / 2 - 10), ny = W2 / 2 + Math.cos(-th + Math.PI) * (W2 / 2 - 10);
+  rctx.fillStyle = '#f3ece0'; rctx.font = 'bold 15px system-ui, sans-serif'; rctx.textAlign = 'center'; rctx.textBaseline = 'middle'; rctx.fillText('N', nx, ny);
   // 自己：朝上的三角形
   rctx.fillStyle = '#ffb347'; rctx.beginPath(); rctx.moveTo(W2 / 2, W2 / 2 - 8); rctx.lineTo(W2 / 2 - 6, W2 / 2 + 6); rctx.lineTo(W2 / 2 + 6, W2 / 2 + 6); rctx.closePath(); rctx.fill();
 }

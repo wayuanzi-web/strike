@@ -3,26 +3,32 @@ const BOT_NAMES = ['鐵狼', '赤隼', '灰熊', '夜梟'];
 const bots = [];
 // 敵方「赤狼」：沙褐背心、橄欖色褲子、深灰頭盔，頭盔和左臂有鏽橘布條方便遠處辨識（原創配色）
 const BOT_MAT = new THREE.MeshLambertMaterial({ vertexColors: true });
+// 輪廓光：邊緣加一點暖光，遠處和陰影裡也看得出人形
+function patchBotMat(m) {
+  m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
+    'outgoingLight += vec3(1.0, 0.75, 0.5) * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.28;\n#include <opaque_fragment>'); };
+  m.customProgramCacheKey = () => 'botrim'; return m;
+}
 const BOT_FLASH_MAT = new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
 const BOT_MUZZLE = new V3(0.16, 1.37, -0.84);
-const BC = { vest: '#8a7556', plate: '#7b6849', shirt: '#6d6a52', pants: '#4e5240', helmet: '#3e3f3a', skin: '#c08f6a', glove: '#2b2b2b',
+const BC = { vest: '#a08a62', plate: '#8c7852', shirt: '#7a7660', pants: '#5f6448', helmet: '#3e3f3a', skin: '#c08f6a', glove: '#2b2b2b',
   band: '#ff6a2a', boot: '#2a2622', gun: '#1f2226', pack: '#5b5442', goggle: '#16191d', pouch: '#6f5f45', belt: '#2f2b25' };
 function makeBotModel() {
-  const g = new THREE.Group();
+  const g = new THREE.Group(), mat = patchBotMat(BOT_MAT.clone());
   const body = new THREE.Group(); g.add(body);           // 蹲下時整個身體壓扁成蹲姿的高度
   const leg = (x) => {
     const L = new THREE.Group(); L.position.set(x, 0.85, 0); body.add(L);
     L.add(new THREE.Mesh(mergeParts([
       partBox(0.17, 0.44, 0.19, 0, -0.22, 0, BC.pants), partBox(0.15, 0.36, 0.17, 0, -0.62, 0.01, BC.pants),
       partBox(0.16, 0.11, 0.06, 0, -0.44, -0.1, BC.helmet), partBox(0.17, 0.1, 0.28, 0, -0.8, -0.04, BC.boot), partBox(0.18, 0.06, 0.08, 0, -0.08, -0.1, BC.pouch),
-    ]), BOT_MAT));
+    ]), mat));
     return L;
   };
   const legL = leg(-0.11), legR = leg(0.11);
   const parts = [
     partBox(0.42, 0.62, 0.24, 0, 1.18, 0, BC.shirt), partBox(0.45, 0.38, 0.29, 0, 1.24, 0, BC.vest), partBox(0.4, 0.3, 0.02, 0, 1.25, -0.15, BC.plate),
     partBox(0.09, 0.11, 0.05, -0.11, 1.13, -0.17, BC.pouch), partBox(0.09, 0.11, 0.05, 0, 1.13, -0.17, BC.pouch), partBox(0.09, 0.11, 0.05, 0.11, 1.13, -0.17, BC.pouch),
-    partBox(0.43, 0.06, 0.26, 0, 0.9, 0, BC.belt), partBox(0.28, 0.32, 0.12, 0, 1.22, 0.18, BC.pack), partBox(0.04, 0.2, 0.04, 0.09, 1.45, 0.2, BC.gun),
+    partBox(0.43, 0.06, 0.26, 0, 0.9, 0, BC.belt), partBox(0.28, 0.32, 0.12, 0, 1.22, 0.18, BC.pack), partBox(0.012, 0.28, 0.012, 0.09, 1.5, 0.2, '#3d4030'),
     partBox(0.22, 0.24, 0.23, 0, 1.63, 0, BC.skin),                                                    // 頭
     partBox(0.29, 0.13, 0.31, 0, 1.76, 0.01, BC.helmet), partBox(0.31, 0.03, 0.33, 0, 1.7, 0.01, BC.helmet),
     partBox(0.295, 0.035, 0.315, 0, 1.745, 0.01, BC.band),                                              // 頭盔布條
@@ -36,15 +42,16 @@ function makeBotModel() {
     partBox(0.06, 0.09, 0.42, 0.16, 1.37, -0.38, BC.gun), partBox(0.035, 0.035, 0.26, 0.16, 1.39, -0.7, BC.gun), partBox(0.045, 0.16, 0.06, 0.16, 1.26, -0.42, BC.gun, 0.25),
     partBox(0.05, 0.08, 0.2, 0.16, 1.36, -0.08, '#3a342b'),
   ];
-  body.add(new THREE.Mesh(mergeParts(parts), BOT_MAT));
-  const fl = new THREE.Sprite(BOT_FLASH_MAT); fl.position.copy(BOT_MUZZLE); fl.scale.set(0.5, 0.5, 1); fl.visible = false; body.add(fl);
-  return { g, body, legL, legR, fl };
+  const upper = new THREE.Group(); body.add(upper);       // 蹲下時上身整個往下移（不壓扁）
+  upper.add(new THREE.Mesh(mergeParts(parts), mat));
+  const fl = new THREE.Sprite(BOT_FLASH_MAT); fl.position.copy(BOT_MUZZLE); fl.scale.set(0.32, 0.32, 1); fl.visible = false; upper.add(fl);
+  return { g, body, legL, legR, fl, upper, mat };
 }
 
 function makeBot(i) {
   const mdl = makeBotModel(); scene.add(mdl.g);
   const b = {
-    name: BOT_NAMES[i], i, g: mdl.g, bodyGroup: mdl.body, legL: mdl.legL, legR: mdl.legR, fl: mdl.fl, tagT: 0, flinchT: 0, stepT: 0, lit: 1, dealt: 0,
+    name: BOT_NAMES[i], i, g: mdl.g, bodyGroup: mdl.body, legL: mdl.legL, legR: mdl.legR, fl: mdl.fl, upper: mdl.upper, mat: mdl.mat, litS: 1, ck: 0, tagT: 0, flinchT: 0, stepT: 0, lit: 1, dealt: 0,
     phys: { pos: new V3(), vel: new V3(), r: 0.35, h: STAND_H, onGround: true, jumped: false },
     yaw: 0, hp: 100, alive: true, state: 'patrol', path: null, pi: 0, waitT: 0,
     react: 0, settle: 0, lastSeen: new V3(), lostT: 0, visible: false, seeT: Math.random() * 0.1,
@@ -61,7 +68,7 @@ function botSpawn(b, sx, sz) {
   b.deadT = 0; b.crouch = false; b.burst = 0; b.pauseT = 0; b.react = 0;
   b.yaw = Math.atan2(-(0 - sx), -(0 - sz)) + rand(-0.5, 0.5);  // 面向地圖中央
   b.g.visible = true; b.g.rotation.set(0, b.yaw, 0); b.g.position.copy(p);
-  b.bodyGroup.scale.set(1, 1, 1);
+  b.bodyGroup.scale.set(1, 1, 1); b.ck = 0; b.upper.position.y = 0;
   b.lastP.copy(p); b.stuckT = 0;
   hitBoxes(p, b.phys.h, b.boxes);
 }
@@ -72,16 +79,23 @@ function initBots() {
   }
 }
 // 重生點：離玩家夠遠、玩家看不到的地方
+// 某點看不看得到玩家（腳、腰、頭三個高度任一條視線通就算看得到）
+function pointSeesPlayer(x, z, pe) {
+  for (const h of [0.3, 1.0, 1.6]) if (lineClear(pe, _v2.set(x, h, z))) return true;
+  return false;
+}
 function respawnBot(b) {
-  const pe = eyePos(new V3());
+  const pe = eyePos(new V3()), pp = player.body.pos;
   const cands = BOT_SPAWNS.map((s) => ({ x: s[0], z: s[1] }));
-  for (let k = 0; k < 30; k++) { const n = pick(NAV.nodes); if (n.ok && n.nb.length) cands.push({ x: n.x, z: n.z }); }
+  // 只在玩家另一邊的半場找：離玩家 22 公尺以上
+  for (let k = 0; k < 40; k++) { const n = pick(NAV.nodes); if (n.ok && n.nb.length && Math.hypot(n.x - pp.x, n.z - pp.z) > 22) cands.push({ x: n.x, z: n.z }); }
   let best = null, bs = -1e9;
   for (const c of cands) {
-    const d = Math.hypot(c.x - player.body.pos.x, c.z - player.body.pos.z);
-    const seen = lineClear(pe, _v2.set(c.x, 1.5, c.z));
-    const crowd = bots.some((o) => o !== b && o.alive && Math.hypot(o.phys.pos.x - c.x, o.phys.pos.z - c.z) < 2);
-    const score = Math.min(d, 40) - (seen ? 60 : 0) - (crowd ? 30 : 0) + Math.random() * 6;
+    const d = Math.hypot(c.x - pp.x, c.z - pp.z);
+    const seen = player.alive && pointSeesPlayer(c.x, c.z, pe);
+    const behind = player.alive && Math.abs(angDiff(player.yaw, Math.atan2(-(c.x - pp.x), -(c.z - pp.z)))) > 120 * DEG && d < 30;
+    const crowd = bots.some((o) => o !== b && o.alive && Math.hypot(o.phys.pos.x - c.x, o.phys.pos.z - c.z) < 3);
+    const score = Math.min(d, 45) - (seen ? 100 : 0) - (behind ? 40 : 0) - (crowd ? 30 : 0) + Math.random() * 8;
     if (score > bs) { bs = score; best = c; }
   }
   botSpawn(b, best.x, best.z);
@@ -139,7 +153,8 @@ function turnTo(b, yaw, rate, dt) { const d = angDiff(b.yaw, yaw); b.yaw += clam
 
 function botsHearShot(pos) {
   for (const b of bots) {
-    if (!b.alive || b.state === 'combat') continue;
+    if (!b.alive || b.state === 'combat' || b.state === 'cover' || b.state === 'flank') continue;
+    if (b.state === 'search' && b.searchT > 3) continue;     // 已經在找了，不要一直重設
     const d = Math.hypot(pos.x - b.phys.pos.x, pos.z - b.phys.pos.z);
     if (d > 45) continue;
     b.state = 'search'; b.searchT = 9; b.lastSeen.set(pos.x + rand(-3, 3), 0, pos.z + rand(-3, 3));
@@ -151,7 +166,7 @@ function damageBot(b, dmg, part, dir) {
   b.hp -= dmg;
   if (b.hp <= 0) {
     b.alive = false; b.hp = 0; b.deadT = 0; b.respawnT = 4.5; b.fallDir = Math.sign(Math.random() - 0.5);
-    player.kills++; player.deathStreak = 0; W.reserve = Math.min(RIFLE.reserve, W.reserve + 30); if (part === 'head') player.heads++; SHOOT_TOKENS.delete(b);
+    player.kills++; player.deathStreak = 0; W.reserve = Math.min(RIFLE.reserve, W.reserve + 15); if (part === 'head') player.heads++; SHOOT_TOKENS.delete(b);
     hudHit(part === 'head' ? 'kill head' : 'kill'); sfx('kill'); if (part === 'head') sfx('head');
     hudFeed('你', b.name, part === 'head', true);
     return;
@@ -159,11 +174,40 @@ function damageBot(b, dmg, part, dir) {
   hudHit(part === 'head' ? 'head' : 'hit'); sfx(part === 'head' ? 'head' : 'hit');
   // 中彈硬直：準度變差、連發中斷，先打中的人佔優勢
   b.flinchT = part === 'head' ? 0.6 : 0.35; b.tagT = 1.5; b.hitAnim = part === 'head' ? 0.2 : 0.15; b.hitHead = part === 'head'; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
+  // 血少了就找掩體躲一下（每條命最多兩次）
+  if (b.hp < 55 && (b.coverUsed || 0) < 2 && b.state === 'combat' && Math.random() < 0.75) { if (seekCover(b)) return; }
   // 被打到：轉頭面向槍聲，馬上進入交戰（反應時間縮短）
   if (b.state !== 'combat') {
     b.lastSeen.copy(player.body.pos); b.state = 'search'; b.searchT = 8; setPath(b, b.lastSeen.x, b.lastSeen.z);
     b.alertYaw = Math.atan2(-(player.body.pos.x - b.phys.pos.x), -(player.body.pos.z - b.phys.pos.z));
   }
+}
+
+// 找掩體：10 公尺內、玩家看不到、離玩家比較遠的路點
+function seekCover(b) {
+  const pe = eyePos(new V3()), p = b.phys.pos; let best = null, bs = -1e9;
+  for (const n of NAV.nodes) {
+    if (!n.ok || !n.nb.length) continue;
+    const d = Math.hypot(n.x - p.x, n.z - p.z); if (d > 10 || d < 1.5) continue;
+    if (pointSeesPlayer(n.x, n.z, pe)) continue;
+    const dp = Math.hypot(n.x - player.body.pos.x, n.z - player.body.pos.z);
+    const sc = -d * 1.2 + Math.min(dp, 25) * 0.4 + Math.random();
+    if (sc > bs) { bs = sc; best = n; }
+  }
+  if (!best) return false;
+  setPath(b, best.x, best.z); if (!b.path || !b.path.length) return false;
+  b.state = 'cover'; b.coverT = 0; b.coverWait = rand(1.4, 2.6); b.coverUsed = (b.coverUsed || 0) + 1; SHOOT_TOKENS.delete(b);
+  return true;
+}
+// 包抄：另一隻已經在打的時候，從側面繞過去（一次最多一隻）
+function tryFlank(b) {
+  if (bots.some((o) => o !== b && o.alive && o.state === 'flank')) return false;
+  const pp = player.body.pos, p = b.phys.pos, ang = Math.atan2(p.z - pp.z, p.x - pp.x) + pick([-1, 1]) * rand(1.0, 1.4), r = clamp(Math.hypot(p.x - pp.x, p.z - pp.z), 9, 16);
+  const tx = pp.x + Math.cos(ang) * r, tz = pp.z + Math.sin(ang) * r;
+  const n = nearestNode(clamp(tx, -34, 34), clamp(tz, -24, 24)); if (!n) return false;
+  setPath(b, n.x, n.z); if (!b.path || !b.path.length) return false;
+  b.state = 'flank'; b.flankT = 9; SHOOT_TOKENS.delete(b);
+  return true;
 }
 
 const _wish = new V3();
@@ -172,9 +216,9 @@ function updateBot(b, dt) {
   if (!b.alive) {
     b.deadT += dt; b.respawnT -= dt;
     const k = Math.min(1, b.deadT / 0.45);
-    b.g.rotation.set(0, b.yaw, 0); b.g.rotateX(k * k * 1.5 * (b.fallDir > 0 ? 1 : -1) * 0.9 + 0.0); b.g.rotateZ(k * 0.3 * b.fallDir);
-    if (b.deadT > 2.5) b.g.position.y = p.y - (b.deadT - 2.5) * 0.8;
-    if (b.deadT > 3.6) b.g.visible = false;
+    b.g.rotation.set(0, b.yaw, 0); b.g.rotateX(k * k * 1.57 * (b.fallDir > 0 ? 1 : -1)); b.g.rotateZ(k * 0.15 * b.fallDir);
+    b.g.position.set(p.x, p.y + 0.12 * k, p.z);
+    if ((b.deadT > 3.6 && !inPlayerView(b)) || b.deadT > 6) b.g.visible = false;   // 不在你視線內才收掉，不會看到屍體沉進地板
     b.fl.visible = false;
     if (b.respawnT <= 0) respawnBot(b);
     return;
@@ -188,11 +232,13 @@ function updateBot(b, dt) {
     const was = b.visible; b.visible = botCanSee(b);
     if (b.visible) {
       b.lastSeen.copy(player.body.pos); b.lostT = 0;
-      if (b.state !== 'combat') {
+      const hiding = b.state === 'cover' && b.coverT < b.coverWait && b.phys.pos.distanceTo(player.body.pos) > 6;
+      if (b.state !== 'combat' && !hiding) {
         // 剛發現：反應時間；背對你的要多花轉身的時間
         const need = Math.abs(angDiff(b.yaw, Math.atan2(-(player.body.pos.x - b.phys.pos.x), -(player.body.pos.z - b.phys.pos.z))));
         b.react = D.react * rand(0.8, 1.25) * (b.state === 'search' ? 0.85 : 1) + need / Math.PI * 0.45; b.settle = 1;
         b.state = 'combat'; b.strafeT = 0; b.burst = 0; b.pauseT = 0; b.warnLeft = D.warn;
+        b.flankCheck = rand(1.0, 2.0);
       } else if (!was) {
         // 你躲起來再出來：要重新瞄準，躲得久還會再給一次警告射擊
         const hid = b.lostT;
@@ -226,7 +272,12 @@ function updateBot(b, dt) {
     if (!b.visible && b.lostT > 0.3) { b.crouch = false; }
     b.crouchWant = b.crouch && b.visible;
     // 開火
-    if (b.visible && player.alive) {
+    // 一直排不到開火（別人在打）就有機會去包抄
+    if (b.flankCheck !== undefined && (b.flankCheck -= dt) <= 0) {
+      b.flankCheck = undefined;
+      if (!SHOOT_TOKENS.has(b) && SHOOT_TOKENS.size > 0 && dist > 8 && Math.random() < 0.6) tryFlank(b);
+    }
+    if (b.state === 'combat' && b.visible && player.alive) {
       b.react -= dt; b.settle = Math.max(0, b.settle - dt * 0.7);
       if (playerSpeed() > RUN_SPEED * 0.6) b.settle = Math.min(1, b.settle + dt * 0.5);   // 你一直跑，它就一直瞄不穩
       if (b.react <= 0 && wantToken(b, D)) {
@@ -241,6 +292,18 @@ function updateBot(b, dt) {
         }
       }
     } else SHOOT_TOKENS.delete(b);
+  } else if (b.state === 'cover') {
+    // 跑去掩體、蹲著等一下（像在換彈），再探頭找你
+    b.coverT += dt;
+    if (followPath(b, 4.8, _wish)) turnTo(b, Math.atan2(-_wish.x, -_wish.z), 8, dt);
+    else { b.crouchWant = true; turnTo(b, Math.atan2(-(b.lastSeen.x - p.x), -(b.lastSeen.z - p.z)), 5, dt); }
+    if (b.coverT > b.coverWait + 2.5 || (!b.path || b.pi >= b.path.length) && b.coverT > b.coverWait) {
+      b.state = 'search'; b.searchT = 7; setPath(b, b.lastSeen.x, b.lastSeen.z);
+    }
+  } else if (b.state === 'flank') {
+    b.flankT -= dt;
+    if (followPath(b, 4.6, _wish)) turnTo(b, Math.atan2(-_wish.x, -_wish.z), 7, dt);
+    if (!b.path || b.pi >= b.path.length || b.flankT <= 0) { b.state = 'search'; b.searchT = 6; b.lastSeen.copy(player.body.pos); setPath(b, b.lastSeen.x, b.lastSeen.z); }
   } else if (b.state === 'search') {
     b.searchT -= dt;
     if (b.alertYaw !== undefined) { turnTo(b, b.alertYaw, 8, dt); if (Math.abs(angDiff(b.yaw, b.alertYaw)) < 0.1) b.alertYaw = undefined; }
@@ -259,8 +322,11 @@ function updateBot(b, dt) {
     b.stuckT += dt;
     if (b.stuckT > 1.2) {
       if (p.distanceTo(b.lastP) < 0.4) {
-        if (b.state === 'combat') b.strafe = -b.strafe; else if (b.state === 'search') setPath(b, b.lastSeen.x, b.lastSeen.z); else { b.path = null; pickPatrol(b); }
-      }
+        b.stuckN = (b.stuckN || 0) + 1;
+        if (b.state === 'combat') b.strafe = -b.strafe;
+        else if ((b.state === 'search' || b.state === 'flank' || b.state === 'cover') && b.stuckN < 2) setPath(b, b.lastSeen.x, b.lastSeen.z);
+        else { b.state = 'patrol'; b.path = null; b.stuckN = 0; pickPatrol(b); }
+      } else b.stuckN = 0;
       b.stuckT = 0; b.lastP.copy(p);
     }
   }
@@ -292,10 +358,15 @@ function updateBot(b, dt) {
   // 腳步聲（30 公尺內聽得到，有方位）
   if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(player.body.pos) < 30) sfx('step', 0.9, { pos: p, surface: surfaceAt(p) }); } }
   // 槍口火光
-  if (b.flashT > 0) { b.flashT -= dt; b.fl.visible = true; b.fl.material.rotation = Math.random() * 6; } else b.fl.visible = false;
+  if (b.flashT > 0) { b.flashT -= dt; b.fl.visible = true; b.fl.material.rotation = Math.random() * 6; const fs = rand(0.26, 0.38); b.fl.scale.set(fs, fs, 1); } else b.fl.visible = false;
   // 是否在陽光下（影子長短用），每 0.25 秒算一次
-  if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
-  b.bodyGroup.scale.y = lerp(b.bodyGroup.scale.y, b.phys.h / STAND_H, 1 - Math.exp(-15 * dt));
+  if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; b.litC = bakeRay(p.x, p.y + 1.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
+  b.ck = lerp(b.ck, b.phys.crouched ? 1 : 0, 1 - Math.exp(-15 * dt));
+  b.upper.position.y = -0.6 * b.ck;
+  b.legL.position.y = b.legR.position.y = 0.85 - 0.55 * b.ck;
+  b.legL.rotation.x = sw * (1 - b.ck) - 1.2 * b.ck; b.legR.rotation.x = -sw * (1 - b.ck) + 0.9 * b.ck;   // 一腳往前、一腳跪
+  // 受光：在陰影裡就暗一點
+  b.litS = lerp(b.litS, b.litC === undefined ? 1 : b.litC, 1 - Math.exp(-4 * dt)); b.mat.color.setScalar(lerp(0.55, 1, b.litS));
   hitBoxes(p, b.phys.h, b.boxes);
 }
 
@@ -303,11 +374,14 @@ function updateBot(b, dt) {
 function botShoot(b, dist, D) {
   const pp = player.body.pos;
   botEye(b, _be);
+  // 開火前再確認一次看得到（感知 0.1 秒才更新一次，避免你剛躲起來還朝牆打）
+  if (!lineClear(_be, _pt.set(pp.x, pp.y + player.body.h - 0.12, pp.z)) && !lineClear(_be, _pt.set(pp.x, pp.y + player.body.h * 0.62, pp.z))) { b.visible = false; return; }
+  if (player.spawnT > 0) return;       // 你剛重生的保護時間
   _pt.set(pp.x, pp.y + player.body.h * 0.7, pp.z);
   // 警告射擊：剛發現你、或你在它背後畫面外的前 1 秒，子彈從你頭邊飛過
   let forceMiss = false;
   if (b.warnLeft > 0) { b.warnLeft--; forceMiss = true; }
-  if (b.offT > 0 && b.offT < 1.0) forceMiss = true;
+  if (D.mercy && b.offT > 0 && b.offT < 1.0) forceMiss = true;
   if (forceMiss) {
     const side = Math.random() < 0.5 ? -1 : 1, rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), off = rand(0.6, 0.95);
     _pt.x += rx * side * off; _pt.z += rz * side * off; _pt.y = pp.y + player.body.h + rand(0.15, 0.45);
@@ -315,10 +389,12 @@ function botShoot(b, dist, D) {
   _bd.subVectors(_pt, _be).normalize();
   const moving = Math.hypot(b.phys.vel.x, b.phys.vel.z) > 1 ? 1 : 0;
   let errDeg = D.base + dist * D.distK + moving * 1.0 + (playerSpeed() / RUN_SPEED) * D.pMoveK + b.settle * D.settleK + (b.phys.crouched ? -0.2 : 0) + (b.flinchT > 0 ? 3.5 : 0);
-  if (b.offT > 0) errDeg *= 1.6;
-  // 你血少、連死時，機器人手會抖一點（動態難度）
-  const hpK = player.hp < 40 ? 1 + (40 - player.hp) / 40 * 0.5 : 1, streakK = 1 + Math.min(player.deathStreak || 0, 3) * 0.12;
-  errDeg *= hpK * streakK;
+  if (D.mercy && b.offT > 0) errDeg *= 1.6;
+  // 你血少、連死時，機器人手會抖一點（動態難度，困難沒有）
+  if (D.mercy) {
+    const hpK = player.hp < 40 ? 1 + (40 - player.hp) / 40 * 0.5 : 1, streakK = 1 + Math.min(player.deathStreak || 0, 3) * 0.12;
+    errDeg *= hpK * streakK;
+  }
   if (forceMiss) errDeg = Math.min(errDeg, 1.2);
   const yaw = Math.atan2(-_bd.x, -_bd.z) + gauss() * errDeg * 0.5 * DEG;
   const pitch = Math.asin(clamp(_bd.y, -1, 1)) + gauss() * errDeg * 0.5 * DEG;
@@ -329,11 +405,11 @@ function botShoot(b, dist, D) {
   if (h) t = h.t;
   const end = _end.copy(_be).addScaledVector(_bd, t);
   b.g.updateMatrixWorld();
-  const mz = b.g.localToWorld(_v3.copy(BOT_MUZZLE).multiply(_v1.set(1, b.bodyGroup.scale.y, 1)));
+  const mz = b.fl.getWorldPosition(_v3);
   spawnTracer(mz, end, '#ff9a6a', 0.018, true);
   if (h) {
     let dmg = 25 * (h.part === 'head' ? D.headMul : PART_MUL[h.part]) * D.dmg;
-    if (player.hp > 50 && player.hp - dmg <= 0) dmg = player.hp - 1;   // 血量一半以上時不會被一發打死
+    if (D.mercy && player.hp > 50 && player.hp - dmg <= 0) dmg = player.hp - 1;   // 血量一半以上時不會被一發打死（困難沒有）
     damagePlayer(dmg, b, h.part);
   }
   else if (w) addDecal(end, w.n);

@@ -11,15 +11,19 @@ function updateAim(dt) {
   // 準星正中央的射線有沒有打到看得到的敵人（命中框稍微放大一點，手機上比較好觸發）
   const w = rayWorld(_ae, _ad, RIFLE.range); const wallT = w ? w.t : RIFLE.range;
   let on = false;
-  for (const b of bots) { const h = b.alive && rayBody(_ae, _ad, b.boxes, wallT, 0.06); if (h) { on = true; AIM.dist = h.t; break; } }
+  for (const b of bots) {
+    if (!b.alive) continue;
+    const inf = 0.06 + 0.004 * Math.hypot(b.phys.pos.x - _ae.x, b.phys.pos.z - _ae.z);   // 遠的敵人命中框放大多一點
+    const h = rayBody(_ae, _ad, b.boxes, wallT, inf); if (h) { on = true; AIM.dist = h.t; break; }
+  }
   if (on) { AIM.onT += dt; AIM.offT = 0; } else { AIM.offT += dt; AIM.onT = 0; }
-  // 對到 0.06 秒才開火、離開 0.12 秒才停，避免一閃一閃
-  if (on && AIM.onT > 0.06) AIM.onTarget = true; else if (!on && AIM.offT > 0.12) AIM.onTarget = false;
+  // 對到 0.03 秒才開火、離開 0.05 秒就停
+  if (on && AIM.onT > 0.03) AIM.onTarget = true; else if (!on && AIM.offT > 0.05) AIM.onTarget = false;
   // 輔助：準星附近（依距離決定的錐形內）而且看得到的最近敵人
   let best = null, ba = 1e9;
   for (const b of bots) {
     if (!b.alive) continue;
-    const p = b.phys.pos; _ac.set(p.x, p.y + b.phys.h * 0.66, p.z);
+    const p = b.phys.pos; _ac.set(p.x, p.y + b.phys.h * 0.55, p.z);   // 磁吸對準胸口，不是頭
     const dx = _ac.x - _ae.x, dy = _ac.y - _ae.y, dz = _ac.z - _ae.z, dist = Math.hypot(dx, dy, dz);
     if (dist > 90) continue;
     const yawTo = Math.atan2(-dx, -dz), pitchTo = Math.asin(dy / dist);
@@ -46,17 +50,17 @@ function startGame() {
 }
 function pauseGame() {
   if (game.state !== 'play') return;
-  game.state = 'pause'; INPUT.fire = false; INPUT.mx = INPUT.mz = 0; T.joyId = T.lookId = T.fireId = null; $('bFire').classList.remove('down');
+  game.state = 'pause'; resetTouchState();
   syncSettingsUI(); $('pause').hidden = false;
   if (pointerLocked()) document.exitPointerLock();
 }
 function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; game.state = player.alive ? 'play' : 'dead'; if (game.state === 'dead') game.state = 'play'; }
-$('bStart').addEventListener('click', startGame);
-$('bSet1').addEventListener('click', () => { syncSettingsUI(); $('pause').hidden = false; $('bResume').textContent = '好了'; game.fromMenu = true; });
-$('bResume').addEventListener('click', () => { if (game.fromMenu) { game.fromMenu = false; $('pause').hidden = true; $('bResume').textContent = '繼續'; return; } resumeGame(); });
-$('bRespawn').addEventListener('click', () => {
+onTap($('bStart'), startGame);
+onTap($('bSet1'), () => { syncSettingsUI(); $('pause').hidden = false; $('bResume').textContent = '好了'; $('bRespawn').hidden = true; game.fromMenu = true; });
+onTap($('bResume'), () => { if (game.fromMenu) { game.fromMenu = false; $('pause').hidden = true; $('bResume').textContent = '繼續'; $('bRespawn').hidden = false; return; } resumeGame(); });
+onTap($('bRespawn'), () => {
   if (game.fromMenu) return;
-  $('pause').hidden = true; $('dead').hidden = true; for (const b of bots) respawnBot(b); spawnPlayer(); game.state = 'play';
+  $('pause').hidden = true; $('dead').hidden = true; for (const b of bots) respawnBot(b); resetTouchState(); spawnPlayer(); game.state = 'play';
 });
 $('bPause').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); pauseGame(); });
 
@@ -66,11 +70,11 @@ function applySize() {
   const pr = Math.min(window.devicePixelRatio || 1, QUALITY[S.quality] || 1.5);
   renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix(); vmCam.aspect = w / h; vmCam.updateProjectionMatrix();
-  document.documentElement.style.setProperty('--u', (Math.min(h, w * 0.6) / 100).toFixed(2) + 'px');
+  document.documentElement.style.setProperty('--u', (Math.min(h, w * 0.6, 560) / 100).toFixed(2) + 'px');   // 平板上不要放太大
   const portrait = h > w * 1.05;
   $('rotate').hidden = !(portrait && isTouch);
   if (portrait && isTouch && game.state === 'play') pauseGame();
-  if (!T.joyId) setJoyIdle();
+  if (T.joyId === null) setJoyIdle();
 }
 window.addEventListener('resize', applySize);
 window.addEventListener('orientationchange', () => setTimeout(applySize, 200));
@@ -106,12 +110,13 @@ function step(dt) {
   const adsScale = lerp(1, S.adsSens * (ADS_FOV / BASE_FOV) * 1.6, player.adsT);
   updateAim(dt);
   const assist = S.aimAssist && INPUT.mode === 'touch' && AIM.bot && player.alive;
-  const friction = assist && AIM.near ? 0.55 : 1;
+  const friction = assist && AIM.near ? 0.65 : 1;
+  if (INPUT.fingerMoveT > 0) INPUT.fingerMoveT -= dt;
   ldx *= adsScale * friction; ldy *= adsScale * friction;
   if (player.alive) {
     player.yaw -= ldx * DEG; player.pitch = clamp(player.pitch - ldy * DEG, -85 * DEG, 85 * DEG);
     // 磁吸：手指在轉視角、在移動或在開火時，才把準星慢慢帶向敵人（不碰螢幕不會自己瞄）
-    const active = INPUT.looking || Math.hypot(INPUT.mx, INPUT.mz) > 0.1 || INPUT.fire;
+    const active = INPUT.fingerMoveT > 0 || Math.hypot(INPUT.mx, INPUT.mz) > 0.1 || INPUT.fire;
     if (assist && active) {
       const rate = (Math.hypot(INPUT.mx, INPUT.mz) > 0.1 ? 14 : 8) * DEG * dt;
       player.yaw += clamp(AIM.yawErr, -rate, rate); player.pitch += clamp(AIM.pitchErr, -rate * 0.6, rate * 0.6);
@@ -126,11 +131,13 @@ function step(dt) {
   // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
   camera.position.set(p.x, p.y + player.eye, p.z);
-  camera.rotation.set(player.pitch + (W.rp * VIEW_TRACK + W.vp + player.punchP) * DEG + (player.alive ? 0 : -0.5),
-    player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? 0 : 0.35);
+  camera.rotation.set(player.pitch + (W.rp * VIEW_TRACK + W.vp + player.punchP) * DEG + (player.alive ? 0 : -0.12),
+    player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? 0 : 0.25);
   camera.fov = lerp(BASE_FOV, ADS_FOV, player.adsT); camera.updateProjectionMatrix();
   updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt);
   if (!player.alive) {
+    const kb = bots.find((b) => b.name === player.killer);
+    if (kb) { const ty = Math.atan2(-(kb.phys.pos.x - p.x), -(kb.phys.pos.z - p.z)); player.yaw += angDiff(player.yaw, ty) * (1 - Math.exp(-3 * dt)); player.pitch *= 1 - Math.min(1, 3 * dt); }
     player.respawnT -= dt;
     $('deadT').textContent = Math.max(0, player.respawnT).toFixed(1) + ' 秒後重生';
     if (player.respawnT <= 0) { $('dead').hidden = true; spawnPlayer(); }
