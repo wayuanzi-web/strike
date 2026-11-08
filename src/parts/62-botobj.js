@@ -310,7 +310,7 @@ function botBuy(b, mode) {
   }
   if (hasTrait(b, 'support') && mode === 'full') { armor(); nades(true); if (m() >= 500 && !b.nades.molotov) { pay(500); b.nades.molotov = 1; } }
   else { armor(); if (mode !== 'half') nades(false); else if (m() >= 200) { pay(200); b.nades.flash++; } }
-  if (mode === 'full' && !b.nades.molotov && m() >= 1500 && Math.random() < (role === 'def' ? 0.5 : 0.3)) { pay(500); b.nades.molotov = 1; }
+  if (mode === 'full' && !b.nades.molotov && m() >= 1500 && Math.random() < (role === 'def' ? 0.25 : 0.45)) { pay(500); b.nades.molotov = 1; }
   if (role === 'def' && !b.kit && m() >= 400 && (mode === 'full' || Math.random() < 0.3)) { pay(400); b.kit = true; }
 }
 
