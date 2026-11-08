@@ -157,7 +157,7 @@ function orderGoal(b) {
 function objectiveGoal(b) {
   const atk = b.team === ROUND.atk, P = ROUND.plan || { site: 'A', exec: true }, defSp = TEAM_SPAWN.def[0];
   const og = orderGoal(b); if (og) return og;
-  if (!isCarrier(b) && BOMB.state !== 'planted') { const dg = dropGoalFor(b); if (dg) return dg; }   // 沒槍：先去撿地上的
+  if (!game.tune.noDrops && !isCarrier(b) && BOMB.state !== 'planted') { const dg = dropGoalFor(b); if (dg) return dg; }   // 沒槍：先去撿地上的
   if (BOMB.state === 'planted') {
     if (atk) {
       if (!b.guard || b.guardFor !== ROUND.num) { b.guard = guardSpot(b); b.guardFor = ROUND.num; }
@@ -303,14 +303,14 @@ function botBuy(b, mode) {
     if (mode === 'full' && sniperOk && m() >= 5750 && (hasTrait(b, 'sniper') || (m() >= 7000 && Math.random() < 0.15))) { pay(4750); b.primary = WEAPONS.sniper; }
     else if ((mode === 'full' && m() >= 2900) || (mode === 'force' && m() >= 2900 + 650)) {
       // 守方六成拿卡賓槍（便宜一點、比較準），攻方拿步槍
-      const w = role === 'def' && Math.random() < 0.6 ? WEAPONS.carbine : WEAPONS.rifle; pay(w.price); b.primary = w;
+      const w = role === 'def' && !game.tune.noCarbine && Math.random() < 0.6 ? WEAPONS.carbine : WEAPONS.rifle; pay(w.price); b.primary = w;
     }
     else if (m() >= 1250) { const w = hasTrait(b, 'entry') || Math.random() < 0.3 ? WEAPONS.shotgun : WEAPONS.smg; if (m() >= w.price) { pay(w.price); b.primary = w; } }
     else if (mode === 'half' && !b.secondary && m() >= 700 && Math.random() < 0.6) { pay(700); b.secondary = WEAPONS.deagle; }
   }
   if (hasTrait(b, 'support') && mode === 'full') { armor(); nades(true); if (m() >= 500 && !b.nades.molotov) { pay(500); b.nades.molotov = 1; } }
   else { armor(); if (mode !== 'half') nades(false); else if (m() >= 200) { pay(200); b.nades.flash++; } }
-  if (mode === 'full' && !b.nades.molotov && m() >= 1500 && Math.random() < (role === 'def' ? 0.25 : 0.45)) { pay(500); b.nades.molotov = 1; }
+  if (!game.tune.noMolotov && mode === 'full' && !b.nades.molotov && m() >= 1500 && Math.random() < (role === 'def' ? 0.25 : 0.45)) { pay(500); b.nades.molotov = 1; }
   if (role === 'def' && !b.kit && m() >= 400 && (mode === 'full' || Math.random() < 0.3)) { pay(400); b.kit = true; }
 }
 

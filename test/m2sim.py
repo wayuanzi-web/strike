@@ -7,8 +7,9 @@ from harness import open_game, OUT
 PROBE = """(cfg) => {
   const s = window.__strike, R = s.ROUND;
   if (!window.M) {
-    window.M = { nades: { he: 0, flash: 0, smoke: 0 }, buys: {}, kills: {}, stuck: 0, maxLive: 0, money: [] };
+    window.M = { nades: { he: 0, flash: 0, smoke: 0, molotov: 0 }, buys: {}, kills: {}, stuck: 0, maxLive: 0, money: [] };
     const orig = s.throwNade; 
+    if (cfg.tune) Object.assign(s.game.tune, cfg.tune);
     if (cfg.map) s.switchMap(cfg.map);
     s.startGame('match');
     if (cfg.ghost) { const x = s.bots[4]; x.active = false; x.alive = false; x.g.visible = false; }   // 你不在場時，敵方也少一人（4 對 4）
@@ -28,13 +29,14 @@ PROBE = """(cfg) => {
 }"""
 
 MAPID = ''
+TUNE = {}
 async def match(p, ghost):
     browser, page, errors = await open_game(p)
     await page.evaluate("() => { window.__strike.game.manual = true; }")
     feed = []
     r = None
     for _ in range(240):
-        r = await page.evaluate(PROBE, {'secs': 15, 'ghost': ghost, 'map': MAPID})
+        r = await page.evaluate(PROBE, {'secs': 15, 'ghost': ghost, 'map': MAPID, 'tune': TUNE})
         if r['state'] == 'over': break
     await browser.close()
     return r, errors
@@ -42,7 +44,8 @@ async def match(p, ghost):
 async def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     mode = sys.argv[2] if len(sys.argv) > 2 else 'ghost'
-    global MAPID; MAPID = sys.argv[3] if len(sys.argv) > 3 else ''
+    global MAPID, TUNE; MAPID = sys.argv[3] if len(sys.argv) > 3 else ''
+    TUNE = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
     async with async_playwright() as p:
         tot = {'atk': 0, 'def': 0, 'kinds': {}, 'plants': 0}
         for i in range(n):

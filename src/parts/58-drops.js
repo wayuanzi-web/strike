@@ -12,6 +12,7 @@ function dropGeo(def) {
   return (_dropGeo[def.id] = g);
 }
 function spawnDrop(def, ammo, reserve, x, y, z) {
+  if (game.tune.noDrops) return null;   // 平衡實驗用
   if (!def || def === WEAPONS.pistol) return null;     // 基本手槍不掉（地上太亂）
   while (DROPS.length >= 14) removeDrop(DROPS[0]);
   // 掉在高處就放到最近的地面路點（機器人才拿得到）；不要卡進牆

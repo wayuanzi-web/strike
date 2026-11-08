@@ -1,5 +1,5 @@
 /* ===== 90-main：遊戲狀態、瞄準輔助與自動開火、主迴圈、螢幕大小與方向 ===== */
-const game = { autoPR: isTouch ? 1.25 : 1.5, slowN: 0, state: 'menu', t: 0, fps: 60, fpsAcc: 0, fpsN: 0, menuT: 0, mode: 'practice', spec: 0 };
+const game = { autoPR: isTouch ? 1.25 : 1.5, slowN: 0, state: 'menu', t: 0, fps: 60, fpsAcc: 0, fpsN: 0, menuT: 0, mode: 'practice', spec: 0, tune: {} };
 const AIM = { onTarget: false, onT: 0, offT: 0, bot: null, yawErr: 0, pitchErr: 0, near: false };
 
 // ---------- 瞄準輔助、自動開火 ----------
