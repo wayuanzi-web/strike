@@ -231,7 +231,11 @@ function followPath(b, speed, out) {
     const f = fireAt(p.x, p.z, p.y, 0.4);
     if (f) { const ax = p.x - f.x, az = p.z - f.z, ad = Math.hypot(ax, az) || 1; out.set(ax / ad * speed, 0, az / ad * speed); return true; }
     const ax = tgt[0] - p.x, az = tgt[1] - p.z, ad = Math.hypot(ax, az) || 1, k = Math.min(ad, 1.6) / ad;   // 往前看 1.6 公尺
-    if (fireAt(p.x + ax * k, p.z + az * k, p.y, 0.5) || (ad < 3 && fireAt(tgt[0], tgt[1], tgt[2] || 0, 0.5))) { b.fireWait = game.t; return true; }
+    if (fireAt(p.x + ax * k, p.z + az * k, p.y, 0.5) || (ad < 3 && fireAt(tgt[0], tgt[1], tgt[2] || 0, 0.5))) {
+      // 先試著繞路（每秒最多一次）；繞不過去才停下來等火熄
+      if (game.t - (b.fireRepath || -9) > 1) { b.fireRepath = game.t; const e = b.path[b.path.length - 1]; const np = findPath(p.x, p.z, e[0], e[1], p.y, e[2]); if (np && np.length && !fireOnLine(p.x, p.z, np[0][0], np[0][1], p.y)) { b.path = np; b.pi = 0; return true; } }
+      b.fireWait = game.t; return true;
+    }
   }
   const dx = tgt[0] - p.x, dz = tgt[1] - p.z, d = Math.hypot(dx, dz);
   if (d < 0.5) { b.pi++; return b.pi < b.path.length; }

@@ -17,7 +17,7 @@ const STD_SPAWN = {
 const MAPS = {
   // ---------- 1. 曙光倉區：破曉的貨櫃倉庫區 ----------
   dawn: {
-    id: 'dawn', name: '曙光倉區', sub: '破曉・倉庫與貨櫃場', floor: 'floor', defEdge: 1.25,
+    id: 'dawn', name: '曙光倉區', sub: '破曉・倉庫與貨櫃場', floor: 'floor',
     theme: { sun: [0.82, 0.22, 0.28], sunColor: '#ffc792', sunI: 2.5, hemi: ['#c4d0ea', '#8a6e56', 1.45], fog: ['#d9c2b0', 45, 190], exposure: 1.0,
       sky: { zen: '#3f6fa6', mid: '#a9bad6', hor: '#ffc79a', low: '#6b6168', warm: '#ffdba8' }, skyline: 'industrial', skyTop: '#a7a2ad', skyBot: '#6b6772', amb: 'harbor' },
     build() {
@@ -363,7 +363,8 @@ function findPath(sx, sz, tx, tz, sy = 0, ty) {
     const cn = NAV.nodes[cur];
     for (const nb of cn.nb) {
       if (closed.has(nb)) continue;
-      const m = NAV.nodes[nb], ng = g.get(cur) + Math.hypot(m.x - cn.x, m.z - cn.z) + Math.abs(m.y - cn.y) * 1.5;
+      const m = NAV.nodes[nb], burn = typeof FIRES !== 'undefined' && FIRES.length && nb !== t.id && fireAt(m.x, m.z, m.y, 0.8) ? 80 : 0;   // 燃燒彈：繞過火
+      const ng = g.get(cur) + Math.hypot(m.x - cn.x, m.z - cn.z) + Math.abs(m.y - cn.y) * 1.5 + burn;
       if (ng < (g.has(nb) ? g.get(nb) : 1e9)) {
         came.set(nb, cur); g.set(nb, ng); f.set(nb, ng + Math.hypot(m.x - t.x, m.z - t.z));
         if (!open.includes(nb)) open.push(nb);
@@ -379,10 +380,17 @@ function smoothPath(sx, sz, pts, sy = 0) {
   while (i < pts.length) {
     // 只在同一層裡拉直；要換層（樓梯）的地方保留路點
     let j = pts.length - 1;
-    while (j > i && !(sameLevelRun(pts, i, j, ay) && sweepFree(ax, az, pts[j][0], pts[j][1], 0.42, ay))) j--;
+    while (j > i && !(sameLevelRun(pts, i, j, ay) && sweepFree(ax, az, pts[j][0], pts[j][1], 0.42, ay) && !fireOnLine(ax, az, pts[j][0], pts[j][1], ay))) j--;
     out.push(pts[j]); ax = pts[j][0]; az = pts[j][1]; ay = pts[j][2] || 0; i = j + 1;
   }
   return out;
+}
+// 這段直線會不會穿過火（拉直路線時不要抄近路穿火）
+function fireOnLine(ax, az, bx, bz, y) {
+  if (typeof FIRES === 'undefined' || !FIRES.length) return false;
+  const d = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(d / 1));
+  for (let i = 1; i < n; i++) { const t = i / n; if (fireAt(ax + (bx - ax) * t, az + (bz - az) * t, y, 0.6)) return true; }
+  return false;
 }
 function sameLevelRun(pts, i, j, y) { for (let k = i; k <= j; k++) if (Math.abs((pts[k][2] || 0) - y) > 0.05) return false; return true; }
 
