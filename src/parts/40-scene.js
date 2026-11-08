@@ -12,15 +12,31 @@ const camera = new THREE.PerspectiveCamera(BASE_FOV, 16 / 9, 0.08, 600);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
-// 破曉的冷暖對比：環境光偏冷藍、太陽低而暖
-scene.add(new THREE.HemisphereLight('#c4d0ea', '#8a6e56', 1.45));
-const sunLight = new THREE.DirectionalLight('#ffc792', 2.5);
-sunLight.position.copy(SUN_DIR).multiplyScalar(50);
-scene.add(sunLight);
+// 燈光、霧、天空、遠景都跟著地圖的主題（破曉冷暖對比、正午白光、黃昏橘紫）
+const hemiLight = new THREE.HemisphereLight('#c4d0ea', '#8a6e56', 1.45); scene.add(hemiLight);
+const sunLight = new THREE.DirectionalLight('#ffc792', 2.5); scene.add(sunLight);
 const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-const mapMeshes = buildMapMeshes(MAX_ANISO); for (const m of mapMeshes) scene.add(m);
-const skyline = buildSkyline(); scene.add(skyline);
-const sky = buildSky(); scene.add(sky);
+const mapMeshes = [];
+let skyline = null, sky = null;
+function applyTheme() {
+  const t = MAP.theme;
+  SUN_DIR.fromArray(t.sun).normalize();
+  sunLight.color.set(t.sunColor); sunLight.intensity = t.sunI; sunLight.position.copy(SUN_DIR).multiplyScalar(50);
+  hemiLight.color.set(t.hemi[0]); hemiLight.groundColor.set(t.hemi[1]); hemiLight.intensity = t.hemi[2];
+  scene.fog.color.set(t.fog[0]); scene.fog.near = t.fog[1]; scene.fog.far = t.fog[2];
+  renderer.toneMappingExposure = t.exposure;
+  for (const o of [skyline, sky]) if (o) { scene.remove(o); o.traverse((m) => { if (m.geometry) m.geometry.dispose(); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
+  skyline = buildSkyline(t.skyline, t.skyTop, t.skyBot); skyline.visible = S.quality !== 'eco'; scene.add(skyline);
+  sky = buildSky(t.sky); scene.add(sky);
+}
+// 重建地圖網格（換地圖時）：舊的丟掉、新的加進場景
+function rebuildMapMeshes() {
+  for (const m of mapMeshes) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  mapMeshes.length = 0;
+  rebuildDecor();
+  for (const m of buildMapMeshes(MAX_ANISO)) { mapMeshes.push(m); scene.add(m); }
+}
+rebuildMapMeshes(); applyTheme();
 
 // ---------- 手上的槍：另一個場景、固定視野，最後疊上去畫，不會插進牆裡 ----------
 const vmScene = new THREE.Scene();
@@ -493,10 +509,55 @@ function sfx(kind, vol = 1, o = {}) {
     noise(0.035, 350 * r, 1.2, 0.35 * v, 'lowpass', 0, pan); noise(0.018, 1800 * r, 1.5, 0.12 * v, 'bandpass', 0.008, pan);
     if (surf === 'container' || surf === 'metal') noise(0.08, 2400 * r, 9, 0.12 * v, 'bandpass', 0.004, pan);
     else if (surf === 'wood') noise(0.05, 700 * r, 5, 0.18 * v, 'bandpass', 0.004, pan);
+    else if (surf === 'gravel') { noise(0.07, 3200 * r, 1.2, 0.16 * v, 'highpass', 0.004, pan); noise(0.05, 1400 * r, 1.5, 0.1 * v, 'bandpass', 0.02, pan); }
+    else if (surf === 'cobble') noise(0.03, 2600 * r, 3, 0.12 * v, 'bandpass', 0.003, pan);
   }
   else if (kind === 'land') { noise(0.1, 420, 1, 0.45 * vol); noise(0.03, 1600, 2, 0.15 * vol, 'bandpass', 0.01); }
   else if (kind === 'ping') noise(0.05, 4500, 6, 0.25 * vol, 'bandpass');
   else if (kind === 'win') { tone(523, 0.18, 0.12, 'triangle'); tone(659, 0.18, 0.12, 'triangle', 0.14); tone(784, 0.35, 0.14, 'triangle', 0.28); }
   else if (kind === 'lose') { tone(392, 0.25, 0.12, 'triangle'); tone(311, 0.45, 0.12, 'triangle', 0.2); }
   else if (kind === 'go') { tone(880, 0.08, 0.1, 'square'); tone(1320, 0.12, 0.1, 'square', 0.09); }
+}
+
+// ---------- 地圖環境音：底層的風聲（循環噪音＋慢慢起伏）＋不定時的事件聲（海鷗、鳥、鐘、火車鳴笛） ----------
+const AMB = { node: null, gain: null, lfoT: 0, nextT: 3, kind: '' };
+function ambStart() {
+  if (!AC || AMB.node) return;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 0.4;
+  const g = AC.createGain(); g.gain.value = 0;
+  src.connect(f); f.connect(g); g.connect(master); src.start();
+  AMB.node = src; AMB.gain = g; AMB.filter = f;
+}
+function updateAmbience(dt) {
+  if (!AC) return;
+  if (!AMB.node) ambStart();
+  const on = S.sound && !document.hidden;
+  AMB.lfoT += dt;
+  const k = MAP.theme.amb, base = k === 'rail' ? 0.05 : k === 'town' ? 0.025 : 0.04;
+  const target = on ? base * (0.7 + 0.3 * Math.sin(AMB.lfoT * 0.35) + 0.15 * Math.sin(AMB.lfoT * 1.3)) : 0;
+  AMB.gain.gain.value += (target - AMB.gain.gain.value) * Math.min(1, dt * 2);
+  AMB.filter.frequency.value = k === 'town' ? 700 : k === 'rail' ? 320 : 450;
+  if (!on || (AMB.nextT -= dt) > 0) return;
+  AMB.nextT = rand(6, 16);
+  const pan = rand(-0.7, 0.7), r = Math.random();
+  if (k === 'harbor') {
+    if (r < 0.7) { for (let i = 0; i < 2; i++) tonePan(rand(1500, 1900), 0.18, 0.025, 'triangle', i * 0.22, rand(1100, 1300), pan); }   // 海鷗
+    else { tonePan(110, 2.2, 0.04, 'sawtooth', 0, 108, pan, 500); tonePan(138, 2.2, 0.03, 'sawtooth', 0, 136, pan, 500); }               // 遠處船笛
+  } else if (k === 'town') {
+    if (r < 0.75) { const n = 3 + (Math.random() * 4 | 0); for (let i = 0; i < n; i++) tonePan(rand(3000, 4200), 0.06, 0.018, 'sine', i * 0.09, rand(2600, 4600), pan); }   // 鳥
+    else { for (const [f, v] of [[523, 0.04], [1046, 0.015], [1570, 0.01]]) tonePan(f, 2.6, v, 'sine', 0, f * 0.995, pan); }              // 鐘
+  } else {
+    if (r < 0.55) { tonePan(311, 1.6, 0.035, 'sawtooth', 0, 305, pan, 900); tonePan(392, 1.6, 0.03, 'sawtooth', 0, 385, pan, 900); }     // 火車鳴笛
+    else noise(0.25, 2400, 7, 0.05, 'bandpass', 0, pan);                                                                               // 金屬碰撞
+  }
+}
+function tonePan(freq, dur, vol, type, at, slide, pan, lp) {
+  const t = AC.currentTime + at, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(0.15, dur * 0.2)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let node = o; if (lp) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); node = f; }
+  node.connect(g);
+  if (AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(master); } else g.connect(master);
+  o.start(t); o.stop(t + dur + 0.05);
 }

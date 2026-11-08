@@ -76,7 +76,7 @@ function objectiveGoal(b) {
   const call = ROUND.defCall;
   if (call && game.t - call.t < 25 && call.site !== b.post && b.rotN !== ROUND.callN) {
     b.rotN = ROUND.callN;
-    if (Math.random() < 0.7) { b.post = call.site; b.holdIdx = 3 + (b.i % 2); }
+    if (Math.random() < 0.85) { b.post = call.site; b.holdIdx = 3 + (b.i % 2); }
   }
   const S = SITES[b.post || 'A'], h = S.holds[(b.holdIdx || 0) % S.holds.length];
   return { tag: 'post' + (b.post || 'A') + (b.holdIdx || 0), x: h[0], z: h[1], kind: 'hold', yaw: yawTo(h[0], h[1], h[2], h[3]) };

@@ -223,6 +223,10 @@ body.match #dead { background: none; }
 .bi span { color: var(--mute); font-size: max(10px, calc(var(--u) * 2.3)); } .bi em { font-style: normal; font-family: var(--f-num); font-weight: 700; font-size: max(13px, calc(var(--u) * 3.4)); color: #9fe8a8; }
 .bi:disabled { opacity: .45; } .bi:disabled em { color: var(--hurt); } .bi.own { opacity: .7; border-color: #9fe8a8; } .bi.own em { color: #9fe8a8; }
 .bi:not(:disabled):active { background: rgba(159,232,168,.25); }
+.maps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 1.6); }
+.maps button { text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); min-height: 44px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid var(--line); touch-action: manipulation; }
+.maps b { font-size: max(13px, calc(var(--u) * 3.4)); } .maps small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); }
+.maps button[aria-checked="true"] { border-color: var(--dawn); background: rgba(255,179,71,.16); } .maps button[aria-checked="true"] b { color: var(--dawn-lt); }
 #boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); font-size: 15px; background: var(--ink); }
 </style>
 <div id="app">
@@ -266,7 +270,7 @@ body.match #dead { background: none; }
 
   <div id="menu" class="ov" hidden>
     <div class="card">
-      <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>「曙光倉區」炸彈模式：攻方裝炸彈、守方拆彈，回合之間用賺來的錢買槍。</p></div>
+      <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>炸彈模式：攻方裝炸彈、守方拆彈，回合之間用賺來的錢買槍。</p></div>
       <ul class="help help-t">
         <li><b>左半邊</b>按住拖：移動，推到底是跑</li>
         <li><b>右半邊</b>拖曳：轉視角</li>
@@ -280,6 +284,7 @@ body.match #dead { background: none; }
         <li><b>C／Ctrl</b>蹲　<b>R</b>換彈　<b>Esc</b>暫停</li>
         <li><b>1／2／Q</b>換槍　<b>G</b>投擲物　<b>B</b>購買　<b>E</b>按住裝彈／拆彈</li>
       </ul>
+      <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bSet1">設定</button></div>
       <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>
     </div>
@@ -295,10 +300,10 @@ body.match #dead { background: none; }
         <div class="opt"><span>準星跟著後座</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
-        <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
+        <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>顯示幀數</span><div class="seg" data-k="showFps"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質切到或切出「省電」要重新整理才完全生效（抗鋸齒）。</p>
+        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質「自動」會依手機速度調解析度，太卡就自動降；「省電」最低解析度、不開抗鋸齒、不畫遠景（切到或切出省電要重新整理才完全生效）。</p>
       </div>
     </div>
   </div>

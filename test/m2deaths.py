@@ -1,10 +1,11 @@
-import asyncio, collections
+import asyncio, collections, sys
 from playwright.async_api import async_playwright
 from harness import open_game
 async def main():
     async with async_playwright() as p:
         b, page, errors = await open_game(p)
-        await page.evaluate("() => { const s = window.__strike; s.game.manual = true; s.startGame('match'); window.D = []; }")
+        await page.evaluate(f"() => {{ window.MAPID = '{sys.argv[1] if len(sys.argv)>1 else ''}'; }}")
+        await page.evaluate("() => { const s = window.__strike; s.game.manual = true; if (window.MAPID) s.switchMap(window.MAPID); s.startGame('match'); window.D = []; }")
         for _ in range(60):
             r = await page.evaluate("""() => { const s = window.__strike, R = s.ROUND;
               for (let i = 0; i < 900; i++) { if (s.game.state === 'over') break;
@@ -24,5 +25,9 @@ async def main():
     for k, v in by.most_common(20): print(v, k)
     print('dist', collections.Counter((d['side'], min(d['kd'] // 10 * 10, 60)) for d in D))
     print('pre-exec deaths', collections.Counter(d['side'] for d in D if not d['exec'] and not d['planted']))
-    for d in D[:40]: print(d)
+    import collections as C
+    print('pre-exec atk deaths by area', C.Counter((d['x']//8*8, d['z']//8*8) for d in D if d['side']=='atk' and not d['exec']).most_common(8))
+    print('atk deaths after exec', C.Counter((d['x']//6*6, d['z']//6*6) for d in D if d['side']=='atk' and d['exec']).most_common(10))
+    print('def deaths after exec', C.Counter((d['x']//6*6, d['z']//6*6) for d in D if d['side']=='def' and d['exec']).most_common(10))
+    print('def deaths pre-exec', C.Counter((d['x']//8*8, d['z']//8*8) for d in D if d['side']=='def' and not d['exec']).most_common(8))
 asyncio.run(main())

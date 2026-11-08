@@ -1,15 +1,12 @@
 /* ===== 66-bomb：炸彈模式——兩個包點，攻方帶炸彈去裝（按住 3.2 秒），裝好 40 秒後爆炸；守方按住拆（10 秒，有拆彈器 5 秒）
    帶炸彈的人陣亡，炸彈掉在地上，攻方的人走過去就撿起來。 */
-const SITES = {
-  A: { id: 'A', x0: 14, x1: 27.5, z0: 16.5, z1: 25.8, cx: 21, cz: 20.5,
-    stage: [1, 19], plants: [[20.8, 20.3], [24.6, 22.8], [17.8, 21.6]],
-    holds: [[24.6, 23.2, 10, 20], [27.2, 16.6, 22, 6], [18.2, 24.6, 10, 20], [22.4, 12.2, 16, 4], [25.2, 20.4, 10, 20]],
-    entries: [[10, 20], [22, 6]], smokes: [[28.8, 13.5], [22, 11.5]], post: [[12, 22], [16, 17.5], [21, 18], [24, 21]] },
-  B: { id: 'B', x0: 11, x1: 27, z0: -19, z1: -14.2, cx: 19, cz: -16.6,
-    stage: [-2, -18.5], plants: [[18.6, -17.6], [23.6, -17.4], [13, -17]],
-    holds: [[23.4, -15.2, 6, -16.5], [25.6, -18, 6, -16.5], [16.2, -16.4, 6, -16.5], [18.4, -11, 16, -6], [27.5, -12.5, 16, -6]],
-    entries: [[6, -16.5], [16, -6]], smokes: [[26.5, -11.5], [17, -10.2]], post: [[12, -15.5], [17, -18], [22, -18.2], [20, -14.8]] },
-};
+const SITES = {};
+// 從地圖資料載入包點（換地圖時呼叫）
+function loadSites() {
+  for (const k of Object.keys(SITES)) delete SITES[k];
+  for (const [k, v] of Object.entries(MAP.sites)) SITES[k] = Object.assign({ id: k }, v);
+}
+loadSites();
 function siteAt(x, y, z) {
   for (const k in SITES) { const s = SITES[k]; if (y < 0.6 && x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return k; }
   return null;
@@ -130,7 +127,10 @@ function useProgress() {
 }
 
 // ---------- 地上的包點標示：黃色外框＋大字 ----------
-(function siteMarks() {
+let siteMarkMeshes = [];
+function buildSiteMarks() {
+  for (const m of siteMarkMeshes) { scene.remove(m); m.geometry.dispose(); if (m.material.map) m.material.map.dispose(); m.material.dispose(); }
+  siteMarkMeshes = [];
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const c = cv.getContext('2d');
   c.font = '900 110px "Saira Condensed","Arial Narrow",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
   c.fillStyle = 'rgba(255,196,60,.85)'; c.fillText('A', 64, 68); c.fillText('B', 192, 68);
@@ -141,9 +141,10 @@ function useProgress() {
     const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, u0 + (u1 - u0) * uv.getX(i));
     geos.push(g);
   };
-  quad(SITES.A.cx - 1.5, SITES.A.cz - 1.5, 3.2, 3.2, 0, 0.5); quad(SITES.B.cx - 3.2, SITES.B.cz + 0.6, 3.2, 3.2, 0.5, 1);
+  const mk = (s) => s.mark || [s.cx, s.cz];
+  quad(mk(SITES.A)[0], mk(SITES.A)[1], 3.2, 3.2, 0, 0.5); quad(mk(SITES.B)[0], mk(SITES.B)[1], 3.2, 3.2, 0.5, 1);
   const letters = new THREE.Mesh(BufferGeometryUtils_merge(geos), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
-  scene.add(letters);
+  scene.add(letters); siteMarkMeshes.push(letters);
   // 外框：細長條
   const lines = [], col = '#e8b23a';
   for (const s of Object.values(SITES)) {
@@ -151,8 +152,9 @@ function useProgress() {
     lines.push(partBox(s.x1 - s.x0, 0.01, t, (s.x0 + s.x1) / 2, 0.012, s.z0, col), partBox(s.x1 - s.x0, 0.01, t, (s.x0 + s.x1) / 2, 0.012, s.z1, col),
       partBox(t, 0.01, s.z1 - s.z0, s.x0, 0.012, (s.z0 + s.z1) / 2, col), partBox(t, 0.01, s.z1 - s.z0, s.x1, 0.012, (s.z0 + s.z1) / 2, col));
   }
-  scene.add(new THREE.Mesh(mergeParts(lines), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.75, depthWrite: false })));
-})();
+  const fr = new THREE.Mesh(mergeParts(lines), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.75, depthWrite: false })); scene.add(fr); siteMarkMeshes.push(fr);
+}
+buildSiteMarks();
 function BufferGeometryUtils_merge(geos) {
   // 合併幾個非索引幾何（只要位置與 UV）
   let n = 0; const parts = geos.map((g) => { const ng = g.index ? g.toNonIndexed() : g; n += ng.attributes.position.count; return ng; });

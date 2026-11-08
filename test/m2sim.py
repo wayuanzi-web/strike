@@ -9,7 +9,9 @@ PROBE = """(cfg) => {
   if (!window.M) {
     window.M = { nades: { he: 0, flash: 0, smoke: 0 }, buys: {}, kills: {}, stuck: 0, maxLive: 0, money: [] };
     const orig = s.throwNade; 
+    if (cfg.map) s.switchMap(cfg.map);
     s.startGame('match');
+    if (cfg.ghost) { const x = s.bots[4]; x.active = false; x.alive = false; x.g.visible = false; }   // 你不在場時，敵方也少一人（4 對 4）
   }
   const M = window.M;
   for (let i = 0; i < cfg.secs * 60; i++) {
@@ -25,13 +27,14 @@ PROBE = """(cfg) => {
   return { state: s.game.state, phase: R.phase, num: R.num, score: R.score, log: R.log, nades: M.nades, buys: M.buys };
 }"""
 
+MAPID = ''
 async def match(p, ghost):
     browser, page, errors = await open_game(p)
     await page.evaluate("() => { window.__strike.game.manual = true; }")
     feed = []
     r = None
     for _ in range(240):
-        r = await page.evaluate(PROBE, {'secs': 15, 'ghost': ghost})
+        r = await page.evaluate(PROBE, {'secs': 15, 'ghost': ghost, 'map': MAPID})
         if r['state'] == 'over': break
     await browser.close()
     return r, errors
@@ -39,6 +42,7 @@ async def match(p, ghost):
 async def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     mode = sys.argv[2] if len(sys.argv) > 2 else 'ghost'
+    global MAPID; MAPID = sys.argv[3] if len(sys.argv) > 3 else ''
     async with async_playwright() as p:
         tot = {'atk': 0, 'def': 0, 'kinds': {}, 'plants': 0}
         for i in range(n):

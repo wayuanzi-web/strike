@@ -35,11 +35,12 @@ function makeBotModel(team) {
   const g = new THREE.Group(), mat = patchBotMat(BOT_MAT.clone(), BC.rim);
   const body = new THREE.Group(); g.add(body);
   const leg = (x) => {
+    // 大腿＋小腿（膝蓋是關節：走路會彎、蹲下單膝跪）
     const L = new THREE.Group(); L.position.set(x, 0.85, 0); body.add(L);
-    L.add(new THREE.Mesh(mergeParts([
-      partBox(0.17, 0.44, 0.19, 0, -0.22, 0, BC.pants), partBox(0.15, 0.36, 0.17, 0, -0.62, 0.01, BC.pants),
-      partBox(0.16, 0.11, 0.06, 0, -0.44, -0.1, BC.helmet), partBox(0.17, 0.1, 0.28, 0, -0.8, -0.04, BC.boot), partBox(0.18, 0.06, 0.08, 0, -0.08, -0.1, BC.pouch),
-    ]), mat));
+    L.add(new THREE.Mesh(mergeParts([partBox(0.17, 0.44, 0.19, 0, -0.22, 0, BC.pants), partBox(0.18, 0.06, 0.08, 0, -0.08, -0.1, BC.pouch)]), mat));
+    const K = new THREE.Group(); K.position.set(0, -0.42, 0); L.add(K);
+    K.add(new THREE.Mesh(mergeParts([partBox(0.15, 0.38, 0.17, 0, -0.2, 0.01, BC.pants), partBox(0.16, 0.11, 0.06, 0, -0.02, -0.1, BC.helmet), partBox(0.17, 0.1, 0.28, 0, -0.38, -0.04, BC.boot)]), mat));
+    L.userData.knee = K;
     return L;
   };
   const legL = leg(-0.11), legR = leg(0.11);
@@ -511,8 +512,12 @@ function updateBot(b, dt) {
   if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; b.litC = bakeRay(p.x, p.y + 1.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
   b.ck = lerp(b.ck, b.phys.crouched ? 1 : 0, 1 - Math.exp(-15 * dt));
   b.upper.position.y = -0.6 * b.ck;
-  b.legL.position.y = b.legR.position.y = 0.85 - 0.55 * b.ck;
-  b.legL.rotation.x = sw * (1 - b.ck) - 1.2 * b.ck; b.legR.rotation.x = -sw * (1 - b.ck) + 0.9 * b.ck;
+  b.legL.position.y = b.legR.position.y = 0.85 - 0.45 * b.ck;
+  // 走路：腿往後時膝蓋彎；蹲：左腳跪地（小腿平貼往後）、右腳大腿向前、小腿直立
+  const mv = Math.min(1, sp / 3), swL = sw * (1 - b.ck), swR = -sw * (1 - b.ck);
+  b.legL.rotation.x = swL + 0.15 * b.ck; b.legR.rotation.x = swR + 1.3 * b.ck;
+  b.legL.userData.knee.rotation.x = -(Math.max(0, -swL) * 1.5 + 0.12 * mv) * (1 - b.ck) - 1.45 * b.ck;
+  b.legR.userData.knee.rotation.x = -(Math.max(0, -swR) * 1.5 + 0.12 * mv) * (1 - b.ck) - 1.3 * b.ck;
   b.litS = lerp(b.litS, b.litC === undefined ? 1 : b.litC, 1 - Math.exp(-4 * dt)); b.mat.color.setScalar(lerp(0.55, 1, b.litS));
   hitBoxes(p, b.phys.h, b.boxes);
 }

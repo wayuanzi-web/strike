@@ -1,17 +1,24 @@
 /* ===== 22-mapgfx：地圖的樣子——程式畫的寫實貼圖、烘焙陰影與環境光遮蔽、邊角磨損、裝飾與遠景 =====
    碰撞只看 BOXES；這裡加的裝飾（DECOR）只畫不擋。太陽與地圖都不會動，所以陰影在載入時算一次存在頂點上。 */
-const SUN_DIR = new V3(0.82, 0.22, 0.28).normalize();
+const SUN_DIR = new V3().fromArray(MAP.theme.sun).normalize();
 // 每種方塊用哪個材質，和它的底色（貼圖是灰階，顏色靠頂點色）
 const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'concrete', dock: 'concrete', lintel: 'concrete', trim: 'concrete',
-  wall: 'brick', rust: 'container', teal: 'container', olive: 'container', crate: 'wood', shed: 'metal', dark: 'metal', paint: 'floor', hazard: 'floor' };
+  wall: 'brick', rust: 'container', teal: 'container', olive: 'container', crate: 'wood', shed: 'metal', dark: 'metal', paint: 'floor', hazard: 'floor',
+  // 舊城：灰泥牆、石材、石板地、木攤位、窗、屋簷、遮陽布、水
+  house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'metal', roof: 'brick', door: 'wood',
+  awn1: 'plaster', awn2: 'plaster', water: 'floor', clock: 'plaster', sill: 'concrete',
+  // 鐵道：碎石地、車廂、鐵軌、枕木
+  gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
   wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
+  house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#34393f', roof: '#b0573a', door: '#6b4a32',
+  awn1: '#c8423a', awn2: '#f0e8d8', water: '#4f8fa8', clock: '#f2ede2', sill: '#d8d0c0',
+  gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
 };
-const DECOR = [];
-function D(x0, z0, x1, z1, y0, y1, c) { DECOR.push({ min: [Math.min(x0, x1), y0, Math.min(z0, z1)], max: [Math.max(x0, x1), y1, Math.max(z0, z1)], c }); }
 
-(function buildDecor() {
+// 每張地圖都有的：依方塊顏色自動加的裝飾（貨櫃凸條、牆頂壓條、外牆壁柱、房子窗戶與屋簷、車廂細節）
+function decorBoxes() {
   for (const b of BOXES) {
     const [x0, y0, z0] = b.min, [x1, y1, z1] = b.max;
     if (b.c === 'rust' || b.c === 'teal' || b.c === 'olive') {
@@ -34,12 +41,55 @@ function D(x0, z0, x1, z1, y0, y1, c) { DECOR.push({ min: [Math.min(x0, x1), y0,
       if (thinX) D(x0 - 0.06, z0, x1 + 0.06, z1, y1, y1 + 0.08, 'trim'); else D(x0, z0 - 0.06, x1, z1 + 0.06, y1, y1 + 0.08, 'trim');
     } else if (b.c === 'outer') {
       // 外牆內側：壁柱每 6 公尺一根、牆頂壓條
-      if (z0 >= 26) { for (let x = -33; x <= 33; x += 6) D(x - 0.2, 25.9, x + 0.2, 26, 0, 5, 'outer'); D(-36, 25.85, 36, 26, 5, 5.1, 'trim'); }
-      if (z1 <= -26) { for (let x = -33; x <= 33; x += 6) D(x - 0.2, -26, x + 0.2, -25.9, 0, 5, 'outer'); D(-36, -26, 36, -25.85, 5, 5.1, 'trim'); }
-      if (x0 >= 36) { for (let z = -21; z <= 21; z += 6) D(35.9, z - 0.2, 36, z + 0.2, 0, 5, 'outer'); D(35.85, -26, 36, 26, 5, 5.1, 'trim'); }
-      if (x1 <= -36) { for (let z = -21; z <= 21; z += 6) D(-36, z - 0.2, -35.9, z + 0.2, 0, 5, 'outer'); D(-36, -26, -35.85, 26, 5, 5.1, 'trim'); }
+      if (z0 >= 26) { for (let x = -33; x <= 33; x += 6) D(x - 0.2, 25.9, x + 0.2, 26, 0, y1, 'outer'); D(-36, 25.85, 36, 26, y1, y1 + 0.1, 'trim'); }
+      if (z1 <= -26) { for (let x = -33; x <= 33; x += 6) D(x - 0.2, -26, x + 0.2, -25.9, 0, y1, 'outer'); D(-36, -26, 36, -25.85, y1, y1 + 0.1, 'trim'); }
+      if (x0 >= 36) { for (let z = -21; z <= 21; z += 6) D(35.9, z - 0.2, 36, z + 0.2, 0, y1, 'outer'); D(35.85, -26, 36, 26, y1, y1 + 0.1, 'trim'); }
+      if (x1 <= -36) { for (let z = -21; z <= 21; z += 6) D(-36, z - 0.2, -35.9, z + 0.2, 0, y1, 'outer'); D(-36, -26, -35.85, 26, y1, y1 + 0.1, 'trim'); }
+    }
+  
+    else if (b.c.startsWith('house') && y1 > 4) decorHouse(b);
+    else if (b.c.startsWith('car')) decorCar(b);
+  }
+}
+// 房子：每層窗戶（窗台、窗框）、一樓偶爾有門、屋簷（陶瓦色）
+function decorHouse(b) {
+  const [x0, y0, z0] = b.min, [x1, y1, z1] = b.max, e = 0.04;
+  const faces = [[2, -1, z0], [2, 1, z1], [0, -1, x0], [0, 1, x1]];
+  for (const [ax, sg, pl] of faces) {
+    if ((ax === 2 && (pl <= -25.9 || pl >= 25.9)) || (ax === 0 && (pl <= -35.9 || pl >= 35.9))) continue;
+    const a0 = ax === 2 ? x0 : z0, a1 = ax === 2 ? x1 : z1, len = a1 - a0; if (len < 2.5) continue;
+    const n = Math.max(1, Math.floor(len / 3.2)), step = len / n;
+    for (let k = 0; k < n; k++) {
+      const c = a0 + step * (k + 0.5);
+      for (const fy of [1.6, 4.4]) {
+        if (fy + 1.4 > y1 - 0.4) continue;
+        const ground = fy < 2 && hash1(Math.round(c * 7 + pl * 3)) < 0.25;
+        const w = ground ? 1.1 : 0.9, h0 = ground ? 0 : fy, h1 = ground ? 2.3 : fy + 1.3, col = ground ? 'door' : 'win';
+        const o0 = sg > 0 ? pl : pl - e, o1 = sg > 0 ? pl + e : pl;
+        if (ax === 2) { D(c - w / 2, o0, c + w / 2, o1, h0, h1, col); if (!ground) D(c - w / 2 - 0.1, sg > 0 ? pl : pl - 0.12, c + w / 2 + 0.1, sg > 0 ? pl + 0.12 : pl, h0 - 0.1, h0, 'sill'); }
+        else { D(o0, c - w / 2, o1, c + w / 2, h0, h1, col); if (!ground) D(sg > 0 ? pl : pl - 0.12, c - w / 2 - 0.1, sg > 0 ? pl + 0.12 : pl, c + w / 2 + 0.1, h0 - 0.1, h0, 'sill'); }
+      }
     }
   }
+  D(x0 - 0.18, z0 - 0.18, x1 + 0.18, z1 + 0.18, y1, y1 + 0.22, 'roof');
+  D(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, y1 - 0.5, y1 - 0.38, 'sill');
+}
+// 車廂：底下的轉向架（輪子）、車頂、側門的框、車身下緣的暗色
+function decorCar(b) {
+  const [x0, y0, z0] = b.min, [x1, y1, z1] = b.max, alongZ = z1 - z0 > x1 - x0;
+  const L0 = alongZ ? z0 : x0, L1 = alongZ ? z1 : x1, W0 = alongZ ? x0 : z0, W1 = alongZ ? x1 : z1;
+  const box = (l0, l1, w0, w1, h0, h1, c) => (alongZ ? D(w0, l0, w1, l1, h0, h1, c) : D(l0, w0, l1, w1, h0, h1, c));
+  for (const l of [L0 + 1.6, L1 - 1.6]) { box(l - 1.1, l + 1.1, W0 - 0.05, W0, 0.1, 0.75, 'dark'); box(l - 1.1, l + 1.1, W1, W1 + 0.05, 0.1, 0.75, 'dark'); }
+  box(L0, L1, W0 - 0.03, W0, 0.75, 0.95, 'dark'); box(L0, L1, W1, W1 + 0.03, 0.75, 0.95, 'dark');
+  box(L0 + 0.2, L1 - 0.2, W0 + 0.3, W1 - 0.3, y1, y1 + 0.12, b.c);
+  const mid = (L0 + L1) / 2;
+  for (const [w, o] of [[W0 - 0.04, W0], [W1, W1 + 0.04]]) { box(mid - 1.4, mid - 1.3, w, o, 1.0, 3.0, 'dark'); box(mid + 1.3, mid + 1.4, w, o, 1.0, 3.0, 'dark'); box(mid - 1.4, mid + 1.4, w, o, 2.95, 3.05, 'dark'); }
+}
+const DECOR = [];
+function D(x0, z0, x1, z1, y0, y1, c) { DECOR.push({ min: [Math.min(x0, x1), y0, Math.min(z0, z1)], max: [Math.max(x0, x1), y1, Math.max(z0, z1)], c }); }
+function rebuildDecor() { DECOR.length = 0; decorBoxes(); MAP.decor(D); }
+// 曙光倉區：管線、黃色標線、警示條
+function decorDawn(D) {
   // 北牆上的兩條管線
   D(-36, 25.72, 36, 25.86, 3.5, 3.64, 'dark'); D(-36, 25.74, 36, 25.86, 3.85, 3.95, 'dark');
   // 地上的黃色標線：倉庫四周、貨櫃場的停放格
@@ -51,8 +101,42 @@ function D(x0, z0, x1, z1, y0, y1, c) { DECOR.push({ min: [Math.min(x0, x1), y0,
   for (let x = -34; x <= 34; x += 3) D(x, -0.05, x + 1.5, 0.05, 0, P, 'paint');    // 中線虛線
   // 卸貨平台北緣的黃黑警示條
   for (let x = 12, k = 0; x < 24; x += 0.4, k++) D(x, -19.012, Math.min(24, x + 0.4), -19, 2.12, 2.4, k % 2 ? 'hazard' : 'paint');
-})();
-
+}
+// 正午舊城：鐘面、噴水池的水與中柱、攤位遮陽布（紅白條）、路燈、石板路的邊石
+function decorMarket(D) {
+  for (const [ax, sg] of [[0, -1], [0, 1], [2, -1], [2, 1]]) {
+    const p = 3 * sg + (sg > 0 ? 0.03 : -0.03);
+    if (ax === 0) { D(sg > 0 ? 3 : p, -1.2, sg > 0 ? p : -3, 1.2, 9, 11.4, 'clock'); D(sg > 0 ? 3 : p - 0.02, -0.08, sg > 0 ? p + 0.02 : -3, 0.08, 10.2, 11.1, 'win'); D(sg > 0 ? 3 : p - 0.02, -0.08, sg > 0 ? p + 0.02 : -3, 0.7, 10.12, 10.28, 'win'); }
+    else { D(-1.2, sg > 0 ? 3 : p, 1.2, sg > 0 ? p : -3, 9, 11.4, 'clock'); D(-0.08, sg > 0 ? 3 : p - 0.02, 0.08, sg > 0 ? p + 0.02 : -3, 10.2, 11.1, 'win'); D(-0.08, sg > 0 ? 3 : p - 0.02, 0.7, sg > 0 ? p + 0.02 : -3, 10.12, 10.28, 'win'); }
+  }
+  D(-3.3, -3.3, 3.3, 3.3, 13, 13.4, 'roof'); D(-2.2, -2.2, 2.2, 2.2, 13.4, 14.6, 'roof'); D(-1, -1, 1, 1, 14.6, 15.6, 'roof');
+  D(-3.2, -3.2, 3.2, 3.2, 6.5, 6.7, 'sill');
+  D(20.7, 18.2, 22.3, 19.8, 0.9, 0.93, 'water'); D(21.3, 18.8, 21.7, 19.2, 0.9, 1.9, 'stone'); D(21, 18.5, 22, 19.5, 1.9, 2.05, 'stone');
+  const awning = (x0, z0, x1, z1) => { const w = x1 - x0; for (let k = 0, x = x0; x < x1 - 0.01; x += 0.5, k++) D(x, z0 - 0.3, Math.min(x1, x + 0.5), z1 + 0.3, 2.2, 2.28, k % 2 ? 'awn2' : 'awn1');
+    for (const x of [x0 + 0.05, x1 - 0.15]) for (const z of [z0 - 0.25, z1 + 0.15]) D(x, z, x + 0.1, z + 0.1, 0, 2.2, 'stall'); };
+  awning(16, -17.2, 19, -16); awning(22, -21.2, 25, -20); awning(27, -16.2, 30, -15); awning(29.5, 19, 31, 21.5); awning(-2.2, 11.2, -0.6, 12.6);
+  for (const [x, z] of [[-9, 9.2], [9.2, -9], [14, 12.3], [14, -12.3], [-24, 12.5], [-24, -12.5], [30, 11.3], [30, -11.3]]) { D(x - 0.06, z - 0.06, x + 0.06, z + 0.06, 0, 3.6, 'win'); D(x - 0.2, z - 0.2, x + 0.2, z + 0.2, 3.6, 3.9, 'win'); }
+  const P = 0.01; for (let x = -34; x <= 34; x += 2) { D(x, 8.95, x + 0.12, 9.05, 0, P, 'sill'); D(x, -9.05, x + 0.12, -8.95, 0, P, 'sill'); }
+}
+// 黃昏鐵道：鐵軌與枕木、吊車橫樑、車站雨棚、月台邊黃線、電線桿
+function decorRail(D) {
+  const track = (x, z0, z1) => {
+    D(x - 0.78, z0, x - 0.7, z1, 0, 0.16, 'rail'); D(x + 0.7, z0, x + 0.78, z1, 0, 0.16, 'rail');
+    for (let z = z0 + 0.3; z < z1; z += 0.75) D(x - 1.25, z, x + 1.25, z + 0.24, 0, 0.09, 'sleeper');
+  };
+  track(-20, -26, 26); track(-13, -26, 26); track(12, -26, 26); track(20.5, -26, -9);
+  D(19, 12.6, 31, 13.4, 7.4, 8, 'dark'); D(19, 22.6, 31, 23.4, 7.4, 8, 'dark'); D(24.6, 12.6, 25.4, 23.4, 7.6, 8.2, 'dark');
+  D(24.8, 17.6, 25.2, 18, 3.5, 7.6, 'rail'); D(24.4, 17.4, 25.6, 18.2, 3.1, 3.5, 'dark');
+  D(-7.5, -7.5, 7.5, 7.5, 3.6, 3.75, 'canopy');
+  for (const [x, z] of [[-7.2, -7.2], [7.2, -7.2], [-7.2, 7.2], [7.2, 7.2]]) D(x - 0.1, z - 0.1, x + 0.1, z + 0.1, 0, 3.6, 'dark');
+  D(-7.5, -7.6, 7.5, -7.5, 0, 0.01, 'yellow'); D(-7.5, 7.5, 7.5, 7.6, 0, 0.01, 'yellow');
+  for (const x of [-30, -10, 10, 30]) { D(x - 0.12, 19.6, x + 0.12, 19.84, 0, 7.5, 'sleeper'); D(x - 1, 19.6, x + 1, 19.8, 7.1, 7.25, 'sleeper'); }
+  for (const x of [-30, -10, 10, 30]) { D(x - 0.12, -19.84, x + 0.12, -19.6, 0, 7.5, 'sleeper'); D(x - 1, -19.8, x + 1, -19.6, 7.1, 7.25, 'sleeper'); }
+  D(-36, 19.7, 36, 19.74, 6.9, 6.94, 'dark'); D(-36, -19.74, 36, -19.7, 6.9, 6.94, 'dark');
+  // 月台邊緣（南邊房子前）與倉庫的大門
+  D(-36, -21.1, 6, -21, 0, 0.01, 'yellow');
+  for (const x of [-28, -16, -4]) D(x - 2, 20.95, x + 2, 21, 0, 4.2, 'dark');
+}
 // ---------- 程式畫的貼圖（可無縫重複） ----------
 function tileNoise(size, cells, seed) {
   const r = (i, j) => { i = ((i % cells) + cells) % cells; j = ((j % cells) + cells) % cells; let h = (i * 374761393 + j * 668265263 + seed * 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
@@ -84,10 +168,17 @@ function makeTex(w, h, fn, aniso) {
   return t;
 }
 const g3 = (v) => [v, v, v];
-function buildTextures(aniso) {
+// 貼圖只在第一次用到時才畫（換地圖時沿用）
+const TEX_CACHE = {};
+function getTex(name, aniso) {
+  if (!TEX_CACHE[name]) { const T = buildTextures(aniso, name); TEX_CACHE[name] = T[name]; }
+  return TEX_CACHE[name];
+}
+function buildTextures(aniso, only) {
   const T = {};
+  const want = (k) => !only || only === k;
   // 混凝土（4 公尺一張）：明暗起伏、小斑點、水漬、模板螺栓孔、2 公尺一道施工縫
-  { const S = 512, n = fbm(S, 11), st = fbm(S, 23, 2, 3);
+  if (want('concrete')) { const S = 512, n = fbm(S, 11), st = fbm(S, 23, 2, 3);
     T.concrete = makeTex(S, S, (x, y, i) => {
       let v = 0.86 + (n[i] - 0.5) * 0.3;
       if (st[i] > 0.6) v -= (st[i] - 0.6) * 0.5;
@@ -97,7 +188,7 @@ function buildTextures(aniso) {
       return g3(v);
     }, aniso); }
   // 磚牆（2 公尺一張）：每塊磚色差、灰縫、半塊錯開
-  { const S = 256, n = fbm(S, 31, 8, 4), rows = 24, bw = 32;
+  if (want('brick')) { const S = 256, n = fbm(S, 31, 8, 4), rows = 24, bw = 32;
     T.brick = makeTex(S, S, (x, y, i) => {
       const r = Math.floor(y / (S / rows)), yy = y - r * (S / rows), off = (r % 2) * bw / 2, bx = Math.floor((x + off) / bw), xx = (x + off) % bw;
       const mortar = yy < 2 || xx < 2;
@@ -107,7 +198,7 @@ function buildTextures(aniso) {
       return mortar ? [v * 1.05, v * 1.0, v * 0.95] : g3(v);
     }, aniso); }
   // 地面（4 公尺一張）：淡淡的起伏、2 公尺伸縮縫、油漬
-  { const S = 512, n = fbm(S, 41, 4, 5), oil = fbm(S, 53, 2, 3), spot = fbm(S, 59, 8, 3);
+  if (want('floor')) { const S = 512, n = fbm(S, 41, 4, 5), oil = fbm(S, 53, 2, 3), spot = fbm(S, 59, 8, 3);
     T.floor = makeTex(S, S, (x, y, i) => {
       let v = 0.88 + (n[i] - 0.5) * 0.22;
       if (oil[i] > 0.7) v -= (oil[i] - 0.7) * 0.45;
@@ -117,7 +208,7 @@ function buildTextures(aniso) {
       return g3(v);
     }, aniso); }
   // 貨櫃浪板（橫向 2.4 公尺、縱向 2.6 公尺）：凹凸明暗、從上往下的鏽痕、掉漆
-  { const W2 = 256, H2 = 256, n = fbm(W2, 61, 4, 4), streak = tileNoise(W2, 32, 71), chip = fbm(W2, 83, 4, 4);
+  if (want('container')) { const W2 = 256, H2 = 256, n = fbm(W2, 61, 4, 4), streak = tileNoise(W2, 32, 71), chip = fbm(W2, 83, 4, 4);
     T.container = makeTex(W2, H2, (x, y, i) => {
       const rib = 0.5 + 0.5 * Math.sin(x / W2 * 8 * Math.PI * 2);
       let v = 0.8 + (rib - 0.5) * 0.36 + (n[i] - 0.5) * 0.14;
@@ -128,7 +219,7 @@ function buildTextures(aniso) {
       return rgb;
     }, aniso); }
   // 木箱（每個面剛好一張）：外框、斜撐、木紋、木板縫
-  { const S = 256, n = fbm(S, 91, 4, 4), grain = tileNoise(S, 32, 97);
+  if (want('wood')) { const S = 256, n = fbm(S, 91, 4, 4), grain = tileNoise(S, 32, 97);
     T.wood = makeTex(S, S, (x, y, i) => {
       const fr = 30, inFrame = x < fr || x > S - fr || y < fr || y > S - fr;
       const dx = x - y, brace = Math.abs(dx) < 18 && !inFrame;
@@ -142,11 +233,38 @@ function buildTextures(aniso) {
       return [v * 1.0, v * 0.97, v * 0.92];
     }, aniso); }
   // 鐵皮（棚、深色金屬）：細浪板＋髒污
-  { const S = 256, n = fbm(S, 101, 4, 5);
+  if (want('metal')) { const S = 256, n = fbm(S, 101, 4, 5);
     T.metal = makeTex(S, S, (x, y, i) => {
       const rib = 0.5 + 0.5 * Math.sin(x / S * 16 * Math.PI * 2);
       const v = 0.8 + (rib - 0.5) * 0.22 + (n[i] - 0.5) * 0.26 - (y / S) * 0.06;
       return g3(v);
+    }, aniso); }
+  // 灰泥牆（4 公尺一張）：大片柔和的色斑、雨水痕、少數裂紋與剝落
+  if (want('plaster')) { const S = 256, n = fbm(S, 131, 3, 5), st = tileNoise(S, 24, 137), cr = fbm(S, 139, 8, 3);
+    T.plaster = makeTex(S, S, (x, y, i) => {
+      let v = 0.9 + (n[i] - 0.5) * 0.16;
+      v -= Math.max(0, st[Math.floor(y / 4) * S + x] - 0.6) * 0.25 * (y / S);
+      if (cr[i] > 0.72) v -= (cr[i] - 0.72) * 0.9;
+      if (hash1(i * 5 + 1) < 0.02) v -= 0.05;
+      return g3(v);
+    }, aniso); }
+  // 石板路（2 公尺一張）：不規則大小的石塊、深色縫、每塊明暗不同
+  if (want('cobble')) { const S = 256, n = fbm(S, 151, 8, 4), cols = 8, rows = 10;
+    T.cobble = makeTex(S, S, (x, y, i) => {
+      const r = Math.floor(y / (S / rows)), off = (r % 2) * (S / cols) * 0.5, c = Math.floor(((x + off) % S) / (S / cols));
+      const yy = y % (S / rows), xx = (x + off) % (S / cols);
+      const edge = Math.min(yy, S / rows - yy, xx, S / cols - xx);
+      const k = hash1(r * 97 + c * 13);
+      let v = 0.82 + (k - 0.5) * 0.24 + (n[i] - 0.5) * 0.14;
+      if (edge < 2.5) v = 0.42 + n[i] * 0.1; else if (edge < 5) v -= (5 - edge) * 0.05;
+      return [v * 1.02, v, v * 0.95];
+    }, aniso); }
+  // 碎石（2 公尺一張）：細碎的亮暗顆粒
+  if (want('gravel')) { const S = 256, n = fbm(S, 171, 16, 3), m = fbm(S, 173, 4, 3);
+    T.gravel = makeTex(S, S, (x, y, i) => {
+      const g = hash1(i * 3 + 7);
+      let v = 0.8 + (n[i] - 0.5) * 0.42 + (g - 0.5) * 0.22 + (m[i] - 0.5) * 0.1;
+      return [v * 1.03, v, v * 0.96];
     }, aniso); }
   return T;
 }
@@ -244,7 +362,8 @@ function patchMapMaterial(mat, wear, grime, chip = false) {
 }
 function buildMapMeshes(aniso) {
   const t0 = performance.now();
-  const tex = buildTextures(aniso);
+  const used = new Set(BOXES.concat(DECOR).map((b) => MAT_OF[b.c] || 'concrete'));
+  const tex = {}; for (const m of used) tex[m] = getTex(m, aniso);
   const t1 = performance.now();
   bakeIndex();
   const groups = {};
@@ -264,10 +383,10 @@ function buildMapMeshes(aniso) {
       if (ax === 0 && sg < 0 && b.min[0] <= BOUND.x0 + 0.001) continue;
       if (ax === 2 && sg > 0 && b.max[2] >= BOUND.z1 - 0.001) continue;
       if (ax === 2 && sg < 0 && b.min[2] <= BOUND.z0 + 0.001) continue;
-      if (b.c === 'floor' && ax !== 1) continue;
+      if (b === BOXES[0] && ax !== 1) continue;
       const plane = sg > 0 ? b.max[ax] : b.min[ax];
       const lu = size[ua], lv = size[va];
-      const cell = decor ? 99 : b.c === 'floor' ? 0.5 : ax === 1 ? 1.0 : 0.5;
+      const cell = decor ? 99 : b === BOXES[0] ? 0.5 : ax === 1 ? 1.0 : (size[1] > 5 ? 0.8 : 0.5);
       const nu = Math.max(1, Math.ceil(lu / cell)), nv = Math.max(1, Math.ceil(lv / cell));
       const n = [0, 0, 0]; n[ax] = sg;
       const tu = [0, 0, 0]; tu[ua] = 1; const tv = [0, 0, 0]; tv[va] = 1;
@@ -282,7 +401,7 @@ function buildMapMeshes(aniso) {
         let u, v;
         if (mat === 'wood') { u = (p[ua] - b.min[ua]) / lu; v = (p[va] - b.min[va]) / lv; }
         else {
-          const scale = mat === 'brick' ? 0.5 : mat === 'container' ? (ax === 1 ? 1 / 2.4 : 1 / 2.4) : mat === 'metal' ? 0.5 : 0.25;
+          const scale = mat === 'brick' ? 0.5 : mat === 'container' ? (ax === 1 ? 1 / 2.4 : 1 / 2.4) : mat === 'metal' || mat === 'cobble' || mat === 'gravel' ? 0.5 : 0.25;
           const hu = ax === 0 ? p[2] : p[0], hv = ax === 1 ? p[2] : p[1];
           u = hu * scale * (ax === 0 && sg > 0 || ax === 2 && sg < 0 ? -1 : 1); v = mat === 'container' && ax !== 1 ? (p[1] - b.min[1]) / 2.6 : hv * scale;
         }
@@ -299,7 +418,7 @@ function buildMapMeshes(aniso) {
       }
     }
   }
-  const SETTINGS = { concrete: [0.5, 0.25], brick: [0.35, 0.3], floor: [0.0, 0.0], container: [0.9, 0.2], wood: [0.7, 0.2], metal: [0.6, 0.25] };
+  const SETTINGS = { concrete: [0.5, 0.25], brick: [0.35, 0.3], floor: [0.0, 0.0], container: [0.9, 0.2], wood: [0.7, 0.2], metal: [0.6, 0.25], plaster: [0.35, 0.4], cobble: [0, 0], gravel: [0, 0] };
   const meshes = [];
   for (const [m, g] of Object.entries(groups)) {
     const geo = new THREE.BufferGeometry();
@@ -330,24 +449,37 @@ function checkWinding(mesh) {
   return bad;
 }
 
-// ---------- 遠景：牆外的倉庫、龍門吊、煙囪剪影，不再像關在盒子裡 ----------
-function buildSkyline() {
-  const P = [], C = [], I = []; const c = new THREE.Color(), top = new THREE.Color('#a7a2ad'), bot = new THREE.Color('#6b6772');
-  const box = (x0, z0, x1, z1, h, y0 = 0) => {
+// ---------- 遠景：牆外的剪影（工業區、舊城屋頂與山、城市高樓與電塔），不再像關在盒子裡 ----------
+function buildSkyline(style, topC, botC) {
+  const P = [], C = [], I = []; const c = new THREE.Color(), top = new THREE.Color(topC || '#a7a2ad'), bot = new THREE.Color(botC || '#6b6772');
+  const box = (x0, z0, x1, z1, h, y0 = 0, tx = 0) => {
     const s = P.length / 3;
-    const v = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0, h, z0], [x1, h, z0], [x1, h, z1], [x0, h, z1]];
+    const v = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0 + tx, h, z0 + tx], [x1 - tx, h, z0 + tx], [x1 - tx, h, z1 - tx], [x0 + tx, h, z1 - tx]];
     for (const p of v) { P.push(...p); c.copy(bot).lerp(top, clamp((p[1] - y0) / 30, 0, 1)); C.push(c.r, c.g, c.b); }
     for (const f of [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [4, 5, 6, 7]]) I.push(s + f[0], s + f[2], s + f[1], s + f[0], s + f[3], s + f[2]);
   };
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let k = 0; k < 46; k++) {
-    const a = k / 46 * Math.PI * 2 + rnd() * 0.08, r = 70 + rnd() * 70, x = Math.cos(a) * r * 1.25, z = Math.sin(a) * r;
-    const w = 8 + rnd() * 18, d = 8 + rnd() * 14, h = 7 + rnd() * 20;
-    box(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h);
-    if (rnd() < 0.25) box(x - 1, z - 1, x + 1, z + 1, h + 14 + rnd() * 16);     // 煙囪
+  const ring = (n, r0, r1, fn) => { for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + rnd() * 0.08, r = r0 + rnd() * (r1 - r0); fn(Math.cos(a) * r * 1.25, Math.sin(a) * r); } };
+  if (style === 'town') {
+    // 舊城：一圈高低錯落的屋子（屋頂收窄像斜屋頂）、兩座鐘塔、遠山
+    ring(60, 60, 110, (x, z) => { const w = 6 + rnd() * 9, d = 6 + rnd() * 9, h = 6 + rnd() * 9; box(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h); box(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h + 2.5, h, Math.min(w, d) * 0.45); });
+    for (const [x, z] of [[-90, 55], [70, -80]]) { box(x - 3, z - 3, x + 3, z + 3, 26); box(x - 3, z - 3, x + 3, z + 3, 34, 26, 2.8); }
+    ring(14, 220, 260, (x, z) => { const w = 90 + rnd() * 60; box(x - w / 2, z - w / 3, x + w / 2, z + w / 3, 25 + rnd() * 30, 0, w * 0.3); });
+  } else if (style === 'rail') {
+    // 鐵道：遠處的高樓、電塔、一座高架橋
+    ring(40, 80, 150, (x, z) => { const w = 8 + rnd() * 14, h = 15 + rnd() * 45; box(x - w / 2, z - w / 2, x + w / 2, z + w / 2, h); });
+    for (let k = 0; k < 6; k++) { const x = -120 + k * 48, z = 90; box(x - 0.8, z - 0.8, x + 0.8, z + 0.8, 34, 0, 0.6); box(x - 6, z - 0.3, x + 6, z + 0.3, 30, 29.4); }
+    box(-160, -95, 160, -88, 14, 12); for (let x = -150; x <= 150; x += 25) box(x - 1.2, -93, x + 1.2, -90, 12);
+  } else {
+    for (let k = 0; k < 46; k++) {
+      const a = k / 46 * Math.PI * 2 + rnd() * 0.08, r = 70 + rnd() * 70, x = Math.cos(a) * r * 1.25, z = Math.sin(a) * r;
+      const w = 8 + rnd() * 18, d = 8 + rnd() * 14, h = 7 + rnd() * 20;
+      box(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h);
+      if (rnd() < 0.25) box(x - 1, z - 1, x + 1, z + 1, h + 14 + rnd() * 16);     // 煙囪
+    }
+    // 兩座龍門吊
+    for (const [x, z] of [[-60, 70], [75, -66]]) { box(x - 9, z - 1, x - 7.5, z + 1, 32); box(x + 7.5, z - 1, x + 9, z + 1, 32); box(x - 12, z - 1.2, x + 22, z + 1.2, 34, 30); }
   }
-  // 兩座龍門吊
-  for (const [x, z] of [[-60, 70], [75, -66]]) { box(x - 9, z - 1, x - 7.5, z + 1, 32); box(x + 7.5, z - 1, x + 9, z + 1, 32); box(x - 12, z - 1.2, x + 22, z + 1.2, 34, 30); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I);
   g.computeBoundingSphere();
@@ -355,11 +487,11 @@ function buildSkyline() {
 }
 
 // 天空：反面的大球，頂點顏色畫破曉漸層；太陽一張發光的圓（不受色調映射影響，照原色）
-function buildSky() {
+function buildSky(th) {
   const g = new THREE.SphereGeometry(400, 48, 24);
-  const pos = g.attributes.position, cols = [];
-  const zen = new THREE.Color('#3f6fa6'), mid = new THREE.Color('#a9bad6'), hor = new THREE.Color('#ffc79a'), low = new THREE.Color('#6b6168');
-  const warm = new THREE.Color('#ffdba8'), c = new THREE.Color();
+  const pos = g.attributes.position, cols = [], k = th || MAP.theme.sky;
+  const zen = new THREE.Color(k.zen), mid = new THREE.Color(k.mid), hor = new THREE.Color(k.hor), low = new THREE.Color(k.low);
+  const warm = new THREE.Color(k.warm), c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i) / 400, x = pos.getX(i) / 400, z = pos.getZ(i) / 400;
     const sun = Math.max(0, x * SUN_DIR.x + z * SUN_DIR.z);

@@ -1,9 +1,8 @@
 /* ===== 65-round：對戰模式（炸彈模式）——5 對 5、一條命一回合、準備時間買東西、回合計時、先贏 7 回合；第 6 回合後換邊
    攻方：把炸彈裝在 A 或 B 點並守到爆炸，或殺光守方。守方：時間到前沒被裝彈、拆掉炸彈，或在裝彈前殺光攻方。 */
-const TEAM_SPAWN = {
-  atk: [[-32.5, 0], [-32.5, -2.2], [-32.5, 2.2], [-30.5, -6], [-30.5, 6]],
-  def: [[32.5, 0], [32.5, -2.2], [32.5, 2.2], [30.5, -6.5], [31.5, 6.8]],
-};
+const TEAM_SPAWN = { atk: [], def: [] };
+function loadTeamSpawns() { TEAM_SPAWN.atk = MAP.spawn.atk.slice(); TEAM_SPAWN.def = MAP.spawn.def.slice(); }
+loadTeamSpawns();
 const ROUND = { phase: 'none', t: 0, num: 0, score: { A: 0, B: 0 }, winTo: 7, half: 6, freeze: 8, length: 115, endT: 0, over: false, history: [],
   atk: 'A', loss: { A: 0, B: 0 }, liveT: 0, plan: null, swapped: false, log: [] };
 const otherTeam = (t) => (t === 'A' ? 'B' : 'A');
@@ -45,7 +44,7 @@ function startRound() {
   const pistolRound = ROUND.num === 1 || ROUND.num === ROUND.half + 1;
   for (const team of ['A', 'B']) {
     const list = bots.filter((b) => b.active && b.team === team), sp = sideOf(team), off = team === 'A' ? 1 : 0;
-    const avg = list.reduce((a, b) => a + b.money, team === 'A' ? player.money : 0) / (list.length + (team === 'A' ? 1 : 0));
+    const avg = list.reduce((a, b) => a + b.money, 0) / Math.max(1, list.length);   // 機器人自己的平均錢（不算你）
     list.forEach((b, i) => {
       const s = sp[i + off]; botSpawn(b, s[0], s[1], face(team), s[1]);
       if (!b.keep) resetBotGear(b);
@@ -63,7 +62,7 @@ function startRound() {
   assignPosts();
   const last = ROUND.score.A + ROUND.score.B + 1 === ROUND.winTo * 2 - 1;
   const role = ROUND.atk === player.team ? '你們是攻方：把炸彈裝在 A 或 B 點' : '你們是守方：守住 A、B 兩個包點';
-  hudBanner(halftime ? '換邊' : `第 ${ROUND.num} 回合`, last ? '決勝回合　' + role : role, 3);
+  hudBanner(halftime ? '換邊' : `第 ${ROUND.num} 回合`, (ROUND.num === 1 ? `「${MAP.name}」　` : '') + (last ? '決勝回合　' + role : role), 3);
   if (player.alive) openBuy();
 }
 // 有人陣亡：掉炸彈、檢查勝負（炸彈裝好之後，攻方全滅也要等守方拆掉才算贏）
