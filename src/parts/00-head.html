@@ -297,6 +297,11 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 #sv i.step { border-top-color: color-mix(in srgb, var(--enemy) 80%, white); } #sv i.step.near { border-width: 5px; } #sv i.shot { border-top-color: #fff; width: calc(var(--u) * 16); height: calc(var(--u) * 16); left: calc(var(--u) * -8); top: calc(var(--u) * -8); }
 #cap { position: absolute; left: 50%; bottom: calc(var(--sb) + var(--u) * 24); transform: translateX(-50%); display: grid; justify-items: center; gap: 4px; pointer-events: none; }
 #cap p { margin: 0; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,.6); color: var(--bone); font-size: max(12px, calc(var(--u) * 2.9)); font-weight: 700; }
+#duel { z-index: 9; } #duel .card { width: min(100%, 720px); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
+.dl { display: grid; gap: 4px; margin: 6px 0; } .dl span { color: var(--mute); font-size: .9em; }
+#duel input, #duel textarea { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); color: var(--bone); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 14px; user-select: text; -webkit-user-select: text; }
+#duel textarea { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; }
+#duelSt { color: var(--dawn-lt); font-weight: 700; }
 #perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
 #bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
 #glLost { z-index: 20; }
@@ -368,7 +373,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
       <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
-      <div class="row modes"><small>更多模式</small><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button></div>
+      <div class="row modes"><small>更多模式</small><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
       <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
       <div class="install" id="installBox" hidden><span id="installT"></span><button class="btn" id="bInstall" hidden>安裝到主畫面</button></div>
       <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」。攻方把炸彈裝在 A 或 B 點，守方阻止或拆掉；一條命一回合，第 6 回合後換邊，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生，所有武器免費試。</p>
@@ -436,6 +441,17 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div id="statBody"></div><p class="mnote">戰績只存在這台裝置的瀏覽器裡。</p></div></div>
   <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadRep"></p><p id="deadT"></p></div></div>
   <div id="rotate" hidden><svg viewBox="0 0 48 48"><rect x="15" y="5" width="18" height="38" rx="3"/><path d="M21 38h6"/></svg><p>請把手機轉成橫向</p><small>破曉突擊只支援橫向畫面</small></div>
+  <div id="duel" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>好友 1 對 1</h2><button class="btn" id="duelX">關閉</button></div>
+    <p class="mnote">兩支手機直接連線，不用帳號。一個人按「建立房間」把邀請碼傳給朋友；朋友貼上按「加入／連線」，再把回覆碼傳回來；開房的人貼上回覆碼按「加入／連線」。用開房的人選的地圖，先到 10 殺。</p>
+    <label class="dl"><span>暱稱</span><input id="duelName" maxlength="12" placeholder="對方會看到的名字"></label>
+    <div class="row"><button class="btn go" id="duelHost">建立房間</button></div>
+    <label class="dl"><span id="duelMineL">你的代碼</span><textarea id="duelMine" rows="2" readonly placeholder="按「建立房間」或貼上邀請碼後，這裡會出現要傳給對方的代碼"></textarea></label>
+    <div class="row"><button class="btn" id="duelShare">分享／複製</button></div>
+    <label class="dl"><span>對方給你的代碼</span><textarea id="duelTheirs" rows="2" placeholder="貼上朋友傳來的邀請碼（DSO1…）或回覆碼（DSA1…）" spellcheck="false"></textarea></label>
+    <div class="row"><button class="btn" id="duelJoin">加入／連線</button><button class="btn go" id="duelGo" hidden>開始</button></div>
+    <p id="duelSt" class="mnote"></p>
+    <p class="mnote">連線時雙方會看到彼此的網路位址（IP），只跟認識的人玩。有些網路（例如雙方都用行動網路）可能連不上，換 Wi-Fi 再試。</p>
+  </div></div>
   <div id="toast" hidden></div>
   <div id="kc" hidden><b>擊殺鏡頭</b><span id="kcN"></span><small>點一下跳過</small></div>
   <div id="prog" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>成長</h2><button class="btn go" id="pgX">好了</button></div>

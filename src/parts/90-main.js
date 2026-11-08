@@ -90,6 +90,7 @@ function syncMenuHints() {
   $('firstHint').hidden = !first; $('bTut').classList.toggle('go', first); $('bMatch').classList.toggle('go', !first);
 }
 function backToMenu() {
+  if (game.mode === 'duel' && NET.on) netSend({ t: 'end', win: true });   // 中途離開算對方贏
   clearNades(); resetBomb(); closeBuy(); leaveMode(); TUT.on = false; beacon.visible = false; $('tut').hidden = true; $('tutDone').hidden = true; syncMenuHints(); syncMenuLevel(); KC.on = false; $('kc').hidden = true;
   closeRadio(); $('bRadio').hidden = true; $('bBuy').hidden = true;
   game.state = 'menu'; $('over').hidden = true; $('pause').hidden = true; $('dead').hidden = true; $('hud').hidden = true; $('bPause').hidden = true; $('bBoard').hidden = true; $('touch').hidden = true;
@@ -109,7 +110,10 @@ onTap($('bTut'), () => startGame('tutorial'));
 onTap($('bStats'), openStats);
 onTap($('bPerf'), openPerf);
 onTap($('bMatch'), () => startGame('match'));
-onTap($('bAgain'), () => startGame(game.lastMode || 'match'));
+onTap($('bAgain'), () => {
+  if (game.lastMode === 'duel') { if (NET.state === 'linked' && NET.role === 'host') startDuel(S.map, NET.goal, true); else { backToMenu(); openDuelUI(); netStatus(NET.state === 'linked' ? '等開房的人按「開始」' : '連線已中斷，請重新配對'); } return; }
+  startGame(game.lastMode || 'match');
+});
 onTap($('bMenu'), backToMenu);
 $('bBoard').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); $('bBoard').classList.toggle('on'); boardT = 0; });
 onTap($('bSet1'), () => { syncSettingsUI(); $('pause').hidden = false; $('bResume').textContent = '好了'; $('bRespawn').hidden = true; game.fromMenu = true; });
@@ -165,7 +169,7 @@ function autoQuality() {
   }
 }
 function step(dt) {
-  game.t += dt; updateToast(dt); updateReverb(dt); updateCues(dt);
+  game.t += dt; updateToast(dt); updateReverb(dt); updateCues(dt); netUpdate(dt);
   updateAmbience(dt);
   if (game.state === 'menu') {
     // 選單背景：鏡頭繞著倉庫慢慢轉
@@ -259,4 +263,4 @@ requestAnimationFrame(frame);
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
-  levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };
+  levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };

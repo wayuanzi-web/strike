@@ -96,7 +96,7 @@ function updateDrops(dt) {
   }
   // 機器人：沒有主武器、腳邊有槍就撿
   for (const b of bots) {
-    if (!b.active || !b.alive || b.primary || b.dummy) continue;
+    if (!b.active || !b.alive || b.primary || b.dummy || b.remote) continue;
     const d = nearDrop(b.phys.pos, 1.2, (x) => x.def.slot === 'primary'); if (d) takeDrop(b, d);
   }
 }

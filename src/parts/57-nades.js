@@ -73,6 +73,7 @@ function explodeHE(n) {
   spawnSparks(p, _v2.set(0, 1, 0), '#ffd27a', 18);
   addDecal(_v2.set(p.x, 0.005, p.z), [0, 1, 0], 9, _scorch);
   sfx('boom', 1, { pos: p });
+  if (n.owner && n.owner.remote) return;   // 好友對戰：對手丟的手榴彈傷害由他那台算
   const units = [player].concat(bots.filter((b) => b.active));
   for (const u of units) {
     if (!u.alive) continue;
@@ -201,6 +202,7 @@ function updateFires(dt) {
     f.tick += dt;
     if (f.tick >= 0.25) {
       f.tick -= 0.25;
+      if (f.owner && f.owner.remote) continue;   // 好友對戰：對手的火傷害由他那台算
       for (const u of [player].concat(bots.filter((b) => b.active))) {
         if (!u.alive || (u.team === f.team && u !== f.owner)) continue;
         const up = u.body.pos; if (Math.abs(up.y - f.y) > 1.2 || Math.hypot(up.x - f.x, up.z - f.z) > f.r) continue;

@@ -182,7 +182,7 @@ function updateWeapon(dt, wantFire, auto, dist) {
       const before = W.throwT; W.throwT -= dt;
       if (before > 0.14 && W.throwT <= 0.14) {
         const k = INV.nade; INV[k]--; eyePos(_o); aimDir(_d);
-        throwNade(k, _o, _d, player, player.body.vel);
+        throwNade(k, _o, _d, player, player.body.vel); if (game.mode === 'duel') netNade(k, _o, _d, player.body.vel);
       }
       if (W.throwT <= 0) { W.throwT = 0; if (INV[INV.nade] > 0) { W.deployT = 0.35; } else if (NADE_ORDER.some((n) => INV[n] > 0)) cycleNade(); else equip(INV[INV.last] ? INV.last : bestSlot(), true); }
     } else if (wantFire && !auto && player.alive && W.deployT <= 0 && INV[INV.nade] > 0) { W.throwT = 0.42; sfx('magout', 0.6); }
@@ -259,6 +259,7 @@ function shoot() {
     if (k < 3) spawnTracer(_mz, _hit, '#ffe0a0', n > 1 ? 0.018 : 0.028);
   }
   if (anyHit) W.hits++;
+  if (game.mode === 'duel') netShot(_mz, _hit, decals > 0);
   for (const [bot, e] of _pel) {
     player.dealt += Math.min(e.dmg, Math.max(0, bot.hp)); player.dealtHits++;
     damageBot(bot, e.dmg, e.part, e.dir, player, WP);

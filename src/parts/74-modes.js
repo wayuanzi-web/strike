@@ -34,7 +34,7 @@ function modeLoadout(b) {
 // 重生位置：搶點回自己出生區；死鬥挑離大家遠、沒人看得到的路點
 function modeSpawnFor(u) {
   if (game.mode === 'koth') { const list = TEAM_SPAWN[u.team === 'A' ? 'atk' : 'def']; return list[(u === player ? 0 : (u.i % (list.length - 1)) + 1)] || list[0]; }
-  if (game.mode === 'dm') {
+  if (game.mode === 'dm' || game.mode === 'duel') {
     let best = null, bs = -1e9;
     for (let k = 0; k < 40; k++) {
       const n = pick(NAV.nodes); if (!n.ok || !n.nb.length || n.up) continue;
@@ -193,7 +193,11 @@ function endMode() {
   if (pointerLocked()) document.exitPointerLock();
   for (const b of bots) if (b.dummy) { b.alive = false; b.g.visible = false; }
 }
-function leaveMode() { removeZone(); MODE.rg = null; MODE.kind = ''; document.body.classList.remove('mode'); for (const b of bots) { b.dummy = false; } }
+function leaveMode() {
+  removeZone(); MODE.rg = null; MODE.kind = ''; document.body.classList.remove('mode');
+  for (const b of bots) { b.dummy = false; if (b.remote) { b.remote = false; b.name = b.baseName || b.name; } }
+  if (typeof NET !== 'undefined') { NET.on = false; NET.remote = null; }
+}
 
 // ---------- 上方的分數列（借用對戰的版面）、死鬥的記分板 ----------
 function modeHud() {

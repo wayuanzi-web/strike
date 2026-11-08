@@ -51,6 +51,7 @@ function drawBoard() {
 }
 let boardT = 0;
 function hudMatch(dt) {
+  if (game.mode === 'duel') { duelHud(); return; }
   if (isMode()) { modeHud(); return; }
   const m = game.mode === 'match';
   $('mtop').hidden = !m; $('ptop').hidden = m; $('bBoard').hidden = !m;

@@ -92,7 +92,7 @@ function makeBot(name, team) {
   b.body = b.phys;   // 物理身體：玩家程式用 bot.body，機器人程式用 bot.phys，是同一個
   b.gunM = mdl.gunM; b.gunP = mdl.gunP; b.money = 0; b.trait = TRAIT_OF[name] || ''; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.kit = false;
   b.wpn = WEAPONS.rifle; b.mag = 30; b.reloadT = 0; b.blindT = 0; b.useT = 0;
-  b.baseTeam = team;
+  b.baseTeam = team; b.baseName = name;
   if (team === 'A') { b.tag = nameTag(name); b.g.add(b.tag); }
   b.g.visible = false;
   bots.push(b);
@@ -120,7 +120,7 @@ function setupBots(mode) {
   const cnt = { A: 0, B: 0 };
   for (const b of bots) {
     b.team = b.baseTeam;
-    b.active = mode === 'match' ? true : mode === 'tutorial' || mode === 'range' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : (b.team === 'B' && b.i < 4); b.dummy = false;
+    b.active = mode === 'match' ? true : mode === 'tutorial' || mode === 'range' || mode === 'duel' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : (b.team === 'B' && b.i < 4); b.dummy = false;
     if (mode === 'dm') b.team = 'D' + b.i;   // 死鬥：每個人自己一隊
     b.kills = b.deaths = b.heads = 0;
     if (mode !== 'match') { b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b); }
@@ -274,6 +274,7 @@ function botsHearShot(pos, team = 'A') {
 }
 // 機器人被打：attacker 是你或另一隻機器人
 function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
+  if (b.remote) { netHitRemote(b, dmg, part, weapon || WP); return; }   // 好友對戰：傷害交給對方那台算
   if (!b.alive) return;
   b.hp -= dmg;
   const byPlayer = attacker === player, w = weapon || (byPlayer ? WP : attacker.wpn) || WEAPONS.rifle;
@@ -361,6 +362,7 @@ function updateBot(b, dt) {
     return;
   }
   if (b.tag) b.tag.visible = b.team === player.team;
+  if (b.remote) { netDriveRemote(b, dt); botModel(b, dt); return; }   // 好友對戰：對手的位置來自網路
   // 教學的靶子：不會看、不會開槍，一直面向你
   if (b.dummy) { b.state = 'hold'; b.holdT = 99; b.holdObj = false; b.blindT = 99; b.target = null; b.visible = false; b.path = null; b.holdYaw = Math.atan2(-(player.body.pos.x - b.phys.pos.x), -(player.body.pos.z - b.phys.pos.z)); b.holdCrouch = false; }
   if (b.flinchT > 0) b.flinchT -= dt;
@@ -542,7 +544,11 @@ function updateBot(b, dt) {
   }
   // 看的高低（觀戰鏡頭用）
   b.pitch = tg && b.visible ? Math.atan2(tg.body.pos.y + tg.body.h * 0.7 - (p.y + b.phys.h - 0.14), dist) : b.pitch * 0.9;
-  // 模型
+  botModel(b, dt);
+}
+// 模型：位置、走路、蹲、中彈與動作、腳步聲、槍口火光、明暗、命中框（好友對戰的對手也用這個）
+function botModel(b, dt) {
+  const p = b.phys.pos;
   b.g.position.copy(p); b.g.rotation.set(0, b.yaw, 0);
   const sp = Math.hypot(b.phys.vel.x, b.phys.vel.z);
   b.walk += dt * sp * 2.6;
