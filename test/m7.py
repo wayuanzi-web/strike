@@ -45,7 +45,7 @@ async def main():
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; s.startGame('match'); s.game.freezeBots = false; R.phase = 'live'; R.t = 100; R.liveT = 1;
           for (const b of s.bots) if (b.team === 'B') { b.phys.pos.set(34, 0, 24 - b.i); b.blindT = 999; b.alive = false; b.g.visible = false; }
           s.player.alive = true; s.player.body.pos.set(-20, 0, 6);
-          s.giveOrder('follow'); for (let i = 0; i < 60 * 10; i++) { s.player.body.pos.set(-20, 0, 6); s.step(1/60); }
+          s.giveOrder('follow'); for (let i = 0; i < 60 * 14; i++) { s.player.body.pos.set(-20, 0, 6); s.step(1/60); }
           const al = s.bots.filter((b) => b.team === 'A' && b.alive), d1 = al.map((b) => +Math.hypot(b.phys.pos.x + 20, b.phys.pos.z - 6).toFixed(1));
           s.player.body.pos.set(-10, 0, -10); s.player.yaw = 0; s.giveOrder('hold'); for (let i = 0; i < 60 * 12; i++) { s.player.body.pos.set(-30, 0, 0); s.step(1/60); }
           const d2 = al.map((b) => +Math.hypot(b.phys.pos.x + 10, b.phys.pos.z + 10).toFixed(1));
