@@ -126,7 +126,7 @@ const MAPS = {
   },
   // ---------- 3. 黃昏鐵道：調車場、月台、吊車 ----------
   rail: {
-    id: 'rail', name: '黃昏鐵道', sub: '黃昏・調車場與月台', floor: 'gravel', defEdge: 0.68,
+    id: 'rail', name: '黃昏鐵道', sub: '黃昏・調車場與月台', floor: 'gravel', defEdge: 0.76,
     theme: { sun: [-0.84, 0.3, -0.34], sunColor: '#ffa468', sunI: 2.9, hemi: ['#a99fd0', '#8a6a56', 1.75], fog: ['#b98f8a', 55, 230], exposure: 1.12,
       sky: { zen: '#2b2f6a', mid: '#8a6fa8', hor: '#ff9a6a', low: '#4a3a44', warm: '#ffb070' }, skyline: 'rail', skyTop: '#5d5068', skyBot: '#3a3142', amb: 'rail' },
     build() {
