@@ -10,13 +10,53 @@ function hudHurt(rel, dmg) {
   const b = document.createElement('b'); b.style.transform = `rotate(${-rel}rad)`; b.dataset.t = '1.2';
   dirs.appendChild(b); while (dirs.children.length > 4) dirs.firstChild.remove();
 }
-function hudFeed(killer, victim, head, you) {
+// 擊殺訊息：kTeam/vTeam 決定顏色（我方青、敵方紅、你自己琥珀），跟你有關的那條加框
+function hudFeed(killer, victim, head, kTeam, vTeam, byPlayer) {
+  const cls = (name, team) => name === '你' ? 'you' : team === 'A' ? 'ally' : 'bot';
   const p = document.createElement('p');
-  const k = document.createElement('span'); k.className = you ? 'you' : 'bot'; k.textContent = killer;
+  const k = document.createElement('span'); k.className = cls(killer, kTeam); k.textContent = killer;
   const m = document.createElement('span'); m.className = 'hs'; m.textContent = head ? '◎ 爆頭 ›' : '›';
-  const v = document.createElement('span'); v.className = you ? 'bot' : 'you'; v.textContent = victim;
-  p.append(k, m, v); p.dataset.t = '5'; p.className = 'mine';
+  const v = document.createElement('span'); v.className = cls(victim, vTeam); v.textContent = victim;
+  p.append(k, m, v); p.dataset.t = '5'; if (killer === '你' || victim === '你') p.className = 'mine';
   const f = $('feed'); f.appendChild(p); while (f.children.length > 4) f.firstChild.remove();
+}
+// 回合橫幅（第幾回合、勝負）
+let bannerT = 0;
+function hudBanner(title, sub, sec = 2.5, cls = '') {
+  const b = $('banner'); $('bnT').textContent = title; $('bnS').textContent = sub || ''; b.className = cls; b.hidden = false; b.style.opacity = 1; bannerT = sec;
+}
+function fmtClock(t) { t = Math.max(0, Math.ceil(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }
+function pips(el, team) {
+  const units = (team === 'A' ? [player] : []).concat(bots.filter((b) => b.active && b.team === team));
+  const key = units.map((u) => u.alive ? 1 : 0).join('');
+  if (el.dataset.k === key) return; el.dataset.k = key;
+  el.innerHTML = units.map((u) => `<i class="${u.alive ? '' : 'dead'}"></i>`).join('');
+}
+// 計分板：兩隊每個人的擊殺、陣亡、爆頭
+function drawBoard() {
+  const row = (u, team) => `<tr class="${team}${u === player ? ' me' : ''}${u.alive ? '' : ' dead'}"><td>${u.name}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td><td class="n">${u.heads || 0}</td><td class="n">${u.alive ? Math.ceil(u.hp) : '—'}</td></tr>`;
+  const A = [player].concat(bots.filter((b) => b.active && b.team === 'A')).sort((a, b) => b.kills - a.kills);
+  const B = bots.filter((b) => b.active && b.team === 'B').sort((a, b) => b.kills - a.kills);
+  $('board').innerHTML = `<table><tr><th>我方 ${ROUND.score.A}</th><th class="n">殺</th><th class="n">死</th><th class="n">爆頭</th><th class="n">血</th></tr>${A.map((u) => row(u, 'A')).join('')}
+    <tr class="gap"><td colspan="5"></td></tr><tr><th>敵方 ${ROUND.score.B}</th><th class="n">殺</th><th class="n">死</th><th class="n">爆頭</th><th class="n">血</th></tr>${B.map((u) => row(u, 'B')).join('')}</table>`;
+}
+let boardT = 0;
+function hudMatch(dt) {
+  const m = game.mode === 'match';
+  $('mtop').hidden = !m; $('ptop').hidden = m; $('bBoard').hidden = !m;
+  if (!m) { $('board').hidden = true; $('spec').hidden = true; return; }
+  const clk = $('clk');
+  if (ROUND.phase === 'freeze') { clk.textContent = fmtClock(ROUND.t); clk.className = 'frz'; }
+  else if (ROUND.phase === 'live') { clk.textContent = fmtClock(ROUND.t); clk.className = ROUND.t < 15 ? 'low' : ''; }
+  else clk.className = '';
+  $('rnd').textContent = ROUND.phase === 'freeze' ? '準備' : `第 ${ROUND.num} 回合`;
+  $('scA').textContent = ROUND.score.A; $('scB').textContent = ROUND.score.B;
+  pips($('pipsA'), 'A'); pips($('pipsB'), 'B');
+  const showBoard = $('bBoard').classList.contains('on') || ROUND.phase === 'end';
+  $('board').hidden = !showBoard;
+  if (showBoard && (boardT -= dt) <= 0) { boardT = 0.25; drawBoard(); }
+  const sp = !player.alive && ROUND.phase !== 'over' ? spectateTarget() : null;
+  $('spec').hidden = !sp; if (sp) $('specN').textContent = sp.name + `（${Math.ceil(sp.hp)}）`;
 }
 function hudTip(text, sec = 2.5) { const t = $('tip'); t.textContent = text; t.hidden = false; t.style.opacity = 1; tipT = sec; }
 
@@ -42,9 +82,11 @@ function hudUpdate(dt) {
   for (const p of [...$('feed').children]) { const t = +p.dataset.t - dt; p.dataset.t = t; if (t < 0.5) p.style.opacity = Math.max(0, t * 2); if (t <= 0) p.remove(); }
   if (tipT > 0) { tipT -= dt; if (tipT < 0.5) $('tip').style.opacity = Math.max(0, tipT * 2); if (tipT <= 0) $('tip').hidden = true; }
   const hp = Math.ceil(player.hp);
+  const specOn = !!game.specBot; $('hp').hidden = specOn; $('ammo').hidden = specOn;
   if (hp !== lastHp) { lastHp = hp; $('hpN').textContent = hp; $('hpI').style.width = hp + '%'; $('hp').classList.toggle('low', hp < 30); }
   if (W.ammo * 1000 + W.reserve !== lastAmmo) { lastAmmo = W.ammo * 1000 + W.reserve; $('ammoN').textContent = W.ammo; $('ammoR').textContent = '/ ' + W.reserve; $('ammo').classList.toggle('low', W.ammo <= 6); }
-  drawRadar(dt);
+  drawRadar(dt); hudMatch(dt);
+  if (bannerT > 0) { bannerT -= dt; if (bannerT < 0.4) $('banner').style.opacity = Math.max(0, bannerT / 0.4); if (bannerT <= 0) $('banner').hidden = true; }
   if (player.kills !== lastK) { lastK = player.kills; $('sK').textContent = player.kills; }
   if (player.deaths !== lastD) { lastD = player.deaths; $('sD').textContent = player.deaths; }
   if (player.heads !== lastH) { lastH = player.heads; $('sH').textContent = player.heads; }
@@ -105,23 +147,24 @@ function radarMap() {
 function drawRadar(dt) {
   radarT -= dt; if (radarT > 0) return; radarT = 1 / 15;
   if (!radarBase) radarBase = radarMap();
-  const W2 = radar.width, s = W2 / 2 / RADAR_R, p = player.body.pos;
+  const W2 = radar.width, s = W2 / 2 / RADAR_R, p = camera.position;
   rctx.clearRect(0, 0, W2, W2); rctx.save();
   rctx.beginPath(); rctx.arc(W2 / 2, W2 / 2, W2 / 2 - 1, 0, Math.PI * 2); rctx.clip();
-  const th = Math.PI - player.yaw;   // 讓你面對的方向朝上
+  const th = Math.PI - camera.rotation.y;   // 讓面對的方向朝上
   rctx.translate(W2 / 2, W2 / 2); rctx.rotate(th); rctx.scale(s / 4, s / 4);
   rctx.drawImage(radarBase, -(p.x + 37) * 4, -(27 - p.z) * 4);
   rctx.restore();
-  // 敵人紅點
-  eyePos(_v1);
+  // 隊友藍點（一直看得到）、敵人紅點（被我方任何人看到、或剛開槍 1.5 秒內）
+  _v1.copy(camera.position);
   for (const b of bots) {
-    if (!b.alive) continue;
-    const seen = game.t - (b.firedAt || -9) < 1.5 || lineClear(_v1, _v2.set(b.phys.pos.x, b.phys.pos.y + 1.5, b.phys.pos.z));
+    if (!b.active || !b.alive) continue;
+    const ally = b.team === 'A';
+    const seen = ally || b.spottedT > 0 || game.t - (b.firedAt || -9) < 1.5 || (player.alive && lineClear(_v1, _v2.set(b.phys.pos.x, b.phys.pos.y + 1.5, b.phys.pos.z)));
     if (!seen) continue;
     const dx = b.phys.pos.x - p.x, my = -(b.phys.pos.z - p.z), c = Math.cos(th), sn = Math.sin(th);
     const rx = (dx * c - my * sn) * s, ry = (dx * sn + my * c) * s, d = Math.hypot(rx, ry), lim = W2 / 2 - 6;
     const kx = d > lim ? rx / d * lim : rx, ky = d > lim ? ry / d * lim : ry;
-    rctx.fillStyle = '#ff4a3d'; rctx.beginPath(); rctx.arc(W2 / 2 + kx, W2 / 2 + ky, 5, 0, Math.PI * 2); rctx.fill();
+    rctx.fillStyle = ally ? '#5fd8ee' : '#ff4a3d'; rctx.beginPath(); rctx.arc(W2 / 2 + kx, W2 / 2 + ky, ally ? 4.5 : 5, 0, Math.PI * 2); rctx.fill();
   }
   // 視野扇形與北方標記
   rctx.fillStyle = 'rgba(255,179,71,.14)'; rctx.beginPath(); rctx.moveTo(W2 / 2, W2 / 2);

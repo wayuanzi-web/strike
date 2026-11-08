@@ -67,6 +67,7 @@ function updateWeapon(dt, wantFire, auto, dist) {
   // 自動開火的點放：中遠距離打 4 發停 0.28 秒，讓花紋與散佈回來；8 公尺內才全自動
   if (auto && dist > 8 && W.autoPause > 0) wantFire = false;
   if (!auto) W.autoN = 0;
+  if (roundFrozen()) wantFire = false;
   if (wantFire && player.alive && W.reloadT <= 0 && W.deployT <= 0) {
     if (W.ammo <= 0) {
       if (W.emptyClick <= 0) { sfx('empty'); W.emptyClick = 0.3; if (W.reserve <= 0) hudTip('沒子彈了：擊倒機器人補彈，或陣亡後補滿', 2); }
@@ -130,14 +131,14 @@ function shoot() {
   ejectShell();
   sfx('shot');
   try { if (navigator.vibrate && INPUT.mode === 'touch') navigator.vibrate(8); } catch (e) { /* iPhone 不支援震動 */ }
-  botsHearShot(player.body.pos);
+  botsHearShot(player.body.pos, 'A');
 }
 // 一條射線：先找打到的牆，再看有沒有更近的機器人
 function traceShot(o, d, range) {
   const w = rayWorld(o, d, range);
   let t = w ? w.t : range, bot = null, part = null;
   for (const b of bots) {
-    if (!b.alive) continue;
+    if (!b.active || !b.alive || b.team !== 'B') continue;   // 子彈會穿過隊友（不會誤傷）
     const h = rayBody(o, d, b.boxes, t);
     if (h) { t = h.t; bot = b; part = h.part; }
   }

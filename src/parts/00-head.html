@@ -60,7 +60,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 #feed { position: absolute; top: calc(var(--st) + var(--u) * 2); right: calc(var(--sr) + var(--u) * 3); display: grid; gap: 3px; justify-items: end; font-size: calc(var(--u) * 3); }
 #feed p { margin: 0; background: var(--panel); padding: calc(var(--u) * .5) calc(var(--u) * 1.6); border-radius: 3px; transition: opacity .4s; }
 #feed p.mine { box-shadow: inset 0 0 0 1px var(--dawn); }
-#feed .you { color: var(--dawn); } #feed .bot { color: #ff8f80; } #feed .hs { color: var(--head); font-family: var(--f-num); font-weight: 800; margin: 0 .3em; }
+#feed .you { color: var(--dawn); } #feed .bot { color: #ff8f80; } #feed .ally { color: #7fe9f0; } #feed .hs { color: var(--head); font-family: var(--f-num); font-weight: 800; margin: 0 .3em; }
 #radar { position: absolute; left: calc(var(--sl) + var(--u) * 3); top: calc(var(--st) + var(--u) * 16); width: calc(var(--u) * 26); height: calc(var(--u) * 26);
   border-radius: 50%; background: rgba(10,16,24,.55); box-shadow: 0 0 0 1px rgba(255,228,190,.25); }
 #fps { position: absolute; top: calc(var(--st) + var(--u) * 42); left: calc(var(--sl) + var(--u) * 3); font: 600 max(11px, calc(var(--u) * 2.8)) var(--f-num); color: var(--ok); background: var(--panel); padding: 1px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; }
@@ -126,6 +126,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 .btn { min-height: 44px; padding: calc(var(--u) * 2) calc(var(--u) * 5); border-radius: 6px; background: rgba(255,255,255,.08); border: 1px solid var(--line);
   font-size: calc(var(--u) * 3.6); font-weight: 700; letter-spacing: .08em; touch-action: manipulation; }
 .btn.go { background: var(--dawn); color: var(--dawn-ink); border-color: var(--dawn); }
+.mnote { margin: 0; color: var(--mute); font-size: max(12px, calc(var(--u) * 2.8)); line-height: 1.5; }
 .help { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: calc(var(--u) * 1.4) calc(var(--u) * 4); margin: 0; padding: 0; list-style: none;
   font-size: calc(var(--u) * 2.9); color: var(--mute); }
 .help b { color: var(--bone); font-weight: 600; margin-right: .4em; }
@@ -144,7 +145,42 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
 #dead p { margin: 0; text-align: center; color: var(--mute); font-size: calc(var(--u) * 3.4); }
 #dead .card { width: auto; justify-items: center; }
 #pause { z-index: 8; }
-#dead { background: linear-gradient(180deg, rgba(40,6,4,0) 40%, rgba(40,6,4,.55)); align-items: end; padding-bottom: calc(var(--sb) + var(--u) * 6); }
+#dead { background: linear-gradient(180deg, rgba(40,6,4,0) 40%, rgba(40,6,4,.55)); align-items: end; padding-bottom: calc(var(--sb) + var(--u) * 6); pointer-events: none; }
+body.match #dead { background: none; }
+
+/* ---------- 對戰模式：比分與計時、存活人數、回合橫幅、計分板、觀戰、賽末 ---------- */
+#mtop { position: absolute; top: calc(var(--st) + var(--u) * 2); left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 2px; font-family: var(--f-num); }
+#mtop > div { background: var(--panel); display: flex; align-items: center; gap: calc(var(--u) * 1.4); padding: calc(var(--u) * .6) calc(var(--u) * 2); }
+#mtop .tm b { font-size: calc(var(--u) * 6); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+#mtop .a { border-radius: 4px 0 0 4px; } #mtop .a b { color: #7fe9f0; } #mtop .b { border-radius: 0 4px 4px 0; } #mtop .b b { color: #ff8f80; }
+#mtop .clk { flex-direction: column; gap: 0; min-width: calc(var(--u) * 15); justify-content: center; }
+#mtop .clk strong { font-size: calc(var(--u) * 5); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+#mtop .clk strong.low { color: var(--hurt); } #mtop .clk strong.frz { color: var(--dawn); }
+#mtop .clk small { font-family: var(--f-body); font-size: max(10px, calc(var(--u) * 2.2)); color: var(--mute); }
+.pips { display: flex; gap: 3px; } .pips i { width: calc(var(--u) * 1.6); height: calc(var(--u) * 3.4); border-radius: 2px; background: currentColor; opacity: .9; }
+.pips i.dead { opacity: .18; } .a .pips { color: #7fe9f0; } .b .pips { color: #ff8f80; }
+#banner { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); text-align: center; display: grid; gap: calc(var(--u) * 1); pointer-events: none; transition: opacity .4s; }
+#banner strong { font-family: var(--f-title); font-weight: 900; font-size: calc(var(--u) * 10); letter-spacing: .12em; color: var(--bone); text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+#banner span { font-size: max(12px, calc(var(--u) * 3.4)); color: var(--bone); text-shadow: 0 1px 6px rgba(0,0,0,.7); letter-spacing: .06em; }
+#banner.win strong { color: #7fe9f0; } #banner.lose strong { color: #ff8f80; }
+#bBoard { position: absolute; left: calc(var(--sl) + var(--u) * 3 + max(44px, calc(var(--u) * 11)) + 8px); top: calc(var(--st) + var(--u) * 2.4); width: max(44px, calc(var(--u) * 11)); height: max(44px, calc(var(--u) * 11));
+  border-radius: 6px; background: var(--panel); display: grid; place-items: center; z-index: 5; }
+#bBoard svg { width: 52%; height: 52%; stroke: var(--bone); stroke-width: 2.2; fill: none; stroke-linecap: round; }
+#bBoard.on { background: rgba(255,179,71,.3); }
+#board { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 13); transform: translateX(-50%); width: min(92vw, 640px); background: rgba(10,15,22,.9); border: 1px solid var(--line);
+  border-radius: 8px; padding: calc(var(--u) * 2) calc(var(--u) * 3); pointer-events: none; z-index: 4; }
+#board table { width: 100%; border-collapse: collapse; font-size: max(12px, calc(var(--u) * 3)); font-variant-numeric: tabular-nums; }
+#board th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 6px; font-size: max(11px, calc(var(--u) * 2.5)); }
+#board td { padding: 3px 6px; border-top: 1px solid rgba(255,255,255,.06); } #board td.n { text-align: right; }
+#board tr.A td:first-child { color: #7fe9f0; } #board tr.B td:first-child { color: #ff8f80; } #board tr.me td { color: var(--dawn); font-weight: 700; }
+#board tr.dead td { opacity: .45; } #board .gap td { border: 0; height: 6px; }
+#spec { position: absolute; left: 50%; bottom: calc(var(--sb) + var(--u) * 13); transform: translateX(-50%); background: var(--panel); padding: calc(var(--u) * 1) calc(var(--u) * 3);
+  border-radius: 4px; font-size: max(12px, calc(var(--u) * 3)); white-space: nowrap; }
+#spec b { color: #7fe9f0; }
+#over .card { justify-items: center; text-align: center; width: min(100%, 520px); }
+#overT { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 12); letter-spacing: .15em; } #overT.win { color: #7fe9f0; } #overT.lose { color: #ff8f80; }
+#overS { font-family: var(--f-num); font-weight: 800; font-size: calc(var(--u) * 9); line-height: 1; }
+#over p { margin: 0; color: var(--mute); font-size: max(13px, calc(var(--u) * 3.2)); }
 #rotate { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; align-content: center; gap: 18px; background: var(--ink); text-align: center; padding: 24px; }
 #rotate svg { width: 96px; height: 96px; stroke: var(--dawn); fill: none; stroke-width: 2; animation: tilt 2.4s ease-in-out infinite; }
 #rotate p { margin: 0; font-size: 18px; line-height: 1.6; }
@@ -160,7 +196,11 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
     <div id="dirs"></div>
     <div id="xh"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="d"></i></div>
     <div id="hm"><i></i><i></i><i></i><i></i></div>
-    <div class="top"><div class="k"><small>擊殺</small><strong id="sK">0</strong></div><div><small>陣亡</small><strong id="sD">0</strong></div><div><small>爆頭</small><strong id="sH">0</strong></div></div>
+    <div id="mtop" hidden><div class="tm a"><b id="scA">0</b><span class="pips" id="pipsA"></span></div><div class="clk"><strong id="clk">1:55</strong><small id="rnd">第 1 回合</small></div><div class="tm b"><span class="pips" id="pipsB"></span><b id="scB">0</b></div></div>
+    <div id="banner" hidden><strong id="bnT"></strong><span id="bnS"></span></div>
+    <div id="board" hidden></div>
+    <div id="spec" hidden>觀戰：<b id="specN"></b>　點畫面右邊換人</div>
+    <div class="top" id="ptop"><div class="k"><small>擊殺</small><strong id="sK">0</strong></div><div><small>陣亡</small><strong id="sD">0</strong></div><div><small>爆頭</small><strong id="sH">0</strong></div></div>
     <div id="feed"></div>
     <canvas id="radar" width="128" height="128" aria-label="雷達"></canvas>
     <div id="fps" hidden>-- fps</div>
@@ -195,7 +235,8 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
         <li><b>左鍵</b>開火　<b>右鍵</b>開鏡</li>
         <li><b>C／Ctrl</b>蹲　<b>R</b>換彈　<b>Esc</b>暫停</li>
       </ul>
-      <div class="row"><button class="btn go" id="bStart">開始</button><button class="btn" id="bSet1">設定</button></div>
+      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bSet1">設定</button></div>
+      <p class="mnote">對戰：你和 4 個隊友對上 5 個「赤狼」，一條命一回合，先贏 7 回合獲勝。練習：4 個敵人，陣亡馬上重生。</p>
     </div>
   </div>
 
@@ -217,6 +258,9 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
     </div>
   </div>
 
+  <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
+  <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
+    <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
   <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadRep"></p><p id="deadT"></p></div></div>
   <div id="rotate" hidden><svg viewBox="0 0 48 48"><rect x="15" y="5" width="18" height="38" rx="3"/><path d="M21 38h6"/></svg><p>請把手機轉成橫向</p><small>破曉突擊只支援橫向畫面</small></div>
   <div id="boot">載入中…</div>

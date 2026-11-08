@@ -267,13 +267,13 @@ const shadowTex = (function () {
   c.fillStyle = g; c.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(cv);
 })();
 const blobShadows = new THREE.InstancedMesh((function () { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); return g; })(),
-  new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 8);
+  new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 12);
 blobShadows.frustumCulled = false; blobShadows.count = 0; scene.add(blobShadows);
 const SHADOW_YAW = Math.atan2(-SUN_DIR.x, -SUN_DIR.z);
 function updateBlobShadows() {
   let n = 0;
   for (const b of bots) {
-    if (!b.g.visible || !b.alive) continue;
+    if (!b.active || !b.g.visible || !b.alive) continue;
     const p = b.phys.pos, lit = b.lit === undefined ? 1 : b.lit;
     _q.setFromAxisAngle(_yAxis, SHADOW_YAW);
     _s1.set(0.75, 1, 2.2 * lit + 0.9 * (1 - lit));
@@ -349,8 +349,8 @@ function prerenderSounds() {
 }
 // 依位置算音量、悶的程度、左右、延遲
 function spatial(pos) {
-  const pp = player.body.pos, dx = pos.x - pp.x, dz = pos.z - pp.z, d = Math.hypot(dx, dz);
-  const rel = angDiff(player.yaw, Math.atan2(-dx, -dz));
+  const pp = camera.position, dx = pos.x - pp.x, dz = pos.z - pp.z, d = Math.hypot(dx, dz);
+  const rel = angDiff(camera.rotation.y, Math.atan2(-dx, -dz));
   return { d, vol: 1 / (1 + d / 12), lp: clamp(18000 * Math.exp(-d / 22), 900, 18000), pan: clamp(-Math.sin(rel) * 0.8, -0.8, 0.8), delay: d / 343 };
 }
 function playBuf(buf, vol, o = {}) {
@@ -403,4 +403,7 @@ function sfx(kind, vol = 1, o = {}) {
   }
   else if (kind === 'land') { noise(0.1, 420, 1, 0.45 * vol); noise(0.03, 1600, 2, 0.15 * vol, 'bandpass', 0.01); }
   else if (kind === 'ping') noise(0.05, 4500, 6, 0.25 * vol, 'bandpass');
+  else if (kind === 'win') { tone(523, 0.18, 0.12, 'triangle'); tone(659, 0.18, 0.12, 'triangle', 0.14); tone(784, 0.35, 0.14, 'triangle', 0.28); }
+  else if (kind === 'lose') { tone(392, 0.25, 0.12, 'triangle'); tone(311, 0.45, 0.12, 'triangle', 0.2); }
+  else if (kind === 'go') { tone(880, 0.08, 0.1, 'square'); tone(1320, 0.12, 0.1, 'square', 0.09); }
 }

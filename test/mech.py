@@ -98,7 +98,7 @@ async def main():
         r = await ev("""() => { const s = T.s; T.at(-34, -24); s.player.alive = false; const st = s.bots.map(b => { b.waitT = 0; b.state = 'patrol'; b.path = null; b.alive = true; b.hp = 100; return b.phys.pos.clone(); });
             const dist = s.bots.map(() => 0); let prev = s.bots.map(b => b.phys.pos.clone());
             T.run(20, () => { s.bots.forEach((b, i) => { dist[i] += b.phys.pos.distanceTo(prev[i]); prev[i].copy(b.phys.pos); }); });
-            s.player.alive = true; return dist.map(d => +d.toFixed(1)); }""")
+            s.player.alive = true; return dist.filter((d, i) => s.bots[i].active).map(d => +d.toFixed(1)); }""")
         ok('M 巡邏 20 秒都有走動', min(r) > 25, r)
         # N 效能：模擬一步（4 個機器人＋玩家）的時間
         r = await ev("() => { T.at(-30, 0); const t0 = performance.now(); T.run(5); return (performance.now() - t0) / 300; }")

@@ -33,4 +33,6 @@ const DIFF = {
   normal: { react: 0.7,  base: 1.55, distK: 0.045, dmg: 0.52, burst: [3, 4], pause: [0.4, 0.75], pMoveK: 2.8, headMul: 2.5, warn: 1, turn: 4.5, maxShooters: 2, settleK: 2.8, mercy: true },
   hard:   { react: 0.42, base: 1.1,  distK: 0.035, dmg: 0.72, burst: [3, 5], pause: [0.3, 0.55], pMoveK: 2.2, headMul: 3,   warn: 0, turn: 6.5, maxShooters: 3, settleK: 2.4, mercy: false },
 };
+// 隊友：普通的準度，不需要手下留情（只會打機器人）
+DIFF.ally = Object.assign({}, DIFF.normal, { mercy: false, warn: 0 });
 // mercy：簡單、普通才有的手下留情（畫面外先打偏、你血少或連死時手抖、血一半以上不會一發死）。困難全部拿掉

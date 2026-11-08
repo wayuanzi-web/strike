@@ -39,6 +39,7 @@ touchEl.addEventListener('pointerdown', (e) => {
     T.joyId = e.pointerId; T.ox = T.jx = x; T.oy = T.jy = y;
     placeJoyBase(); joyEl.className = 'on'; moveJoy(x, y);
   } else if (x >= window.innerWidth * 0.45) {
+    if (!player.alive && game.mode === 'match') nextSpectate();
     T.lookers.set(e.pointerId, { x, y }); if (T.lookId === null) T.lookId = e.pointerId; updateLooking();
   }
   try { touchEl.setPointerCapture(e.pointerId); } catch (err) { /* 有些瀏覽器不支援，照樣能用 */ }
@@ -148,6 +149,7 @@ function onMouseDown(e) {
   if (e.pointerType && e.pointerType !== 'mouse') return;
   if (game.state !== 'play') return;
   INPUT.mode = 'kb'; audioInit();
+  if (!player.alive && game.mode === 'match' && pointerLocked()) { nextSpectate(); return; }
   if (!pointerLocked()) { try { const p = lockTarget().requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* 不支援就算了 */ } return; }
   if (e.button === 0) INPUT.fire = true;
   if (e.button === 2 && !reloading()) player.ads = !player.ads;
