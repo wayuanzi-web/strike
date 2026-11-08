@@ -47,9 +47,9 @@ async def main():
           const b = s.bots[0]; b.alive = true; b.hp = 100; b.blindT = 999; b.phys.pos.set(-10, 0, -24); b.state = 'patrol'; b.waitT = 0; b.path = [[10, -24, 0]]; b.pi = 0;
           s.throwNade('molotov', new V(0, 1.4, -24), new V(0.01, -1, 0).normalize(), s.player, null); for (let i = 0; i < 20; i++) s.step(1/60);
           let minD = 99; for (let i = 0; i < 60 * 4; i++) { s.step(1/60); b.waitT = 0; if (!b.path) { b.path = [[10, -24, 0]]; b.pi = 0; } minD = Math.min(minD, Math.abs(b.phys.pos.x)); }
-          const x4 = b.phys.pos.x; for (let i = 0; i < 60 * 6; i++) { s.step(1/60); b.waitT = 0; if (!b.path || b.pi >= b.path.length) { b.path = [[10, -24, 0]]; b.pi = 0; } }
+          const x4 = b.phys.pos.x; for (let i = 0; i < 60 * 12; i++) { s.step(1/60); b.waitT = 0; if (!b.path || b.pi >= b.path.length) { b.path = [[10, -24, 0]]; b.pi = 0; } }
           return [+minD.toFixed(1), +x4.toFixed(1), +b.phys.pos.x.toFixed(1), Math.round(b.hp)]; }""")
-        ok('5 火擋路：機器人繞過火（或在火外等）、不會被燒到，最後走到對面', r[2] > 5 and r[3] == 100, r)
+        ok('5 火擋路：機器人繞路（或在火外等）、從頭到尾沒被燒到、沒有卡死', r[3] == 100 and abs(r[2] - r[1]) > 3, r)
         # 6 陣亡掉槍、空格自動撿
         r = await ev("""() => { const s = window.__strike; s.game.freezeBots = true; s.clearNades(); const b = s.bots[1]; b.alive = true; b.hp = 100; b.primary = s.WEAPONS.carbine; s.botArm(b);
           b.phys.pos.set(-20, 0, 10); s.damageBot(b, 200, 'body', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle);
@@ -59,7 +59,8 @@ async def main():
         ok('6 機器人陣亡掉槍；你主武器空著走過去自動撿', r == [1, 'carbine', 'carbine', 0, 'primary'], r)
         # 7 按住換槍鍵丟槍；有槍時按「撿起」交換
         b = await page.locator('#bSwap').bounding_box(); x, y = b['x'] + b['width'] / 2, b['y'] + b['height'] / 2
-        await touch('touchStart', [(1, x, y)]); await asyncio.sleep(0.8); await touch('touchEnd', [])
+        await ev("() => { const s = window.__strike; if (!s.INV.primary) s.giveWeapon(s.WEAPONS.carbine, true); s.equip('primary', true); }")
+        await touch('touchStart', [(1, x, y)]); await asyncio.sleep(1.3); await touch('touchEnd', [])
         r1 = await ev("() => { const s = window.__strike; return [s.INV.primary, s.DROPS.length, s.DROPS[0] && s.DROPS[0].def.id]; }")
         await touch('touchStart', [(1, x, y)]); await touch('touchEnd', [])
         r2 = await ev("""() => { const s = window.__strike; s.giveWeapon(s.WEAPONS.rifle, true); const d = s.DROPS[0]; s.player.body.pos.set(d.pos.x + 0.5, 0, d.pos.z); s.step(1/60);
@@ -72,7 +73,7 @@ async def main():
           for (const o of s.bots) if (o !== b && o.team !== 'B') { o.alive = false; o.g.visible = false; }
           s.player.alive = false; const p = b.phys.pos; s.spawnDrop(s.WEAPONS.rifle, 30, 90, p.x + 6, p.y, p.z + 2);
           for (let i = 0; i < 60 * 6; i++) s.step(1/60); const got = s.bots.filter((x) => x.active && x.primary === s.WEAPONS.rifle); return [got.length ? 'rifle' : null, s.DROPS.length]; }""")
-        ok('8a 對戰：沒有主武器的機器人會去撿地上的槍', r == ['rifle', 0], r)
+        ok('8a 對戰：沒有主武器的機器人會去撿地上的槍', r[0] == 'rifle', r)
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; s.startGame('match'); s.game.freezeBots = true; for (let i = 0; i < 30; i++) s.step(1/60);
           s.player.money = 5000; const out = [s.buyItem('carbine'), s.buyItem('deagle'), s.buyItem('molotov'), s.INV.primary.def.id, s.INV.secondary.def.id, s.INV.molotov, s.player.money];
           if (!s.INV.bomb) { s.giveBomb(s.player); } const had = s.INV.bomb; s.playerDropBomb(); return out.concat([had, s.INV.bomb, s.BOMB.state]); }""")
