@@ -80,7 +80,7 @@ function pickMap(id) {
   if (id === MAP.id) return;
   S.map = id; saveSettings();
   $('boot').textContent = '載入地圖中…'; $('boot').hidden = false;
-  setTimeout(() => { switchMap(id); menuBackdrop(); syncMapMenu(); $('boot').hidden = true; }, 30);
+  setTimeout(() => { if (switchMap(id)) PERF.mapLoads[id] = game.mapLoadMs; menuBackdrop(); syncMapMenu(); $('boot').hidden = true; }, 30);
 }
 // 選單提示：第一次玩建議先教學
 function syncMenuHints() {
@@ -104,6 +104,7 @@ function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = 
 onTap($('bStart'), () => startGame('practice'));
 onTap($('bTut'), () => startGame('tutorial'));
 onTap($('bStats'), openStats);
+onTap($('bPerf'), openPerf);
 onTap($('bMatch'), () => startGame('match'));
 onTap($('bAgain'), () => startGame('match'));
 onTap($('bMenu'), backToMenu);
@@ -145,15 +146,17 @@ function frame(now) {
   if (dt > 0.05) dt = 0.05; if (dt <= 0) dt = 0.001;
   if (!game.manual) step(dt);
   render();
+  perfFrame(raw * 1000);
   game.fpsAcc += raw; game.fpsN++;
   if (game.fpsAcc >= 0.5) { game.fps = game.fpsN / game.fpsAcc; game.fpsAcc = 0; game.fpsN = 0; autoQuality(); if (S.showFps) $('fps').textContent = Math.round(game.fps) + ' fps · ' + renderer.info.render.calls + ' draws'; }
 }
 // 畫質「自動」：玩的時候連續 3 秒低於 45fps，就把解析度往下降一階（最低 0.85 倍）
 function autoQuality() {
-  if (S.quality !== 'auto' || game.state !== 'play' || document.hidden || game.manual) { game.slowN = 0; return; }
+  if (S.quality !== 'auto' || game.state !== 'play' || document.hidden || game.manual || PERF.bench) { game.slowN = 0; return; }
   game.slowN = game.fps < 45 ? game.slowN + 1 : 0;
   if (game.slowN >= 6 && game.autoPR > 0.85) {
-    game.slowN = 0; game.autoPR = Math.max(0.85, +(game.autoPR - 0.2).toFixed(2)); applySize();
+    game.slowN = 0; const was = game.autoPR; game.autoPR = Math.max(0.85, +(game.autoPR - 0.2).toFixed(2)); applySize();
+    PERF.prChanges.push(`${was}→${game.autoPR}（${MAP.name}，${Math.round(game.fps)}fps）`);
     hudTip('畫面有點卡，自動降低解析度', 2);
   }
 }
@@ -241,10 +244,10 @@ document.body.classList.toggle('kb', !isTouch);
 applySize();
 // 先把所有材質編譯好，開局時不會卡一下
 try { renderer.compile(scene, camera); renderer.compile(vmScene, vmCam); } catch (e) { /* 舊瀏覽器略過 */ }
-$('boot').hidden = true; $('menu').hidden = false;
+$('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(performance.now());
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
 window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
-  INV, WEAPONS, NADES, BOMB, TUT, applyHand, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };
+  INV, WEAPONS, NADES, BOMB, TUT, applyHand, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive };

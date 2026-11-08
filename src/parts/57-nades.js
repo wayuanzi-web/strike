@@ -118,8 +118,9 @@ function popFlash(n) {
 const SMOKE_PTS = 26;
 function popSmoke(n) {
   const p = n.pos;
-  const geo = new THREE.BufferGeometry(), pos = new Float32Array(SMOKE_PTS * 3), off = [];
-  for (let i = 0; i < SMOKE_PTS; i++) {
+  const N = S.quality === 'eco' ? 14 : SMOKE_PTS;   // 省電：煙的顆粒少一半
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), off = [];
+  for (let i = 0; i < N; i++) {
     const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()), h = Math.random();
     off.push([Math.cos(a) * r, 0.15 + h * 0.85, Math.sin(a) * r, rand(0.2, 0.6) * (Math.random() < 0.5 ? -1 : 1)]);
   }
@@ -135,7 +136,7 @@ function updateSmokes(dt) {
     const grow = Math.min(1, s.t / 1.2), fade = clamp((s.life - s.t) / 2.5, 0, 1);
     s.r = 4.1 * Math.sqrt(grow) * (0.6 + 0.4 * fade);
     const a = s.pts.geometry.attributes.position;
-    for (let k = 0; k < SMOKE_PTS; k++) {
+    for (let k = 0; k < s.off.length; k++) {
       const o = off3(s, k);
       a.array[k * 3] = s.x + o[0] * s.r; a.array[k * 3 + 1] = s.y + o[1] * 3.4 * Math.sqrt(grow); a.array[k * 3 + 2] = s.z + o[2] * s.r;
     }

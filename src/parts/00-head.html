@@ -247,6 +247,9 @@ body.match #dead { background: none; }
 #stats th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 4px; } #stats td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.06); }
 #stats tr.w td:nth-child(3) { color: #7fe9f0; } #stats tr.l td:nth-child(3) { color: #ff8f80; }
 #touch .tb { scale: var(--bs, 1); }
+#perf { z-index: 10; } #perf .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; } #perfT { white-space: pre-wrap; font-size: max(11px, calc(var(--u) * 2.6)); line-height: 1.55; background: rgba(0,0,0,.3); padding: 10px; border-radius: 6px; margin: 0; user-select: text; -webkit-user-select: text; }
+#bench { position: absolute; left: 50%; top: calc(var(--st) + var(--u) * 14); transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; background: rgba(10,15,22,.85); border: 1px solid var(--dawn); border-radius: 8px; padding: 8px 14px; font-size: max(13px, calc(var(--u) * 3.2)); }
+#glLost { z-index: 20; }
 /* 左手模式：按鈕在左，所以血量、錢移到右下，雷達移到右上，擊殺訊息移到左邊 */
 body.lefty #hp, body.lefty #money { left: auto; right: calc(var(--sr) + var(--u) * 3); }
 body.lefty #radar { left: auto; right: calc(var(--sr) + var(--u) * 3); }
@@ -327,6 +330,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>準星跟著後座</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <div class="opt"><span>效能</span><div class="row"><button class="btn" id="bPerf">效能報告／跑分</button></div></div>
         <div class="opt"><span>操作手</span><div class="seg" data-k="lefty"><button data-v="0">右手（搖桿在左）</button><button data-v="1">左手（搖桿在右）</button></div></div>
         <div class="opt"><span>按鈕大小</span><div class="seg" data-k="btnScale"><button data-v="0.85">小</button><button data-v="1">中</button><button data-v="1.15">大</button></div></div>
         <div class="opt"><span>震動</span><div class="seg" data-k="vibrate"><button data-v="1">開</button><button data-v="0">關</button></div></div>
@@ -334,7 +338,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
         <div class="opt"><span>顯示幀數</span><div class="seg" data-k="showFps"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質「自動」會依手機速度調解析度，太卡就自動降；「省電」最低解析度、不開抗鋸齒、不畫遠景（切到或切出省電要重新整理才完全生效）。</p>
+        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質「自動」會依手機速度調解析度，太卡就自動降；「省電」最低解析度、不開抗鋸齒、不畫遠景（切到或切出省電要重新整理才完全生效）。iPhone 側邊的靜音開關打開時，遊戲不會有聲音。</p>
       </div>
     </div>
   </div>
@@ -349,6 +353,12 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>
   <div id="tutDone" class="ov" hidden><div class="card"><h2>教學完成</h2><p class="mnote">對戰時：準備時間先買東西；攻方帶炸彈去 A 或 B 點裝，守方守住或拆彈。活下來的人下回合保留裝備。</p>
     <div class="row"><button class="btn go" id="tutMatch">開始對戰</button><button class="btn" id="tutMenu">回選單</button></div></div></div>
+  <div id="perf" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>效能報告</h2>
+    <div class="row"><button class="btn go" id="perfCopy">複製報告</button><button class="btn" id="perfBench">跑分</button><button class="btn" id="perfX">關閉</button></div></div>
+    <p class="mnote">「跑分」會自動把三張地圖各打 12 秒（約 1 分鐘），量這台手機在目前畫質下的幀數。把報告複製貼給開發者就好。</p><pre id="perfT"></pre></div></div>
+  <div id="bench" hidden><span id="benchT">跑分中…</span><button class="btn" id="benchStop">停止</button></div>
+  <div id="glLost" class="ov" hidden><div class="card"><h2>畫面需要重新載入</h2><p class="mnote">手機記憶體不夠或放在背景太久時，系統會收回遊戲畫面。重新載入就好，設定和戰績都還在。</p>
+    <div class="row"><button class="btn go" id="glReload">重新載入</button></div></div></div>
   <div id="stats" class="ov" hidden><div class="card"><div class="row" style="justify-content:space-between"><h2>戰績</h2><div class="row"><button class="btn" id="statClear">清除戰績</button><button class="btn go" id="statX">好了</button></div></div>
     <div id="statBody"></div><p class="mnote">戰績只存在這台裝置的瀏覽器裡。</p></div></div>
   <div id="dead" class="ov" hidden><div class="card"><h2>陣亡</h2><p id="deadBy"></p><p id="deadRep"></p><p id="deadT"></p></div></div>

@@ -18,6 +18,8 @@ CDN = f'https://cdn.jsdelivr.net/npm/three@{THREE_VER}/build/three.module.min.js
 head = (parts / '00-head.html').read_text(encoding='utf8')
 js_files = sorted(parts.glob('*.js'))
 js = '\n'.join(p.read_text(encoding='utf8') for p in js_files)
+BUILD = time.strftime('%Y%m%d-%H%M')
+js = js.replace('__BUILD__', BUILD)   # 版本標記（效能報告會帶上）
 web_path = root / 'webparts' / '90-web.js'
 web_js = web_path.read_text(encoding='utf8') if web_path.exists() else ''
 

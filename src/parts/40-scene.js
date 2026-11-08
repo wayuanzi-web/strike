@@ -334,6 +334,7 @@ const sparkV = new Float32Array(SPARKS * 3), sparkL = new Float32Array(SPARKS), 
 for (let i = 0; i < SPARKS; i++) { sparkPos[i * 3 + 1] = -100; sparkC.push(new THREE.Color()); }
 let sparkI = 0;
 function spawnSparks(p, n, color, count) {
+  if (S.quality === 'eco') count = Math.ceil(count * 0.5);   // 省電：火花減半
   const c = new THREE.Color(color);
   for (let k = 0; k < count; k++) {
     const i = sparkI++ % SPARKS;
