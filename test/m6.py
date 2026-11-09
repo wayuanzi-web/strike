@@ -13,6 +13,7 @@ async def main():
         async def center(sel):
             b = await page.locator(sel).bounding_box(); return b['x'] + b['width'] / 2, b['y'] + b['height'] / 2
         async def tap(sel):
+            await page.locator(sel).evaluate("(e) => e.scrollIntoView({ block: 'center' })")   # 設定分組後有些按鈕要捲動才看得到
             x, y = await center(sel); await touch('touchStart', [(9, x, y)]); await touch('touchEnd', [])
         sim = lambda t: ev(SIM, t)
         await ev("() => { try { localStorage.removeItem('strike.settings'); } catch (e) {} }")
@@ -32,7 +33,7 @@ async def main():
         jx, jy = await ev("() => window.__strike.joyHome()")
         await touch('touchStart', [(2, jx, jy)]); await touch('touchMove', [(2, jx + 40, jy - 30)]); await touch('touchEnd', [])
         await page.screenshot(path=str(OUT / 'm6_edit.png'))
-        await tap('#edDone')
+        await tap("#edDone")
         r = await ev("() => { const s = window.__strike; return [s.ED.on, document.getElementById('pause').hidden, !!s.S.layout.joy, JSON.parse(localStorage.getItem('strike.settings')).layout]; }")
         ok('2 完成後回到設定、配置存進手機', (not r[0]) and (not r[1]) and r[2] and r[3]['bJump']['s'] == 1.4, r)
         # 3 重新整理後還在；左手模式左右對調

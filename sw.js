@@ -1,5 +1,5 @@
 /* 破曉突擊的離線快取。每次建置會換 CACHE 名稱，舊快取在啟用時清掉。 */
-const CACHE = 'strike-20261109074355';
+const CACHE = 'strike-20261109080146';
 const SHELL = ['./', 'index.html', 'three.module.min.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

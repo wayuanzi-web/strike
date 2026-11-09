@@ -53,7 +53,7 @@ function closeLayoutEdit() {
   saveSettings(); syncSettingsUI(); $('pause').hidden = false;
 }
 function selectEdit(id) {
-  ED.sel = id; for (const k of EDIT_IDS) $(k).classList.toggle('sel', k === id); syncEditBar();
+  ED.sel = id; for (const k of EDIT_IDS) { $(k).classList.toggle('sel', k === id); $(k).classList.remove('overlap'); } syncEditBar(); editOverlap();
 }
 function syncEditBar() {
   const L = ED.sel && layoutOf(ED.sel);
@@ -85,8 +85,21 @@ document.addEventListener('pointermove', (e) => {
   const under = px + r > bar.left && px - r < bar.right, top = under ? bar.bottom + r + 4 : r;
   const x = px / W0, y = clamp(e.clientY + ED.dy, Math.min(top, H0 - r), H0 - r) / H0;
   L.x = +(S.lefty ? 1 - x : x).toFixed(4); L.y = +y.toFixed(4);
-  applyLayout();
+  applyLayout(); editOverlap();
+  if (performance.now() - (ED.savedAt || 0) > 400) { ED.savedAt = performance.now(); saveSettings(); }   // 拖到一半也存（重新整理不會掉）
 }, true);
+// 跟別顆按鈕疊在一起：編輯列提示、選中的按鈕變紅框（照樣可以放，只是提醒）
+function editOverlap() {
+  if (!ED.sel) return;
+  const me = $(ED.sel).getBoundingClientRect(); let hit = '';
+  for (const k of EDIT_IDS) {
+    if (k === ED.sel) continue; const el = $(k); if (el.hidden || el.offsetParent === null) continue;
+    const r = el.getBoundingClientRect(), ox = Math.min(me.right, r.right) - Math.max(me.left, r.left), oy = Math.min(me.bottom, r.bottom) - Math.max(me.top, r.top);
+    if (ox > 8 && oy > 8) { hit = EDIT_NAME[k]; break; }
+  }
+  $(ED.sel).classList.toggle('overlap', !!hit);
+  $('edName').textContent = EDIT_NAME[ED.sel] + (hit ? `（和「${hit}」疊在一起，可能誤按）` : '');
+}
 document.addEventListener('pointerup', (e) => { if (ED.on && e.pointerId === ED.pid) { ED.pid = null; saveSettings(); } }, true);
 for (const [id, k, out] of [['edSize', 's', 'oEdSize'], ['edOp', 'o', 'oEdOp']]) {
   $(id).addEventListener('input', (e) => {

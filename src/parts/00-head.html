@@ -144,6 +144,11 @@ h2 { margin: 0; font-family: var(--f-title); font-size: calc(var(--u) * 5); lett
 .seg button { flex: 1; min-height: 38px; border-radius: 5px; background: rgba(255,255,255,.07); border: 1px solid var(--line); font-size: calc(var(--u) * 3); touch-action: manipulation; }
 .seg button[aria-pressed="true"] { background: var(--dawn); color: var(--dawn-ink); border-color: var(--dawn); font-weight: 700; }
 .set .note { font-size: calc(var(--u) * 2.6); color: var(--mute); margin: calc(var(--u) * -1) 0 0; }
+.set h3.sg { grid-column: 1 / -1; margin: calc(var(--u) * 2) 0 0; padding-bottom: 4px; border-bottom: 1px solid var(--line); font-size: max(13px, calc(var(--u) * 3.2)); color: var(--dawn-lt); letter-spacing: .1em; }
+.set h3.sg:first-child { margin-top: 0; }
+.set .sh { grid-column: 1 / -1; color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); margin-top: -4px; line-height: 1.4; }
+.seg button { white-space: nowrap; padding: 0 6px; }
+#gyroRow { display: grid; gap: inherit; }
 #dead h2 { color: var(--hurt); font-size: calc(var(--u) * 9); text-align: center; }
 #dead p { margin: 0; text-align: center; color: var(--mute); font-size: calc(var(--u) * 3.4); }
 #dead .card { width: auto; justify-items: center; }
@@ -221,13 +226,16 @@ body.match #dead { background: none; }
 #buy .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; padding: calc(var(--u) * 3) calc(var(--u) * 4); gap: calc(var(--u) * 2); touch-action: pan-y; }
 #buy header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 #buyMoney { font-family: var(--f-num); font-size: calc(var(--u) * 6); font-weight: 800; color: #9fe8a8; }
+body.buying #tut { z-index: 8; top: auto; bottom: calc(var(--sb) + 6px); width: min(60vw, 520px); }   /* 教學時打開購買：說明框移到下面、蓋在選單上 */
+#buy .buyNote { margin: 0; font-size: max(11px, calc(var(--u) * 2.4)); }
 #buyGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: calc(var(--u) * 1.4); }
 .bi { text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.6) calc(var(--u) * 2); min-height: 44px; border-radius: 6px; background: rgba(255,255,255,.07); border: 1px solid var(--line); touch-action: manipulation; }
 .bi small { color: var(--mute); font-size: max(10px, calc(var(--u) * 2.2)); } .bi b { font-size: max(13px, calc(var(--u) * 3.3)); }
 .bi span { color: var(--mute); font-size: max(10px, calc(var(--u) * 2.3)); } .bi em { font-style: normal; font-family: var(--f-num); font-weight: 700; font-size: max(13px, calc(var(--u) * 3.4)); color: #9fe8a8; }
 .bi:disabled { opacity: .45; } .bi:disabled em { color: var(--hurt); } .bi.own { opacity: .7; border-color: #9fe8a8; } .bi.own em { color: #9fe8a8; }
 .bi:not(:disabled):active { background: rgba(159,232,168,.25); }
-.maps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(var(--u) * 1.6); }
+.maps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--u) * 1.6); }
+@media (min-width: 700px) { .maps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }   /* 4 張地圖：一排 4 張或 2×2，不留單獨一張 */
 .maps button { text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); min-height: 44px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid var(--line); touch-action: manipulation; }
 .maps b { font-size: max(13px, calc(var(--u) * 3.4)); } .maps small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); }
 .maps button[aria-checked="true"] { border-color: var(--dawn); background: rgba(255,179,71,.16); } .maps button[aria-checked="true"] b { color: var(--dawn-lt); }
@@ -254,7 +262,7 @@ body.match #dead { background: none; }
 #stats tr.w td:nth-child(3) { color: var(--ally); } #stats tr.l td:nth-child(3) { color: var(--enemy); }
 #touch .tb { scale: var(--bs, 1); }
 #tutArrow { position: absolute; top: 45%; z-index: 4; padding: 6px 12px; border-radius: 6px; background: rgba(255,214,90,.9); color: #1a1408; font-weight: 800; font-size: max(13px, calc(var(--u) * 3.2)); pointer-events: none; animation: tutPulse 1s ease-in-out infinite; }
-#tutArrow.l { left: calc(var(--sl) + var(--u) * 4); } #tutArrow.r { right: calc(var(--sr) + var(--u) * 4); }
+#tutArrow.l { left: 27%; } #tutArrow.r { right: 29%; }   /* 放在搖桿和右邊按鈕之間，不蓋住按鈕 */
 @keyframes tutPulse { 50% { opacity: .55; } }
 .tb .tbl { position: absolute; bottom: 12%; font-style: normal; font-size: max(9px, calc(var(--u) * 2.1)); font-weight: 700; color: rgba(243,236,224,.8); pointer-events: none; }
 .tb:has(.tbl) svg { translate: 0 -12%; }
@@ -278,6 +286,7 @@ body.editing #touch .tb[hidden] { display: grid !important; }
 body.editing #touch .tb, body.editing #joy { outline: 2px dashed rgba(243,236,224,.35); outline-offset: 3px; }
 body.editing #joy { opacity: calc(.8 * var(--op, 1)); pointer-events: auto; }
 #touch .tb.sel, #joy.sel { outline: 3px solid var(--dawn) !important; }
+#touch .tb.sel.overlap, #joy.sel.overlap { outline-color: #ff5a4a !important; }
 body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadio, body.editing #bBoard { visibility: hidden; }
 #edit { position: absolute; left: 50%; top: calc(var(--st) + 8px); transform: translateX(-50%); z-index: 9; display: grid; grid-template-columns: auto auto auto auto; align-items: center; gap: 6px 14px;
   background: rgba(10,15,22,.92); border: 1px solid var(--dawn); border-radius: 10px; padding: 8px 14px; font-size: max(12px, calc(var(--u) * 3)); width: max-content; max-width: calc(100vw - 24px); }
@@ -397,33 +406,36 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div class="card">
       <div class="row" style="justify-content:space-between"><h2>設定</h2><div class="row"><button class="btn" id="bQuit">回選單</button><button class="btn" id="bRespawn">重來</button><button class="btn go" id="bResume">繼續</button></div></div>
       <div class="set">
-        <label for="sSens"><span>視角靈敏度</span><input type="range" id="sSens" min="0.3" max="3" step="0.05"><output id="oSens"></output></label>
-        <label for="sAds"><span>開鏡靈敏度</span><input type="range" id="sAds" min="0.2" max="1.2" step="0.05"><output id="oAds"></output></label>
-        <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>準星跟著後座力</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>效能</span><div class="row"><button class="btn" id="bPerf">效能報告／跑分</button></div></div>
-        <div class="opt"><span>操作手</span><div class="seg" data-k="lefty"><button data-v="0">右手（搖桿在左）</button><button data-v="1">左手（搖桿在右）</button></div></div>
-        <div class="opt"><span>按鈕位置</span><div class="row"><button class="btn" id="bLayout">自訂按鈕位置</button><small id="oLayout" class="mute"></small></div></div>
-        <div class="opt"><span>搖桿</span><div class="seg" data-k="joyMode"><button data-v="float">浮動</button><button data-v="fixed">固定</button></div></div>
-        <div class="opt"><span>前進鎖定</span><div class="seg" data-k="runLock"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>開鏡鍵</span><div class="seg" data-k="adsMode"><button data-v="toggle">按一下切換</button><button data-v="hold">按住</button></div></div>
-        <div class="opt"><span>蹲鍵</span><div class="seg" data-k="crouchMode"><button data-v="toggle">按一下切換</button><button data-v="hold">按住</button></div></div>
-        <div class="opt"><span>轉視角曲線</span><div class="seg" data-k="curve"><button data-v="linear">固定</button><button data-v="accel">加速</button></div></div>
-        <div class="opt"><span>陀螺儀瞄準</span><div class="seg" data-k="gyro"><button data-v="off">關</button><button data-v="ads">只在開鏡時</button><button data-v="on">一直開</button></div></div>
+        <h3 class="sg">瞄準</h3>
+        <label for="sSens"><span>視角靈敏度</span><input type="range" id="sSens" min="0.3" max="3" step="0.05"><output id="oSens"></output><small class="sh">1.0 是手指橫掃整個螢幕寬度約轉 180 度</small></label>
+        <label for="sAds"><span>開鏡靈敏度</span><input type="range" id="sAds" min="0.2" max="1.2" step="0.05"><output id="oAds"></output><small class="sh">開鏡時再乘上的倍數</small></label>
+        <div class="opt"><span>自動開火</span><div class="seg" data-k="autoFire"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">準星對到敵人就自己開槍（觸控才有）</small></div>
+        <div class="opt"><span>瞄準輔助</span><div class="seg" data-k="aimAssist"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">準星靠近敵人時稍微黏住、轉慢一點</small></div>
+        <div class="opt"><span>準星跟著後座力</span><div class="seg" data-k="followRecoil"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">連射時準星跑到子彈真正的落點</small></div>
+        <div class="opt"><span>轉視角曲線</span><div class="seg" data-k="curve"><button data-v="linear">固定</button><button data-v="accel">加速</button></div><small class="sh">「加速」：慢慢拖比較細、快甩轉得比較多</small></div>
+        <div class="opt"><span>陀螺儀瞄準</span><div class="seg" data-k="gyro"><button data-v="off">關</button><button data-v="ads">只在開鏡時</button><button data-v="on">一直開</button></div><small class="sh">橫拿手機轉身就是左右看、上下仰就是上下看；iPhone 第一次開會問要不要允許動作感測</small></div>
         <div id="gyroRow"><label for="sGyro"><span>陀螺儀靈敏度</span><input type="range" id="sGyro" min="0.3" max="3" step="0.05"><output id="oGyro"></output></label>
         <div class="opt"><span>陀螺儀方向</span><div class="seg" data-k="gyroInv"><button data-v="0">正常</button><button data-v="1">反向</button></div></div></div>
+        <h3 class="sg">操作</h3>
+        <div class="opt"><span>操作手</span><div class="seg" data-k="lefty"><button data-v="0">右手（搖桿在左）</button><button data-v="1">左手（搖桿在右）</button></div></div>
+        <div class="opt"><span>按鈕位置</span><div class="row"><button class="btn" id="bLayout">自訂按鈕位置</button><small id="oLayout" class="mute"></small></div><small class="sh">拖曳改每顆按鈕的位置、大小、透明度</small></div>
         <div class="opt"><span>按鈕大小</span><div class="seg" data-k="btnScale"><button data-v="0.85">小</button><button data-v="1">中</button><button data-v="1.15">大</button></div></div>
+        <div class="opt"><span>搖桿</span><div class="seg" data-k="joyMode"><button data-v="float">浮動</button><button data-v="fixed">固定</button></div><small class="sh">「浮動」手指按哪裡就以哪裡為中心，「固定」底座不動</small></div>
+        <div class="opt"><span>前進鎖定</span><div class="seg" data-k="runLock"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">搖桿推到底再往上拉，放開後一直往前走；再按一下搖桿區取消</small></div>
+        <div class="opt"><span>開鏡鍵</span><div class="seg" data-k="adsMode"><button data-v="toggle">按一下切換</button><button data-v="hold">按住</button></div></div>
+        <div class="opt"><span>蹲鍵</span><div class="seg" data-k="crouchMode"><button data-v="toggle">按一下切換</button><button data-v="hold">按住</button></div></div>
         <div class="opt"><span>震動</span><div class="seg" data-k="vibrate"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>敵我配色</span><div class="seg" data-k="palette"><button data-v="default">預設（青／橘）</button><button data-v="cb">色盲友善（藍／黃）</button><button data-v="hc">高對比</button></div></div>
-        <div class="opt"><span>聲音方向提示</span><div class="seg" data-k="soundViz"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>音效字幕</span><div class="seg" data-k="captions"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>擊殺鏡頭</span><div class="seg" data-k="killcam"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
-        <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div></div>
-        <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div></div>
+        <h3 class="sg">畫面與聲音</h3>
+        <div class="opt"><span>敵我配色</span><div class="seg" data-k="palette"><button data-v="default">預設（青／橘）</button><button data-v="cb">色盲友善（藍／黃）</button><button data-v="hc">高對比</button></div><small class="sh">改敵我顏色，色盲或看不清楚時用</small></div>
+        <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">iPhone 側邊靜音開關打開時不會有聲音</small></div>
+        <div class="opt"><span>聲音方向提示</span><div class="seg" data-k="soundViz"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">畫面邊緣顯示槍聲、腳步從哪個方向來</small></div>
+        <div class="opt"><span>音效字幕</span><div class="seg" data-k="captions"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">畫面下方用文字寫出重要的聲音</small></div>
+        <div class="opt"><span>擊殺鏡頭</span><div class="seg" data-k="killcam"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">陣亡後重播對方視角最後 3 秒</small></div>
+        <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div><small class="sh">「自動」依手機速度調解析度、太卡就降；「省電」最低解析度、不畫遠景（切換省電要重新整理）</small></div>
         <div class="opt"><span>顯示幀數</span><div class="seg" data-k="showFps"><button data-v="1">開</button><button data-v="0">關</button></div></div>
-        <p class="note">靈敏度 1.0 是手指橫掃整個螢幕寬度約轉 180 度。搖桿「浮動」是手指按哪裡就以哪裡為中心，「固定」是底座不動。轉視角曲線「加速」：慢慢拖比較細、快甩轉得比較多。前進鎖定：搖桿往前推到底再往上拉，放開後會一直往前走，再按一下搖桿區取消。陀螺儀：橫拿手機原地左右轉身就是左右看、上下仰就是上下看，iPhone 第一次開會問你要不要允許動作感測；方向感覺相反就選「反向」。開鏡靈敏度是開鏡時再乘上的倍數。準星跟著後座：連射時準星會跑到子彈真正的落點。畫質「自動」會依手機速度調解析度，太卡就自動降；「省電」最低解析度、不開抗鋸齒、不畫遠景（切到或切出省電要重新整理才完全生效）。iPhone 側邊的靜音開關打開時，遊戲不會有聲音。</p>
+        <div class="opt"><span>效能</span><div class="row"><button class="btn" id="bPerf">效能報告／跑分</button></div><small class="sh">有卡頓時跑一次，把結果傳給開發者</small></div>
+        <h3 class="sg">遊戲</h3>
+        <div class="opt"><span>機器人難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
       </div>
     </div>
   </div>
@@ -436,7 +448,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <button id="bRadio" hidden>指令</button>
   <div id="radio" hidden><button id="rFollow">跟我來</button><button id="rA">打 A 點</button><button id="rB">打 B 點</button><button id="rHold">守這裡</button><button id="rFree">自由行動</button><button id="rX">取消</button></div>
   <div id="buy" hidden><div class="card"><header><h2>購買</h2><span id="buyMoney">$ 0</span><div class="row"><button class="btn" id="buyAuto">一鍵購買</button><button class="btn go" id="buyX">好了</button></div></header>
-    <div id="buyGrid"></div><p class="mnote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p></div></div>
+    <p class="mnote buyNote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p><div id="buyGrid"></div></div></div>
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
     <p id="overC"></p><p id="overX"></p>

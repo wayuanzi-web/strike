@@ -99,8 +99,8 @@ function buildBuyMenu() {
 }
 function openBuy() {
   if (!buyOpen()) { hudTip(game.mode === 'match' ? '只有準備時間（和開打後 20 秒內在出生區）能買' : '現在不能買', 1.5); return; }
-  buyEl.hidden = false; renderBuy();
+  buyEl.hidden = false; document.body.classList.add("buying"); renderBuy();
 }
-function closeBuy() { buyEl.hidden = true; }
+function closeBuy() { buyEl.hidden = true; document.body.classList.remove("buying"); }
 
 // 機器人買東西：見 62-botobj 的 teamEcoMode／botBuy（全隊一起決定全買、強起、半起或存錢）
