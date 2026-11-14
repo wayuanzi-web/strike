@@ -109,7 +109,7 @@ function botArm(b) {
 
 // ---------- 「單位」：你或機器人，給目標選擇、開槍共用 ----------
 player.team = 'A'; player.isPlayer = true; player.name = '你';
-function unitEye(u, out) { const p = u.body.pos; return u.isPlayer ? out.set(p.x, p.y + player.eye, p.z) : out.set(p.x, p.y + u.phys.h - 0.14, p.z); }
+function unitEye(u, out) { const p = u.body.pos, ox = u.leanX || 0, oz = u.leanZ || 0; return u.isPlayer ? out.set(p.x + ox, p.y + player.eye, p.z + oz) : out.set(p.x + ox, p.y + u.phys.h - 0.14, p.z + oz); }
 function unitSpeed(u) { return Math.hypot(u.body.vel.x, u.body.vel.z); }
 function enemiesOf(team) {
   const out = [];
@@ -141,7 +141,7 @@ function respawnBot(b) {
 }
 
 const _be = new V3(), _pt = new V3(), _bd = new V3(), _end = new V3(), _ue = new V3();
-function botEye(b, out) { const p = b.phys.pos; return out.set(p.x, p.y + b.phys.h - 0.14, p.z); }
+function botEye(b, out) { const p = b.phys.pos; return out.set(p.x + (b.leanX || 0), p.y + b.phys.h - 0.14, p.z + (b.leanZ || 0)); }
 // 看不看得到某個敵人：距離、視野角度（巡邏 124 度、搜索 220 度、交戰中全方位）、視線有沒有被牆擋住
 function canSeeUnit(b, u) {
   const pp = u.body.pos, bp = b.phys.pos;
@@ -150,8 +150,9 @@ function canSeeUnit(b, u) {
   const fov = b.state === 'patrol' || b.state === 'hold' ? 62 : b.state === 'search' ? 110 : 180;
   if (fov < 180 && dist > 3 && Math.abs(angDiff(b.yaw, Math.atan2(-dx, -dz))) > fov * DEG) return false;
   botEye(b, _be);
-  if (lineClear(_be, _pt.set(pp.x, pp.y + u.body.h - 0.12, pp.z))) return true;
-  if (lineClear(_be, _pt.set(pp.x, pp.y + u.body.h * 0.62, pp.z))) return true;
+  const ox = u.leanX || 0, oz = u.leanZ || 0;   // 對方探頭：看的是偏出去的頭
+  if (lineClear(_be, _pt.set(pp.x + ox, pp.y + u.body.h - 0.12, pp.z + oz))) return true;
+  if (lineClear(_be, _pt.set(pp.x + ox * 0.5, pp.y + u.body.h * 0.62, pp.z + oz * 0.5))) return true;
   return false;
 }
 // 挑目標：原本的目標還看得到就繼續打它，否則挑看得到的最近敵人
@@ -524,13 +525,49 @@ function botModel(b, dt) {
   const sp = Math.hypot(b.phys.vel.x, b.phys.vel.z);
   b.walk += dt * sp * 2.3;
   b.ck = lerp(b.ck, b.phys.crouched ? 1 : 0, 1 - Math.exp(-15 * dt));
+  botLean(b, dt, sp);
   if (b.g.visible) humanPose(b, dt);   // 擬真人物的骨頭（59-human）
   // 腳步聲（離聽的人 30 公尺內聽得到，有方位）
   if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(camera.position) < 30) { sfx('step', b.team === 'A' ? 0.5 : 0.9, { pos: p, surface: surfaceAt(p) }); if (b.team !== player.team) soundCue('step', p); } } }
   if (b.flashT > 0) { b.flashT -= dt; b.fl.visible = true; b.fl.material.rotation = Math.random() * 6; const fs = rand(0.26, 0.38); b.fl.scale.set(fs, fs, 1); } else b.fl.visible = false;
   if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; b.litC = bakeRay(p.x, p.y + 1.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
   b.litS = lerp(b.litS, b.litC === undefined ? 1 : b.litC, 1 - Math.exp(-4 * dt)); b.mat.color.setScalar(lerp(0.55, 1, b.litS));
-  hitBoxes(p, b.phys.h, b.boxes);
+  hitBoxes(p, b.phys.h, b.boxes, b.leanX || 0, b.leanZ || 0);
+}
+// 機器人探頭：站著不動、目標（或記得的位置）被牆角擋住，但往旁邊探就看得到 → 往那邊探出去；
+// 守點沒看到人時，旁邊有牆就偶爾探一下
+const _lnA = new V3(), _lnB = new V3();
+function botLean(b, dt, sp) {
+  if ((b.leanCk = (b.leanCk || 0) - dt) <= 0) {
+    b.leanCk = 0.25 + Math.random() * 0.1;
+    let want = 0, tgOrMem = false;
+    const p = b.phys.pos, busy = b.state === 'plant' || b.state === 'defuse' || b.reloadT > 0;
+    if (b.alive && sp < 0.9 && b.phys.onGround && !busy && !b.phys.crouched) {
+      const rx = Math.cos(b.yaw), rz = -Math.sin(b.yaw), ey = p.y + b.phys.h - 0.14, D = 0.42;
+      const tg = b.target && b.target.alive ? b.target : null, mem = !tg && b.lostT < 1.5 && b.lastSeen && b.lastSeen.lengthSq() > 0;
+      tgOrMem = !!(tg || mem);
+      if (tg || mem) {
+        if (tg) { const tp = tg.body.pos; _lnB.set(tp.x, tp.y + tg.body.h - 0.15, tp.z); } else _lnB.set(b.lastSeen.x, b.lastSeen.y + 1.5, b.lastSeen.z);
+        _lnA.set(p.x, ey, p.z);
+        if (!lineClear(_lnA, _lnB)) {
+          for (const sd of b.leanW ? [Math.sign(b.leanW), -Math.sign(b.leanW)] : [1, -1]) {
+            _lnA.set(p.x + rx * sd * D, ey, p.z + rz * sd * D);
+            if (segFree(BOXES, p.x, ey, p.z, _lnA.x + rx * sd * 0.15, ey, _lnA.z + rz * sd * 0.15) && lineClear(_lnA, _lnB)) { want = sd; break; }
+          }
+        } else if (b.leanW && segFree(BOXES, p.x, ey, p.z, p.x + rx * Math.sign(b.leanW) * (D + 0.15), ey, p.z + rz * Math.sign(b.leanW) * (D + 0.15))) want = b.leanW;   // 已經探出去看到了：保持
+      } else if (b.state === 'hold' || b.state === 'search') {
+        const L = !segFree(BOXES, p.x, ey, p.z, p.x - rx * 0.7, ey, p.z - rz * 0.7), R = !segFree(BOXES, p.x, ey, p.z, p.x + rx * 0.7, ey, p.z + rz * 0.7);
+        b.peekPh = (b.peekPh || Math.random() * 9) + 0.3;
+        if (L !== R && Math.sin(b.peekPh * 0.9) > 0.55) want = L ? 0.35 : -0.35;
+        b.leanVis = true;   // 守點時的探頭只是動作，視線不跟著偏（不然守方太強）
+      }
+    }
+    if (tgOrMem) b.leanVis = false;
+    b.leanW = want;
+  }
+  b.leanA = lerp(b.leanA || 0, b.alive ? b.leanW : 0, 1 - Math.exp(-8 * dt));
+  if (Math.abs(b.leanA) < 0.003 && !b.leanW) b.leanA = 0;
+  const D = (b.leanVis ? 0 : 0.36) * b.leanA; b.leanX = Math.cos(b.yaw) * D; b.leanZ = -Math.sin(b.yaw) * D;
 }
 
 // 機器人開槍：瞄準目標胸口，誤差 = （基本誤差 + 距離 × 係數 + 自己在動 + 目標在動 + 剛發現時手還不穩）× 武器準度
@@ -538,9 +575,13 @@ function botShoot(b, tg, dist, D) {
   const pp = tg.body.pos, isP = tg === player, w = b.wpn, n = w.pellets || 1;
   botEye(b, _be);
   // 開火前再確認一次看得到（感知 0.1 秒才更新一次）
-  if (!lineClear(_be, _pt.set(pp.x, pp.y + tg.body.h - 0.12, pp.z)) && !lineClear(_be, _pt.set(pp.x, pp.y + tg.body.h * 0.62, pp.z))) { b.visible = false; return; }
+  const lx = tg.leanX || 0, lz = tg.leanZ || 0;
+  const headOk = lineClear(_be, _pt.set(pp.x + lx, pp.y + tg.body.h - 0.12, pp.z + lz));
+  if (!headOk && !lineClear(_be, _pt.set(pp.x + lx * 0.5, pp.y + tg.body.h * 0.62, pp.z + lz * 0.5))) { b.visible = false; return; }
   if (isP && player.spawnT > 0) return;       // 你剛重生的保護時間
-  _pt.set(pp.x, pp.y + tg.body.h * 0.7, pp.z);
+  _pt.set(pp.x + lx * 0.5, pp.y + tg.body.h * 0.7, pp.z + lz * 0.5);
+  // 對方探頭：身體被牆擋住就瞄露出來的頭肩
+  if ((lx || lz) && headOk && !lineClear(_be, _pt)) _pt.set(pp.x + lx * 0.85, pp.y + tg.body.h - 0.2, pp.z + lz * 0.85);
   // 打你時的警告射擊：剛發現你、或你在它背後畫面外的前 1 秒，子彈從你頭邊飛過
   let forceMiss = false;
   if (isP) {

@@ -60,8 +60,8 @@ async def main():
             T.input({crouch: true}); T.run(0.5); const crouch = T.s.W.spread; T.input({crouch: false}); T.run(0.3);
             T.s.player.ads = true; T.run(0.5); const ads = T.s.W.spread; T.s.player.ads = false; T.run(0.5); return [still, run, air, crouch, ads]; }""")
         ok('G 散佈變化', r[1] > r[0] * 5 and r[2] > r[1] and r[3] < r[0] and r[4] < r[0], [round(x, 3) for x in r])
-        # H 換彈：打光 30 發自動換彈，2.3 秒後補滿
-        r = await ev("() => { T.at(-30, -10); T.s.W.ammo = 2; T.s.W.deployT = 0; T.input({fire: true}); T.run(0.5); const empty = T.s.W.ammo, rl = T.s.W.reloadT > 0; T.input({fire: false}); T.run(2.4); return [empty, rl, T.s.W.ammo]; }")
+        # H 換彈：打光 30 發自動換彈，打光換彈多拉槍機（約 3 秒）後補滿
+        r = await ev("() => { T.at(-30, -10); T.s.W.ammo = 2; T.s.W.deployT = 0; T.input({fire: true}); T.run(0.5); const empty = T.s.W.ammo, rl = T.s.W.reloadT > 0; T.input({fire: false}); T.run(3.1); return [empty, rl, T.s.W.ammo]; }")
         ok('H 打光自動換彈', r[0] == 0 and r[1] and r[2] == 30, r)
         # I 自動開火：準星對到敵人身上就開槍
         r = await ev("() => { T.at(-32, 0.3); T.bot(1, -25.5, 0.3); T.s.W.ammo = 30; T.s.S.autoFire = true; T.input({mode: 'touch', fire: false}); T.aimAt(-25.5, 1.2, 0.3); T.run(0.4); return [30 - T.s.W.ammo, T.s.bots[1].hp]; }")

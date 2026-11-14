@@ -1,7 +1,7 @@
 /* ===== 72-controls：操作進階——自訂按鈕位置（拖曳、大小、透明度）、陀螺儀瞄準
    配置存在設定裡（S.layout），位置用「右手模式」的螢幕比例記；左手模式左右對調。 */
-const EDIT_IDS = ['joy', 'bFire', 'bAds', 'bCrouch', 'bJump', 'bReload', 'bAuto', 'bSwap', 'bNade', 'bUse'];
-const EDIT_NAME = { joy: '搖桿', bFire: '開火', bAds: '開鏡', bCrouch: '蹲', bJump: '跳', bReload: '換彈', bAuto: '自動開火', bSwap: '換槍', bNade: '投擲', bUse: '裝彈／拆彈' };
+const EDIT_IDS = ['joy', 'bFire', 'bAds', 'bCrouch', 'bJump', 'bReload', 'bAuto', 'bSwap', 'bNade', 'bUse', 'bLean'];
+const EDIT_NAME = { joy: '搖桿', bFire: '開火', bAds: '開鏡', bCrouch: '蹲', bJump: '跳', bReload: '換彈', bAuto: '自動開火', bSwap: '換槍', bNade: '投擲', bUse: '裝彈／拆彈', bLean: '探頭' };
 const layoutOf = (id) => (S.layout && S.layout[id]) || null;
 const joyScale = () => { const L = layoutOf('joy'); return L ? L.s : 1; };
 

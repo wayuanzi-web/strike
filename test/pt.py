@@ -33,8 +33,8 @@ async def main():
           const h = b.phys.pos, dx = h.x - e.x, dz = h.z - e.z, dy = (h.y + 1.2) - (e.y + s.player.eye);
           s.player.yaw = Math.atan2(-dx, -dz); s.player.pitch = Math.atan2(dy, Math.hypot(dx, dz)); const hp0 = b.hp;
           s.INPUT.fire = true; for (let i = 0; i < 90; i++) s.step(1/60); s.INPUT.fire = false;
-          return [hp0, Math.round(b.hp), b.alive, s.W.shots, s.W.hits, s.player.team, b.team, s.lineClear ? 1 : 0]; }""")
-        ok('4 死鬥：對準機器人開槍會扣血', r[1] < r[0] or r[2] is False, r)
+          return [+(b.leanA||0).toFixed(2), b.state, hp0, Math.round(b.hp), b.alive, s.W.shots, s.W.hits, s.player.team, b.team, s.lineClear ? 1 : 0]; }""")
+        ok('4 死鬥：對準機器人開槍會扣血', r[3] < r[2] or r[4] is False, r)
         # 5 暫停：對戰中有「回選單」、按兩次才回去
         r = await ev("""() => { const s = window.__strike; s.backToMenu(); s.startGame('match'); for (let i = 0; i < 10; i++) s.step(1/60);
           document.getElementById('bPause').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));

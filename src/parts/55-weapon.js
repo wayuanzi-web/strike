@@ -78,7 +78,7 @@ function equip(slot, quiet) {
   else if (!INV[slot]) return false;
   stashCur();
   if (INV.cur !== slot && INV.cur !== 'nade') INV.last = INV.cur;
-  INV.cur = slot; W.reloadT = 0; W.throwT = 0; player.ads = false; INPUT.adsQueued = false;
+  INV.cur = slot; W.reloadT = 0; W.throwT = 0; W.inspectT = 0; player.ads = false; INPUT.adsQueued = false;
   if (slot === 'nade') { WP = WEAPONS.pistol; setViewmodel(INV.nade); W.deployT = 0.35; W.isNade = true; }
   else { const it = INV[slot]; WP = it.def; W.ammo = it.ammo; W.reserve = it.reserve; setViewmodel(WP.vm); W.deployT = WP.deploy; W.isNade = false; }
   W.bloom = 0; W.idx = 0; W.rp = W.ry = 0; W.cd = Math.max(W.cd, 0);
@@ -137,11 +137,11 @@ function patternAt(f) {
 // rp/ry：子彈的後座偏移（度）；畫面只跟 45%（VIEW_TRACK），準星可以畫到真正落點
 const VIEW_TRACK = 0.45;
 const W = { ammo: 30, reserve: 90, reloadT: 0, cd: 0, bloom: 0, idx: 0, since: 9, rp: 0, ry: 0, vp: 0, vpv: 0, land: 0, spread: 0.2,
-  kick: 0, kickV: 0, roll: 0, flashT: 0, emptyClick: 0, shots: 0, hits: 0, autoN: 0, autoPause: 0, deployT: 0, dragging: false, throwT: 0, isNade: false, pumpT: 0 };
+  kick: 0, kickV: 0, roll: 0, flashT: 0, emptyClick: 0, shots: 0, hits: 0, autoN: 0, autoPause: 0, deployT: 0, dragging: false, throwT: 0, isNade: false, pumpT: 0, inspectT: 0, reloadDur: 0, reloadEmpty: false };
 // 重生：練習模式拿步槍＋手槍；對戰模式由回合決定裝備（keep：上回合活下來，裝備保留）
 function resetWeapon(keep) {
   W.reloadT = 0; W.cd = 0; W.bloom = 0; W.idx = 0; W.rp = 0; W.ry = 0; W.vp = 0; W.vpv = 0;
-  W.kick = 0; W.kickV = 0; W.land = 0; W.autoN = 0; W.autoPause = 0; W.throwT = 0;
+  W.kick = 0; W.kickV = 0; W.land = 0; W.autoN = 0; W.autoPause = 0; W.throwT = 0; W.inspectT = 0;
   if (game.mode !== 'match') {
     if (!INV.secondary) INV.secondary = newItem(WEAPONS.pistol);
     if (!INV.primary) INV.primary = newItem(WEAPONS.rifle);
@@ -152,8 +152,17 @@ function resetWeapon(keep) {
 const reloading = () => W.reloadT > 0;
 function startReload() {
   if (W.isNade || W.reloadT > 0 || W.ammo >= WP.mag || W.reserve <= 0 || !player.alive) return;
-  W.reloadT = WP.reload; player.ads = false; sfx('magout'); W.magIn = false;
+  // 打光才換：多一段拉槍機，比較久（霰彈、狙擊本來就慢，只多一點）
+  W.reloadEmpty = W.ammo === 0 && (WP.pellets || 1) === 1; W.reloadDur = WP.reload * (W.reloadEmpty ? (WP.scope ? 1.12 : 1.22) : 1);
+  W.reloadT = W.reloadDur; player.ads = false; sfx('magout'); W.magIn = false; W.slap = false; W.bolt = false; W.inspectT = 0;
 }
+// 檢視武器：彈匣滿的時候按換彈（或 I 鍵），把槍轉過來看一看；開槍、開鏡、換槍會中斷
+const INSPECT_T = 2.4;
+function startInspect() {
+  if (W.isNade || W.reloadT > 0 || W.deployT > 0 || !player.alive || W.inspectT > 0) return false;
+  W.inspectT = INSPECT_T; player.ads = false; sfx('magout', 0.35); return true;
+}
+const reloadDur = () => W.reloadDur || WP.reload;
 // 現在的散佈（度）：跑到 34%（手機 40%）速度以上才開始變大；空中、落地瞬間更大；蹲、開鏡變小；連射越來越散
 function currentSpread() {
   const sp = playerSpeed() / RUN_SPEED, th = INPUT.mode === 'touch' ? 0.4 : 0.34;
@@ -190,9 +199,13 @@ function updateWeapon(dt, wantFire, auto, dist) {
   }
   if (W.reloadT > 0) {
     W.reloadT -= dt;
-    if (!W.magIn && W.reloadT < WP.reload * 0.45) { W.magIn = true; sfx('magin'); }
+    const rd = reloadDur(), rp = 1 - W.reloadT / rd, base = WP.reload / rd;   // base：插彈匣部分佔多少
+    if (!W.magIn && rp > 0.55 * base) { W.magIn = true; sfx('magin'); }
+    if (!W.slap && rp > 0.68 * base) { W.slap = true; sfx('magout', 0.45); W.kick += 0.25; }
+    if (W.reloadEmpty && !W.bolt && rp > 0.86) { W.bolt = true; sfx('magin', 0.7); }
     if (W.reloadT <= 0) { W.reloadT = 0; const n = Math.min(WP.mag - W.ammo, W.reserve); W.ammo += n; W.reserve -= n; if (INPUT.adsQueued) { player.ads = true; INPUT.adsQueued = false; } }
   }
+  if (W.inspectT > 0) { W.inspectT -= dt; if ((wantFire && !auto) || player.ads || W.reloadT > 0 || !player.alive) W.inspectT = 0; if (W.inspectT < 0) W.inspectT = 0; }
   // 自動開火的點放：中遠距離打 4 發停 0.28 秒，讓花紋與散佈回來；8 公尺內才全自動
   if (auto && dist > 8 && W.autoPause > 0) wantFire = false;
   if (!auto) W.autoN = 0;
@@ -347,12 +360,30 @@ function updateViewmodel(dt, lookDX, lookDY) {
   mag.position.y = my; mag.visible = true; la.position.set(0, 0, 0);
   gunRig.rotation.x += k * 0.05;
   if (W.reloadT > 0) {
-    const p = 1 - W.reloadT / WP.reload, tilt = Math.sin(Math.min(1, p * 1.15) * Math.PI);
-    gunRig.rotation.z += tilt * 0.55; gunRig.rotation.x += tilt * 0.25; gunRig.position.y -= tilt * 0.06;
-    if (p > 0.1 && p < 0.62) { const t = Math.sin((p - 0.1) / 0.52 * Math.PI); la.position.set(0.05 * t, -0.08 * t, 0.22 * t); }
-    if (p > 0.12 && p < 0.4) mag.position.y = my - (p - 0.12) / 0.28 * 0.3;
-    else if (p >= 0.4 && p < 0.45) mag.visible = false;
-    else if (p >= 0.45 && p < 0.56) mag.position.y = my - (0.56 - p) / 0.11 * 0.25;
+    // 分段：0–0.12 槍歪過來、0.12–0.32 退彈匣（左手抓著往下拉）、0.32–0.45 手去拿新的、
+    // 0.45–0.58 插進去、0.62–0.72 拍一下底部（槍震一下）、打光的話再 0.8–0.95 拉槍機（右邊往後扯）
+    const rd = reloadDur(), q = 1 - W.reloadT / rd, base = WP.reload / rd, p = Math.min(1, q / base);
+    const tIn = Math.min(1, q / 0.1), tOut = W.reloadEmpty ? clamp((1 - q) / 0.07, 0, 1) : clamp((1 - p) / 0.16, 0, 1);
+    const tilt = Math.min(tIn, tOut) * (W.reloadEmpty && p >= 1 ? 0.55 : 1);
+    gunRig.rotation.z += tilt * 0.55; gunRig.rotation.x += tilt * 0.22; gunRig.position.y -= tilt * 0.06;
+    if (p < 0.12) la.position.set(0.04 * p / 0.12, -0.04 * p / 0.12, 0.1 * p / 0.12);
+    else if (p < 0.32) { const t = (p - 0.12) / 0.2; mag.position.y = my - t * t * 0.32; la.position.set(0.04, -0.04 - t * 0.26, 0.1 + t * 0.08); }
+    else if (p < 0.45) { const t = (p - 0.32) / 0.13; mag.visible = false; la.position.set(0.04 + 0.04 * Math.sin(t * Math.PI), -0.3 + 0.05 * Math.sin(t * Math.PI), 0.18); }
+    else if (p < 0.58) { const t = (p - 0.45) / 0.13, e = 1 - (1 - t) * (1 - t); mag.position.y = my - (1 - e) * 0.24; la.position.set(0.04, -0.04 - (1 - e) * 0.24, 0.1 + (1 - e) * 0.06); }
+    else if (p < 0.74) { const t = (p - 0.58) / 0.16, s1 = Math.sin(t * Math.PI); la.position.set(0.04 * (1 - t), -0.04 - 0.07 * s1, 0.1 * (1 - t)); if (W.slap) gunRig.position.y += Math.sin(clamp((p - 0.68) / 0.06, 0, 1) * Math.PI) * 0.012; }
+    if (W.reloadEmpty && q > 0.78) {
+      const t = clamp((q - 0.8) / 0.15, 0, 1), pull = t < 0.45 ? t / 0.45 : Math.max(0, 1 - (t - 0.45) / 0.15);
+      gunRig.rotation.z -= 0.35 * Math.sin(Math.min(1, (q - 0.78) / 0.2) * Math.PI); gunRig.rotation.y += 0.25 * Math.sin(Math.min(1, (q - 0.78) / 0.2) * Math.PI);
+      gunRig.position.z += 0.02 * pull; la.position.set(0.12 * pull, 0.05 * pull, -0.05 + 0.1 * pull);
+    }
+  }
+  // 檢視武器：舉起來轉到側面看、再翻過來看另一面、放回去
+  if (W.inspectT > 0) {
+    const p = 1 - W.inspectT / INSPECT_T, ease = (x) => x * x * (3 - 2 * x);
+    const a = ease(clamp(p / 0.2, 0, 1)), b2 = ease(clamp((p - 0.42) / 0.18, 0, 1)), out = ease(clamp((1 - p) / 0.15, 0, 1));
+    const w = Math.min(a, out);
+    gunRig.position.x += -0.06 * w; gunRig.position.y += 0.03 * w; gunRig.position.z += 0.05 * w;
+    gunRig.rotation.y += w * lerp(0.9, 0.25, b2); gunRig.rotation.z += w * lerp(0.35, -0.55, b2); gunRig.rotation.x += w * 0.12 * Math.sin(p * 9);
   }
   // 霰彈槍：開槍後拉一下泵動護木
   if (W.pumpT > 0 && WP.pellets > 1) { const t = Math.sin((1 - W.pumpT / 0.55) * Math.PI); la.position.z = 0.09 * t; }

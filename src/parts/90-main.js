@@ -232,9 +232,9 @@ function step(dt) {
     const sp = spec.phys.pos; camera.position.set(sp.x, sp.y + spec.phys.h - 0.12, sp.z);
     camera.rotation.set(spec.pitch || 0, spec.yaw, 0);
   } else {
-    camera.position.set(p.x, p.y + player.eye, p.z);
+    camera.position.set(p.x + (player.leanX || 0), p.y + player.eye - Math.abs(player.leanA || 0) * 0.04, p.z + (player.leanZ || 0));
     camera.rotation.set(player.pitch + (W.rp * VIEW_TRACK + W.vp + player.punchP) * DEG + (player.alive ? 0 : -0.12),
-      player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? 0 : 0.25);
+      player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? -(player.leanA || 0) * LEAN_ROLL : 0.25);
   }
   if (!killcamActive()) { camera.fov = spec ? BASE_FOV : lerp(BASE_FOV, adsFov, player.adsT); camera.updateProjectionMatrix(); }
   updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt);
@@ -269,7 +269,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };

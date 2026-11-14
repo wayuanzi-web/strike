@@ -252,7 +252,8 @@ const _hT = new V3(), _hT2 = new V3(), _hW = new V3(), _hq2 = new THREE.Quaterni
 // 彈簧（中彈反應）：x'' = -k x - c x'
 function hSpring(s, k, dt) { s.v += (-120 * s.x - 13 * s.v) * dt; s.x += s.v * dt; if (Math.abs(s.x) < 1e-4 && Math.abs(s.v) < 1e-3) { s.x = 0; s.v = 0; } }
 function humanInit(b) {
-  b.hs = { sp: { x: 0, v: 0 }, sy: { x: 0, v: 0 }, sr: { x: 0, v: 0 }, hd: { x: 0, v: 0 }, hy: { x: 0, v: 0 }, kL: { x: 0, v: 0 }, kR: { x: 0, v: 0 } };
+  b.hs = { sp: { x: 0, v: 0 }, sy: { x: 0, v: 0 }, sr: { x: 0, v: 0 }, hd: { x: 0, v: 0 }, hy: { x: 0, v: 0 }, kL: { x: 0, v: 0 }, kR: { x: 0, v: 0 }, ld: { x: 0, v: 0 } };
+  b.hYaw = 0; b.tLag = 0; b.tStep = 0; b.tSide = 1; b.airT = 0; b.airK = 0; b.prevSp = 0; b.lastYaw = b.yaw;
 }
 // 中彈：dir 是子彈飛的方向（世界座標）；照部位和方向推一下
 function humanHit(b, part, dir, dmg) {
@@ -284,21 +285,56 @@ function humanPose(b, dt) {
   const lod = d2 > 22 * 22 ? 1 : 0;
   if (b.hm.lod !== lod) { b.hm.lod = lod; b.hm.mesh.geometry = humanGeo(b.baseTeam, b.hm.look, lod); }
   for (const k in H) hSpring(H[k], 0, dt);
+  if (b.alive === false && b.lastYaw !== undefined) b.lastYaw = undefined;
   // 共用：重設
   for (const bn of B) bn.quaternion.identity();
   B[HB.hips].position.set(0, 0.95, 0);
   if (!b.alive) { humanDeathPose(b, dt); return; }
   b.g.quaternion.setFromAxisAngle(_hAx.set(0, 1, 0), b.yaw); b.g.position.copy(p);
-  const sp = Math.hypot(b.phys.vel.x, b.phys.vel.z), mv = Math.min(1, sp / 3.2), run = clamp((sp - 3) / 2, 0, 1), ck = b.ck;
-  const sw = Math.sin(b.walk) * mv * (0.55 + run * 0.2) * (1 - ck * 0.7), bob = Math.abs(Math.cos(b.walk)) * mv * 0.035;
-  // 腳：走路擺動、膝蓋在往後擺時彎；蹲下：左膝跪地、右腳往前
-  const kneeW = (x) => Math.max(0, -x) * 1.6 + 0.1 * mv;
-  B[HB.thighL].rotation.x = sw * (1 - ck) + 0.25 * ck - H.kL.x * 0.6; B[HB.thighR].rotation.x = -sw * (1 - ck) + 1.35 * ck - H.kR.x * 0.6;
-  B[HB.kneeL].rotation.x = -(kneeW(sw) * (1 - ck) + 1.55 * ck + H.kL.x * 1.4); B[HB.kneeR].rotation.x = -(kneeW(-sw) * (1 - ck) + 1.4 * ck + H.kR.x * 1.4);
-  B[HB.thighL].rotation.z = -0.04; B[HB.thighR].rotation.z = 0.04;
+  const vx = b.phys.vel.x, vz = b.phys.vel.z, sp = Math.hypot(vx, vz), mv = Math.min(1, sp / 3.2), run = clamp((sp - 3) / 2, 0, 1), ck = b.ck;
+  const og = b.phys.onGround, fy = Math.sin(b.yaw), fc = Math.cos(b.yaw);
+  if (!H.ld) H.ld = { x: 0, v: 0 };
+  // 移動方向換到身體座標：0＝往前、正＝往右；往後走時腳朝反方向、步子小一點、膝蓋反過來彎
+  let ma = sp > 0.3 ? Math.atan2(vx * fc - vz * fy, -(vx * fy + vz * fc)) : 0, back = 0;
+  if (ma > 1.75) { ma -= Math.PI; back = 1; } else if (ma < -1.75) { ma += Math.PI; back = 1; }
+  const hyT = clamp(ma, -1.2, 1.2) * 0.7 * mv * (1 - ck * 0.5);
+  b.hYaw = lerp(b.hYaw, hyT, 1 - Math.exp(-8 * dt));
+  const res = (ma - hyT) * mv, sideK = Math.sin(res), fwdK = Math.cos(res);   // 腰轉不夠的部分：腳往側邊跨
+  // 原地轉身：下半身先留著、轉超過 30 度就踏一步跟上
+  const dy = angDiff(b.lastYaw === undefined ? b.yaw : b.lastYaw, b.yaw); b.lastYaw = b.yaw;
+  if (sp < 0.5 && og && ck < 0.5) {
+    b.tLag = clamp(b.tLag - dy, -1.2, 1.2);
+    if (b.tStep <= 0 && Math.abs(b.tLag) > 0.5) { b.tStep = 0.34; b.tSide = b.tLag > 0 ? 1 : -1; if (near && d2 < 15 * 15) sfx('step', 0.25, { pos: p, surface: 'concrete' }); }
+  } else b.tLag = lerp(b.tLag, 0, 1 - Math.exp(-10 * dt));
+  let stepL = 0, stepR = 0;
+  if (b.tStep > 0) {
+    b.tStep -= dt; const t = 1 - Math.max(0, b.tStep) / 0.34, lift = Math.sin(t * Math.PI);
+    b.tLag = lerp(b.tLag, 0, 1 - Math.exp(-9 * dt));
+    if (b.tSide > 0) stepL = lift; else stepR = lift;
+  }
+  // 跳：空中縮腳；落地：膝蓋一彎、身子一沉（彈簧）
+  if (!og) { b.airT += dt; b.airK = lerp(b.airK, b.airT > 0.12 ? 1 : 0, 1 - Math.exp(-10 * dt)); }
+  else { if (b.airT > 0.22) H.ld.v += 2.4 * Math.min(1.4, b.airT * 1.6); b.airT = 0; b.airK = lerp(b.airK, 0, 1 - Math.exp(-18 * dt)); }
+  // 急停：上身往前晃一下
+  if (b.prevSp > 2.4 && sp < 0.8 && og) H.sp.v += 1.6;
+  b.prevSp = lerp(b.prevSp, sp, 1 - Math.exp(-12 * dt)); if (sp < 0.8) b.prevSp = Math.min(b.prevSp, sp + 0.5);
+  const sw = Math.sin(b.walk) * mv * (0.55 + run * 0.2) * (1 - ck * 0.7) * (back ? 0.72 : 1), bob = Math.abs(Math.cos(b.walk)) * mv * 0.035;
+  const swX = sw * fwdK, swZ = sw * sideK * 0.55, ldx = Math.max(0, H.ld.x), ak = b.airK;
+  // 腳：走路擺動、膝蓋在往後擺時彎（倒退走時反過來）；蹲下：左膝跪地、右腳往前
+  const kneeW = (x) => Math.max(0, back ? x : -x) * 1.6 + 0.1 * mv;
+  B[HB.thighL].rotation.x = swX * (1 - ck) + 0.25 * ck - H.kL.x * 0.6 + stepL * 0.4 + ak * 0.5 + ldx * 0.5;
+  B[HB.thighR].rotation.x = -swX * (1 - ck) + 1.35 * ck - H.kR.x * 0.6 + stepR * 0.4 + ak * 0.25 + ldx * 0.5;
+  B[HB.kneeL].rotation.x = -(kneeW(swX) * (1 - ck) + 1.55 * ck + H.kL.x * 1.4 + stepL * 0.8 + ak * 0.95 + ldx * 1.1);
+  B[HB.kneeR].rotation.x = -(kneeW(-swX) * (1 - ck) + 1.4 * ck + H.kR.x * 1.4 + stepR * 0.8 + ak * 0.6 + ldx * 1.1);
+  B[HB.thighL].rotation.z = -0.04 + swZ * (1 - ck); B[HB.thighR].rotation.z = 0.04 - swZ * (1 - ck);
   const legDrop = Math.max(H.kL.x, H.kR.x, 0) * 0.22;   // 打腳：身子一沉
-  B[HB.hips].position.y = 0.95 - 0.46 * ck - bob * (1 - ck) - legDrop + (b.phys.onGround ? 0 : 0.03);
-  B[HB.hips].rotation.y = sw * 0.12;
+  B[HB.hips].position.y = 0.95 - 0.46 * ck - bob * (1 - ck) - legDrop + (og ? 0 : 0.03) - ldx * 0.22 - ak * 0.06;
+  // 腰：朝移動方向轉（上身轉回來對準目標）＋原地轉身時下半身落後
+  const hipY = -b.hYaw + b.tLag;
+  B[HB.hips].rotation.y = sw * 0.12 * fwdK + hipY;
+  // 探頭：上身往旁邊歪、髖往那邊挪一點
+  const la = b.leanA || 0;
+  B[HB.hips].position.x = la * 0.06;
   // 上身：瞄準上下分給腰和胸，持槍側身、走路反向扭、彈簧反應
   const aim = clamp(b.pitch || 0, -0.9, 0.9);
   let gx = 0, lean = 0, act = '';
@@ -307,8 +343,8 @@ function humanPose(b, dt) {
   else if (b.state === 'plant' || b.state === 'defuse') { act = 'use'; gx = -1.0; lean = 0.5; }
   else if (thr < 0.55) { act = 'throw'; const t = thr / 0.55; gx = -0.6 * Math.sin(t * Math.PI); lean = 0.25 * Math.sin(t * Math.PI); }
   const ready = act ? 0 : 1, lowReady = b.state === 'patrol' && !b.visible && sp > 0.5 ? 0.35 : 0;   // 巡邏時槍口稍微朝下
-  B[HB.spine].rotation.set(-aim * 0.35 - lean * 0.6 + H.sp.x * 0.5 + run * 0.08 * ready, -sw * 0.18 - 0.12 + H.sy.x * 0.4, H.sr.x * 0.3);
-  B[HB.chest].rotation.set(-aim * 0.55 - lean * 0.4 + H.sp.x * 0.5, -0.22 + H.sy.x * 0.5, H.sr.x * 0.3);
+  B[HB.spine].rotation.set(-aim * 0.35 - lean * 0.6 + H.sp.x * 0.5 + run * 0.08 * ready - back * mv * 0.06 + ldx * 0.3, -sw * 0.18 * fwdK - 0.12 + H.sy.x * 0.4 - hipY * 0.6, H.sr.x * 0.3 - la * 0.32);
+  B[HB.chest].rotation.set(-aim * 0.55 - lean * 0.4 + H.sp.x * 0.5, -0.22 + H.sy.x * 0.5 - hipY * 0.4, H.sr.x * 0.3 - la * 0.22);
   B[HB.neck].rotation.set(H.hd.x * 0.4 - aim * 0.05, 0.22 + H.hy.x * 0.3, 0);
   B[HB.head].rotation.set(H.hd.x * 0.6 + aim * 0.05, 0.1 + H.hy.x * 0.5, 0);
   // 槍：掛在胸骨上，抵消側身讓槍口朝前

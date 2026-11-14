@@ -108,7 +108,7 @@ function hudUpdate(dt) {
   if (player.deaths !== lastD) { lastD = player.deaths; $('sD').textContent = player.deaths; }
   if (player.heads !== lastH) { lastH = player.heads; $('sH').textContent = player.heads; }
   hid($('rl'), !(W.reloadT > 0));
-  if (W.reloadT > 0) $('rlB').style.width = ((1 - W.reloadT / WP.reload) * 100).toFixed(0) + '%';
+  if (W.reloadT > 0) $('rlB').style.width = ((1 - W.reloadT / reloadDur()) * 100).toFixed(0) + '%';
   hudGear(dt);
   tgl($('bAds'), 'on', player.ads);
   tgl($('bCrouch'), 'on', player.crouch);

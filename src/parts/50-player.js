@@ -51,7 +51,7 @@ function updatePlayer(dt) {
   if (mh > 1) { mx /= mh; mz /= mh; }
   const mag = Math.min(1, mh);
   const landK = player.landT > 0 ? 1 - player.landT / 0.4 * 0.2 : 1;   // 落地後 0.4 秒慢一點
-  const maxS = RUN_SPEED * (player.crouch ? 0.34 : 1) * (player.ads ? 0.72 : 1) * (reloading() ? 0.9 : 1) * player.tag * landK * (W.isNade ? 1.04 : WP.speed) * (plantBusy() ? 0 : 1);
+  const maxS = RUN_SPEED * (player.crouch ? 0.34 : 1) * (player.ads ? 0.72 : 1) * (reloading() ? 0.9 : 1) * player.tag * landK * (W.isNade ? 1.04 : WP.speed) * (plantBusy() ? 0 : 1) * (1 - 0.35 * Math.abs(player.leanA || 0));
   const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
   let wx = cy * mx - sy * mz, wz = -sy * mx - cy * mz; const wl = Math.hypot(wx, wz);
   if (wl > 1e-4) { wx /= wl; wz /= wl; }
@@ -104,8 +104,26 @@ function updatePlayer(dt) {
     player.stepT -= dt;
     if (player.stepT <= 0) { player.stepT = 0.34 * RUN_SPEED / sp; player.stepSide = -player.stepSide; sfx('step', 0.7, { pan: player.stepSide * 0.15, rate: 1 + player.stepSide * 0.04, surface: surfaceAt(p) }); }
   } else player.stepT = Math.min(player.stepT, 0.1);
-  hitBoxes(p, b.h, player.boxes);
+  updateLean(dt);
+  hitBoxes(p, b.h, player.boxes, player.leanX, player.leanZ);
   if (player.hurtT > 0) player.hurtT -= dt;
+}
+// 側身探頭：眼睛往旁邊移 0.38 公尺、畫面歪一點；旁邊有牆就只探得出去一部分；空中、裝拆彈時收回
+const LEAN_D = 0.38, LEAN_ROLL = 0.15;
+function updateLean(dt) {
+  const b = player.body, p = b.pos;
+  const want = player.alive && b.onGround && !plantBusy() && game.state === 'play' ? (INPUT.lean || INPUT.leanKey || 0) : 0;
+  player.leanT = lerp(player.leanT || 0, want, 1 - Math.exp(-10 * dt));
+  if (Math.abs(player.leanT) < 0.002 && !want) player.leanT = 0;
+  const s = Math.sign(player.leanT), cy = Math.cos(player.yaw), sy = Math.sin(player.yaw), ey = p.y + player.eye;
+  let room = 1;
+  if (s) {
+    room = 0;
+    for (const f of [1, 0.66, 0.33]) { const d = LEAN_D * f + 0.18; if (segFree(BOXES, p.x, ey, p.z, p.x + cy * s * d, ey, p.z - sy * s * d)) { room = f; break; } }
+  }
+  player.leanRoom = lerp(player.leanRoom === undefined ? 1 : player.leanRoom, room, 1 - Math.exp(-14 * dt));
+  const a = player.leanT * player.leanRoom;
+  player.leanA = a; player.leanX = cy * a * LEAN_D; player.leanZ = -sy * a * LEAN_D;
 }
 // 腳下是什麼材質（腳步聲用）
 function surfaceAt(p) {

@@ -3,7 +3,7 @@
    開火鍵、跳、蹲按下後拖曳也能轉視角（跟主流手機射擊遊戲一樣）。 */
 const INPUT = {
   mx: 0, mz: 0, lookDX: 0, lookDY: 0, fire: false, jumpT: 0, crouch: false, mode: isTouch ? 'touch' : 'kb',
-  looking: false, fingerMoveT: 0, adsQueued: false, use: false, runLock: false, gyroDX: 0, gyroDY: 0,
+  looking: false, fingerMoveT: 0, adsQueued: false, use: false, runLock: false, gyroDX: 0, gyroDY: 0, lean: 0, leanKey: 0,
 };
 Object.defineProperty(INPUT, 'jump', { get() { return INPUT.jumpT > 0; }, set(v) { INPUT.jumpT = v ? 0.12 : 0; } });   // 跳有 0.12 秒緩衝
 const touchEl = $('touch'), joyEl = $('joy'), joyK = $('joyK');
@@ -145,7 +145,7 @@ function tapBtn(id, fn, drag = false, upFn = null) {
 tapBtn('bJump', (el) => { INPUT.jump = true; el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 120); }, true);
 // 蹲、開鏡：設定裡可選「切換」（按一下開、再按一下關）或「按住」（放開就取消）
 const HOLD = { ads: false, crouch: false };
-function releaseHolds() { if (HOLD.crouch) { HOLD.crouch = false; INPUT.crouch = false; } if (HOLD.ads) { HOLD.ads = false; player.ads = false; INPUT.adsQueued = false; } }
+function releaseHolds() { if (INPUT.lean) { INPUT.lean = 0; if (window.leanShow) window.leanShow(); } if (HOLD.crouch) { HOLD.crouch = false; INPUT.crouch = false; } if (HOLD.ads) { HOLD.ads = false; player.ads = false; INPUT.adsQueued = false; } }
 tapBtn('bCrouch', () => { if (S.crouchMode === 'hold') { INPUT.crouch = true; HOLD.crouch = true; } else INPUT.crouch = !INPUT.crouch; }, true,
   () => { if (S.crouchMode === 'hold' && HOLD.crouch) { HOLD.crouch = false; INPUT.crouch = false; } });
 // 換槍鍵：點一下換槍；按住半秒丟掉手上的槍（拿著炸彈又只有手槍時：丟炸彈）
@@ -171,7 +171,28 @@ tapBtn('bAds', () => {
   if (reloading()) { INPUT.adsQueued = !INPUT.adsQueued; hudTip(INPUT.adsQueued ? '換彈完自動開鏡' : '取消換彈後開鏡', 1.2); return; }
   player.ads = !player.ads;
 }, true, () => { if (S.adsMode === 'hold' && HOLD.ads) { HOLD.ads = false; player.ads = false; INPUT.adsQueued = false; } });
-tapBtn('bReload', (el) => { startReload(); el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 150); });
+// 彈匣滿了再按換彈＝檢視武器
+function reloadOrInspect() { if (!W.isNade && W.ammo >= WP.mag && W.reloadT <= 0) startInspect(); else startReload(); }
+// 側身（探頭）：點一下＝往右探（左手模式往左）、再點一下收回；按住往左右滑換邊，按住超過 0.3 秒放開就收回
+(function leanBtn() {
+  const el = $('bLean'); let pid = null, sx = 0, t0 = 0, was = 0;
+  const show = () => { el.classList.toggle('on', INPUT.lean !== 0); el.dataset.d = INPUT.lean < 0 ? 'L' : INPUT.lean > 0 ? 'R' : ''; };
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation(); audioInit(); pid = e.pointerId; sx = e.clientX; t0 = performance.now(); was = INPUT.lean;
+    INPUT.lean = was ? was : (S.lefty ? -1 : 1); show(); try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ }
+  });
+  el.addEventListener('pointermove', (e) => { if (e.pointerId !== pid) return; const dx = e.clientX - sx; if (Math.abs(dx) > 18) { INPUT.lean = dx < 0 ? -1 : 1; was = 0; show(); } });
+  const up = (e) => {
+    if (e.pointerId !== pid) return; pid = null;
+    const held = performance.now() - t0 > 300;
+    if (held) INPUT.lean = 0; else if (was) INPUT.lean = 0;   // 點一下：開著就關
+    show();
+  };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+  window.leanShow = show;
+})();
+tapBtn('bReload', (el) => { reloadOrInspect(); el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 150); });
 tapBtn('bAuto', () => { S.autoFire = !S.autoFire; saveSettings(); syncSettingsUI(); hudTip(S.autoFire ? '自動開火：開（準星對到敵人就開槍）' : '自動開火：關', 1.6); });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 // 選單、設定裡的按鈕：多指觸控時瀏覽器不會產生 click，所以用放開手指來觸發（鍵盤按 Enter 仍走 click）
@@ -190,7 +211,9 @@ window.addEventListener('keydown', (e) => {
   if (game.state !== 'play') { if (e.code === 'Escape' && game.state === 'pause') resumeGame(); return; }
   INPUT.mode = 'kb';
   if (e.code === 'Space') { INPUT.jump = true; e.preventDefault(); }
-  if (e.code === 'KeyR') startReload();
+  if (e.code === 'KeyR') reloadOrInspect();
+  if (e.code === 'KeyI') startInspect();
+  if (e.code === 'KeyV') INPUT.leanKey = -1; if (e.code === 'KeyT') INPUT.leanKey = 1;
   if (e.code === 'KeyC' || e.code === 'ControlLeft') INPUT.crouch = true;
   if (e.code === 'Escape') { if (!$('buy').hidden) closeBuy(); else pauseGame(); }
   if (e.code === 'Digit1') equip('primary'); if (e.code === 'Digit2') equip('secondary');
@@ -206,6 +229,7 @@ window.addEventListener('keyup', (e) => {
   KEYS[e.code] = false;
   if (e.code === 'KeyC' || e.code === 'ControlLeft') INPUT.crouch = false;
   if (e.code === 'KeyE') INPUT.use = false;
+  if ((e.code === 'KeyV' && INPUT.leanKey < 0) || (e.code === 'KeyT' && INPUT.leanKey > 0)) INPUT.leanKey = KEYS.KeyV ? -1 : KEYS.KeyT ? 1 : 0;
 });
 function keyboardMove() {
   if (INPUT.mode !== 'kb') return;

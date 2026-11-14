@@ -114,11 +114,12 @@ function moveBody(body, dt) {
 }
 
 // 分部位的命中框：頭、身體、腳（站和蹲的高度不同）。給玩家和機器人共用
-function hitBoxes(pos, h, out) {
-  const k = h / 1.8;
-  out[0].part = 'head'; out[0].min[0] = pos.x - 0.15; out[0].max[0] = pos.x + 0.15; out[0].min[2] = pos.z - 0.15; out[0].max[2] = pos.z + 0.15;
+// ox/oz：側身探頭時頭整個偏過去、身體偏一半
+function hitBoxes(pos, h, out, ox = 0, oz = 0) {
+  const k = h / 1.8, hx = pos.x + ox, hz = pos.z + oz, cx = pos.x + ox * 0.5, cz = pos.z + oz * 0.5;
+  out[0].part = 'head'; out[0].min[0] = hx - 0.15; out[0].max[0] = hx + 0.15; out[0].min[2] = hz - 0.15; out[0].max[2] = hz + 0.15;
   out[0].min[1] = pos.y + 1.5 * k; out[0].max[1] = pos.y + h + 0.02;
-  out[1].part = 'body'; out[1].min[0] = pos.x - 0.27; out[1].max[0] = pos.x + 0.27; out[1].min[2] = pos.z - 0.27; out[1].max[2] = pos.z + 0.27;
+  out[1].part = 'body'; out[1].min[0] = cx - 0.27; out[1].max[0] = cx + 0.27; out[1].min[2] = cz - 0.27; out[1].max[2] = cz + 0.27;
   out[1].min[1] = pos.y + 0.85 * k; out[1].max[1] = pos.y + 1.5 * k;
   out[2].part = 'legs'; out[2].min[0] = pos.x - 0.22; out[2].max[0] = pos.x + 0.22; out[2].min[2] = pos.z - 0.22; out[2].max[2] = pos.z + 0.22;
   out[2].min[1] = pos.y; out[2].max[1] = pos.y + 0.85 * k;
