@@ -41,12 +41,15 @@ function patchHumanMat(m, rim, camo) {
   const U = m.userData.rimU = { value: new THREE.Color().setRGB(...rim.split(',').map(Number)) };
   const C = m.userData.camoU = camo.map((c) => ({ value: new THREE.Color(c) }));
   m.userData.skinU = { value: new THREE.Color(pick(SKIN_TONES)) };
+  m.userData.lampU = { value: new THREE.Color(0, 0, 0) };   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; });
-    sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU;
-    sh.vertexShader = 'attribute float aCamo;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvCamo = aCamo; vRest = position; vRN = normal;');
-    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin;
-varying float vCamo; varying vec3 vRest; varying vec3 vRN;
+    sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU; sh.uniforms.uLampH = m.userData.lampU; sh.uniforms.uFl = LIGHT_U.uFl;
+    sh.vertexShader = 'attribute float aCamo;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvCamo = aCamo; vRest = position; vRN = normal;')
+      .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvHw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH;
+varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw;
+${FL_GLSL}
 ` + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
   {
@@ -58,9 +61,11 @@ varying float vCamo; varying vec3 vRest; varying vec3 vRN;
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uSkin * (0.94 + 0.12 * t.a), sw);   // 皮膚：每人膚色不同，帶一點斑駁
     diffuseColor.rgb *= 0.9 + 0.1 * t.a;   // 布料、皮膚細紋
   }`)
-      .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26;\n#include <opaque_fragment>`);
+      .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26;
+outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
+#include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human2'; return m;
+  m.customProgramCacheKey = () => 'human3'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();

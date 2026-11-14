@@ -38,7 +38,7 @@ async def main():
         await tap('#vetoMaps .vmap[data-map="market"]')
         await page.wait_for_function("() => window.__strike.game.sub === 'ranked'", timeout=15000)
         r = await ev("""() => { const s = window.__strike; return [s.getMap().id, s.game.mode, s.game.sub, s.ROUND.atk === s.RK.startAtk, s.RK.live, s.RK.opp > 800 && s.RK.opp < 1200, s.botDiff(s.bots.find((b) => b.active && b.team === 'B')) === s.RK.diff, document.getElementById('rankVeto').hidden]; }""")
-        ok('5 禁選：你禁曙光、對手禁你勝率最高的鐵道、你選舊城 → 在舊城開打、對手強度照分數、對手決定攻守', vis1 and dict((m, c) for m, c, _ in mid) == {'dawn': 'ban', 'market': '', 'rail': 'ban', 'site': ''} and r == ['market', 'match', 'ranked', True, True, True, True, True], [vis1, mid, r])
+        ok('5 禁選：你禁曙光、對手禁你勝率最高的鐵道、你選舊城 → 在舊城開打、對手強度照分數、對手決定攻守', vis1 and dict((m, c) for m, c, _ in mid) == {'dawn': 'ban', 'market': '', 'rail': 'ban', 'site': '', 'night': ''} and r == ['market', 'match', 'ranked', True, True, True, True, True], [vis1, mid, r])
         # 6 打完：段位分變化顯示在結算、定級進度 +1、最近變化有一筆
         r = await ev("""() => { const s = window.__strike; s.ROUND.phase = 'live'; s.ROUND.score.A = 6; s.ROUND.score.B = 2; s.endRound('A', '測試', 'elim');
           for (let i = 0; i < 60 * 6 && s.game.state !== 'over'; i++) s.step(1/60);

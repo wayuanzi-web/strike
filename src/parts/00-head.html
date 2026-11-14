@@ -238,7 +238,8 @@ body.buying #tut { z-index: 8; top: auto; bottom: calc(var(--sb) + 6px); width: 
 .bi:disabled { opacity: .45; } .bi:disabled em { color: var(--hurt); } .bi.own { opacity: .7; border-color: #9fe8a8; } .bi.own em { color: #9fe8a8; }
 .bi:not(:disabled):active { background: rgba(159,232,168,.25); }
 .maps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--u) * 1.6); }
-@media (min-width: 700px) { .maps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }   /* 4 張地圖：一排 4 張或 2×2，不留單獨一張 */
+.maps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 700px) { .maps { grid-template-columns: repeat(5, minmax(0, 1fr)); } }   /* 5 張地圖：一排 5 張（窄螢幕 3＋2） */
 .maps button { text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.6) calc(var(--u) * 2.2); min-height: 44px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid var(--line); touch-action: manipulation; }
 .maps b { font-size: max(13px, calc(var(--u) * 3.4)); } .maps small { color: var(--mute); font-size: max(11px, calc(var(--u) * 2.4)); }
 .maps button[aria-checked="true"] { border-color: var(--dawn); background: rgba(255,179,71,.16); } .maps button[aria-checked="true"] b { color: var(--dawn-lt); }
@@ -334,7 +335,8 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 .rkhist li { display: flex; gap: 8px; font-size: 13px; } .rkhist li b { min-width: 3.2em; text-align: right; font-family: var(--f-num); } .rkhist li.w b { color: #9fe8a8; } .rkhist li.l b { color: #ff9a86; }
 .rkpast li { display: flex; gap: 6px; align-items: center; font-size: 12px; }
 #vetoMaps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--u) * 1.6); }
-@media (min-width: 700px) { #vetoMaps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+#vetoMaps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 700px) { #vetoMaps { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .vmap { position: relative; text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.8) calc(var(--u) * 2.2); min-height: 64px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid var(--line); color: inherit; touch-action: manipulation; }
 .vmap small { color: var(--mute); font-size: 11px; } .vmap i { font-style: normal; font-weight: 800; font-size: 13px; }
 .vmap.ban { opacity: .45; } .vmap.ban b { text-decoration: line-through; } .vmap.ban i { color: #ff9a86; }
@@ -465,6 +467,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
         <div class="opt"><span>敵我配色</span><div class="seg" data-k="palette"><button data-v="default">預設（青／橘）</button><button data-v="cb">色盲友善（藍／黃）</button><button data-v="hc">高對比</button></div><small class="sh">改敵我顏色，色盲或看不清楚時用</small></div>
         <div class="opt"><span>音效</span><div class="seg" data-k="sound"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">iPhone 側邊靜音開關打開時不會有聲音</small></div>
         <div class="opt"><span>聲音方向提示</span><div class="seg" data-k="soundViz"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">畫面邊緣顯示槍聲、腳步從哪個方向來</small></div>
+        <div class="opt"><span>立體方向音效</span><div class="seg" data-k="hrtf"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">分得出聲音從前、後、上、下來（戴耳機最明顯）；比較舊的手機覺得卡可以關</small></div>
         <div class="opt"><span>音效字幕</span><div class="seg" data-k="captions"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">畫面下方用文字寫出重要的聲音</small></div>
         <div class="opt"><span>擊殺鏡頭</span><div class="seg" data-k="killcam"><button data-v="1">開</button><button data-v="0">關</button></div><small class="sh">陣亡後重播對方視角最後 3 秒</small></div>
         <div class="opt"><span>畫質</span><div class="seg" data-k="quality"><button data-v="auto">自動</button><button data-v="eco">省電</button><button data-v="std">標準</button><button data-v="high">清晰</button></div><small class="sh">「自動」依手機速度調解析度、太卡就降；「省電」最低解析度、不畫遠景（切換省電要重新整理）</small></div>
@@ -496,7 +499,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <div id="rankOpt" class="ov" hidden><div class="card"><h2>段位賽</h2><div id="rankBody"></div>
     <div class="row"><button class="btn go" id="rankGo">開始（禁選地圖）</button><button class="btn" id="rankX">取消</button></div></div></div>
   <div id="rankVeto" class="ov" hidden><div class="card"><h2>禁選地圖</h2><p id="vetoMsg"></p><div id="vetoMaps"></div>
-    <p class="mnote">你禁一張 → 對手禁一張 → 你從剩下兩張選 → 對手選邊。對手會禁你勝率最高的地圖。</p>
+    <p class="mnote">你禁一張 → 對手禁一張 → 你從剩下的地圖選 → 對手選邊。對手會禁你勝率最高的地圖。</p>
     <div class="row"><button class="btn" id="vetoX">取消</button></div></div></div>
   <div id="tutArrow" hidden></div>
   <div id="rageCombo" hidden></div><div id="rageTint"></div>

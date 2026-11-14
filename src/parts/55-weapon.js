@@ -267,6 +267,7 @@ function shoot() {
       if (res.part === 'head') spawnSparks(_hit, _d, '#ffd27a', 5);
     } else if (res.n && decals < 4) {
       decals++; addDecal(_hit, res.n); spawnPuff(_hit, '#cfc6b6', n > 1 ? 0.25 : 0.4, 0.5, 0.5);
+      if (decals === 1) impactSfx(_hit, boxMat(res.box), n > 1 ? 0.55 : 0.8);   // 打到什麼材質就是什麼聲音
       spawnSparks(_hit, _v1.set(res.n[0], res.n[1], res.n[2]), '#ffcf86', n > 1 ? 1 : 3);
     }
     if (k < 3) spawnTracer(_mz, _hit, '#ffe0a0', n > 1 ? 0.018 : 0.028);
@@ -277,7 +278,7 @@ function shoot() {
     player.dealt += Math.min(e.dmg, Math.max(0, bot.hp)); player.dealtHits++;
     damageBot(bot, e.dmg, e.part, e.dir, player, WP);
   }
-  muzzleLight(_mz, WP.scope || n > 1 ? 1.8 : 1.3);
+  muzzleLight(_mz, WP.scope || n > 1 ? 1.8 : 1.3); player.firedAt = game.t;
   W.flashT = 0.045;
   W.kickV += WP.kick; W.roll = (Math.random() - 0.5) * 0.04 * WP.kick / 2.2;
   W.vpv += WP.vkick + Math.random() * 3;
@@ -297,7 +298,7 @@ function traceShot(o, d, range) {
     const h = rayBody(o, d, b.boxes, t);
     if (h) { t = h.t; bot = b; part = h.part; }
   }
-  return { t, bot, part, n: bot ? null : (w ? w.n : null) };
+  return { t, bot, part, n: bot ? null : (w ? w.n : null), box: w ? w.box : -1 };
 }
 function muzzleWorld(out) {
   gunRig.updateMatrixWorld(true); camera.updateMatrixWorld();

@@ -22,7 +22,7 @@ function angDiff(a, b) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; wh
 
 // ---------- 設定（存在這台手機的瀏覽器裡，讀不到就用預設） ----------
 const DEFAULTS = { rageGod: false, sens: 1.0, adsSens: 0.6, autoFire: true, aimAssist: true, followRecoil: true, difficulty: 'normal', quality: 'auto', sound: true, showFps: false, map: 'dawn', lefty: false, btnScale: '1', vibrate: true,
-  adsMode: 'toggle', crouchMode: 'toggle', curve: 'linear', joyMode: 'float', runLock: true, gyro: 'off', gyroSens: 1.0, gyroInv: false, killcam: true, soundViz: false, captions: false, palette: 'default', nick: '', lbOn: false, lbId: '', lbUrl: '', layout: null };
+  adsMode: 'toggle', crouchMode: 'toggle', curve: 'linear', joyMode: 'float', runLock: true, gyro: 'off', gyroSens: 1.0, gyroInv: false, killcam: true, soundViz: false, captions: false, hrtf: true, palette: 'default', nick: '', lbOn: false, lbId: '', lbUrl: '', layout: null };
 // 讀進來的資料（localStorage、匯入代碼）照預設值的型別清一遍：型別不對就用預設，免得一個壞值讓遊戲開不起來
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 function cleanLike(v, def) {

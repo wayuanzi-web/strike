@@ -149,6 +149,7 @@ function canSeeUnit(b, u) {
   if (dist > (game.mode === 'match' ? 50 : 85)) return false;
   const fov = b.state === 'patrol' || b.state === 'hold' ? 62 : b.state === 'search' ? 110 : 180;
   if (fov < 180 && dist > 3 && Math.abs(angDiff(b.yaw, Math.atan2(-dx, -dz))) > fov * DEG) return false;
+  if (MAP.theme.night && dist > nightSeeDist(u)) return false;   // 夜裡：暗處的人遠一點就看不到（剛開槍的除外）
   botEye(b, _be);
   const ox = u.leanX || 0, oz = u.leanZ || 0;   // 對方探頭：看的是偏出去的頭
   if (lineClear(_be, _pt.set(pp.x + ox, pp.y + u.body.h - 0.12, pp.z + oz))) return true;
@@ -530,6 +531,8 @@ function botModel(b, dt) {
   b.walk += dt * sp * 2.3;
   b.ck = lerp(b.ck, b.phys.crouched ? 1 : 0, 1 - Math.exp(-15 * dt));
   botLean(b, dt, sp);
+  if (b.g.visible && MAP.lamps && (b.lampT = (b.lampT || 0) - dt) <= 0) { b.lampT = 0.2; lampColorAt(b.phys.pos.x, b.phys.pos.z, b.hm.mat.userData.lampU.value); }   // 夜裡：站在路燈下才被照亮
+  else if (!MAP.lamps && b.hm.mat.userData.lampU.value.r) b.hm.mat.userData.lampU.value.setRGB(0, 0, 0);
   if (b.g.visible) humanPose(b, dt);   // 擬真人物的骨頭（59-human）
   // 腳步聲（離聽的人 30 公尺內聽得到，有方位）
   if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(camera.position) < 30) { sfx('step', b.team === 'A' ? 0.5 : 0.9, { pos: p, surface: surfaceAt(p) }); if (b.team !== player.team) soundCue('step', p); } } }
@@ -631,7 +634,8 @@ function botShoot(b, tg, dist, D) {
       if (hitPart === 'head' || (hitPart === 'body' && e.part === 'legs')) e.part = hitPart;
       hits.set(hitU, e);
       if (hitU !== player && k < 3) spawnPuff(end, '#9e1d16', 0.3, 0.3, 0.2);
-    } else if (wl && k < 3) addDecal(end, wl.n);
+    } else if (wl && k < 3) { addDecal(end, wl.n); if (k === 0 && end.distanceTo(camera.position) < 16) impactSfx(end, boxMat(wl.box), 0.75); }
+    if (k === 0 && hitU !== player) bulletWhiz(_be, end, b.team);   // 子彈從你耳邊飛過
   }
   for (const [u, e] of hits) {
     if (u === player) {

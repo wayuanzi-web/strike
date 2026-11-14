@@ -5,14 +5,14 @@ const SUN_DIR = new V3().fromArray(MAP.theme.sun).normalize();
 const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'concrete', dock: 'concrete', lintel: 'concrete', trim: 'concrete',
   wall: 'brick', rust: 'container', teal: 'container', olive: 'container', crate: 'wood', shed: 'metal', dark: 'metal', paint: 'floor', hazard: 'floor',
   // 舊城：灰泥牆、石材、石板地、木攤位、窗、屋簷、遮陽布、水
-  house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'metal', roof: 'brick', door: 'wood',
+  house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'glass', lampw: 'lamp', lampc: 'lamp', roof: 'brick', door: 'wood',
   awn1: 'plaster', awn2: 'plaster', water: 'floor', clock: 'plaster', sill: 'concrete',
   // 鐵道：碎石地、車廂、鐵軌、枕木
   gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
   wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
-  house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#34393f', roof: '#b0573a', door: '#6b4a32',
+  house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#2c3846', lampw: '#ffe2b0', lampc: '#e4f0ff', roof: '#b0573a', door: '#6b4a32',
   awn1: '#c8423a', awn2: '#f0e8d8', water: '#4f8fa8', clock: '#f2ede2', sill: '#d8d0c0',
   gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
 };
@@ -327,6 +327,7 @@ const AO_DIRS = (function () {
 const SUN_JIT = [[0, 0], [0.018, 0.01], [-0.015, 0.014], [0.006, -0.018]];
 function bakeVertex(px, py, pz, n, tu, tv) {
   const ox = px + n[0] * 0.025, oy = py + n[1] * 0.025, oz = pz + n[2] * 0.025;
+  const lw = lampList().length ? lampAt(ox, oy, oz, n, lampList()) : [0, 0];
   // 日照：朝太陽打 4 條略微錯開的射線，算出柔和的影子邊
   let sun = 0;
   const nd = n[0] * SUN_DIR.x + n[1] * SUN_DIR.y + n[2] * SUN_DIR.z;
@@ -346,14 +347,15 @@ function bakeVertex(px, py, pz, n, tu, tv) {
     if (t >= 0) occ += d[3] * (1 - t / 1.4) * (1 - t / 1.4) + d[3] * 0.25;
     tot += d[3] * 1.25;
   }
-  return [sun, clamp(1 - occ / tot * 1.5, 0.15, 1)];
+  return [sun, clamp(1 - occ / tot * 1.5, 0.15, 1), Math.min(2, lw[0]), Math.min(2, lw[1])];
 }
 
 // ---------- 光照貼圖：每個方塊面在一張圖集裡有一塊，每格算日照與環境光遮蔽（取代以前把面切細、存在頂點上） ----------
 // 密度依地圖大小自動調（每公尺約 3–5 格，總共約 14 萬格）；邊緣多留一圈避免取樣滲色；圖集用線性內插，影子邊比頂點版銳利。
 const LM = { tex: null, size: [0, 0], density: 0, texels: 0, ms: 0 };
-function bakeTexel(px, py, pz, n, tu, tv) {
+function bakeTexel(px, py, pz, n, tu, tv, near) {
   const ox = px + n[0] * 0.03, oy = py + n[1] * 0.03, oz = pz + n[2] * 0.03;
+  const lw = near && near.length ? lampAt(ox, oy, oz, n, near) : null;   // 夜間路燈（暖、冷）
   let sun = 0;
   const nd = n[0] * SUN_DIR.x + n[1] * SUN_DIR.y + n[2] * SUN_DIR.z;
   if (nd > 0.01) {
@@ -370,7 +372,7 @@ function bakeTexel(px, py, pz, n, tu, tv) {
     if (t >= 0) occ += d[3] * (1 - t / 1.4) * (1 - t / 1.4) + d[3] * 0.25;
     tot += d[3] * 1.25;
   }
-  return [sun, clamp(1 - occ / tot * 1.5, 0.15, 1)];
+  return [sun, clamp(1 - occ / tot * 1.5, 0.15, 1), lw ? lw[0] : 0, lw ? lw[1] : 0];
 }
 // 把每個面放進圖集（依高度排成一列一列），回傳每個面的位置
 function packFaces(faces, density) {
@@ -398,15 +400,18 @@ function bakeLightmap(faces) {
     const { b, ax, ua, va, n, tu, tv, plane, lu, lv, tw, th } = f;
     // 先算這個面自己的格子，再輕輕模糊環境光遮蔽（3×3），最後寫進圖集（外圍一圈複製邊緣）
     tmp.length = 0;
+    const near = lampsNearFace(b, n, plane, ax);
     for (let j = 0; j < th; j++) for (let i = 0; i < tw; i++) {
       const p = [0, 0, 0]; p[ax] = plane; p[ua] = b.min[ua] + lu * (i + 0.5) / tw; p[va] = b.min[va] + lv * (j + 0.5) / th;
-      tmp.push(bakeTexel(p[0], p[1], p[2], n, tu, tv)); texels++;
+      tmp.push(bakeTexel(p[0], p[1], p[2], n, tu, tv, near)); texels++;
     }
     const at = (i, j) => tmp[clamp(j, 0, th - 1) * tw + clamp(i, 0, tw - 1)];
     for (let j = -1; j <= th; j++) for (let i = -1; i <= tw; i++) {
       const c = at(i, j); let ao = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) ao += at(i + di, j + dj)[1];
       const o = ((f.ay0 + 1 + j) * W + (f.ax0 + 1 + i)) * 4;
-      data[o] = Math.round(c[0] * 255); data[o + 1] = Math.round(ao / 9 * 255); data[o + 2] = 0; data[o + 3] = 255;
+      // 路燈的光也模糊一點（影子邊柔一些）；存一半的值，讓 0–2 倍放得進 0–255
+      let lw = 0, lc = 0; if (c[2] || c[3] || near.length) for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const q = at(i + di, j + dj); lw += q[2]; lc += q[3]; }
+      data[o] = Math.round(c[0] * 255); data[o + 1] = Math.round(ao / 9 * 255); data[o + 2] = Math.min(255, Math.round(lw / 9 * 127.5)); data[o + 3] = Math.min(255, Math.round(lc / 9 * 127.5));
     }
   }
   if (LM.tex) LM.tex.dispose();
@@ -420,14 +425,14 @@ function bakeLightmap(faces) {
 
 // ---------- 建地圖網格：依材質分組，每組一次繪製 ----------
 const MAP_UNI = { uFlash: { value: new THREE.Vector4(0, 0, 0, 0) }, uLM: { value: null } };
-function patchMapMaterial(mat, wear, grime, chip = false) {
+function patchMapMaterial(mat, wear, grime, chip = false, m = '') {
   mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uFlash = MAP_UNI.uFlash; sh.uniforms.uLM = MAP_UNI.uLM;
+    sh.uniforms.uLM = MAP_UNI.uLM; Object.assign(sh.uniforms, LIGHT_U);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec2 aLight; attribute vec2 aLm; attribute vec3 aLocal; attribute vec3 aSize;\nvarying vec2 vLight; varying vec2 vLm; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
+      .replace('#include <common>', '#include <common>\nattribute vec4 aLight; attribute vec2 aLm; attribute vec3 aLocal; attribute vec3 aSize;\nvarying vec4 vLight; varying vec2 vLm; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLight = aLight; vLm = aLm; vWp = (modelMatrix * vec4(transformed, 1.0)).xyz; vN0 = normal; vLoc = aLocal; vSz = aSize;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec4 uFlash; uniform sampler2D uLM;\nvarying vec2 vLight; varying vec2 vLm; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uLM; uniform vec3 uLampW; uniform vec3 uLampC; uniform vec3 uSunD; uniform vec3 uSunC; uniform vec3 uSkyT; uniform vec3 uSkyH; uniform vec3 uGnd;\n' + FL_GLSL + '\nvarying vec4 vLight; varying vec2 vLm; varying vec3 vWp; varying vec3 vN0; varying vec3 vLoc; varying vec3 vSz;')
       .replace('#include <map_fragment>', `#include <map_fragment>
       {
         vec3 an = abs(vN0);
@@ -442,19 +447,21 @@ function patchMapMaterial(mat, wear, grime, chip = false) {
         diffuseColor.rgb *= 1.0 - grime * ${grime.toFixed(2)} * step(an.y, 0.5);
       }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-        vec2 L = vLm.x < 0.0 ? vLight : texture2D(uLM, vLm).rg;   // 方塊用光照貼圖，裝飾用頂點上的值
+        vec4 L = vLm.x < 0.0 ? vLight : texture2D(uLM, vLm);   // 方塊用光照貼圖，裝飾用頂點上的值：日照、遮蔽、暖燈、冷燈
         reflectedLight.directDiffuse *= L.x;
         reflectedLight.indirectDiffuse *= mix(0.42, 1.0, L.y);
         reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.08, 0.05, 0.03) * (1.0 - smoothstep(0.0, 2.0, vWp.y));
-        { float fd = distance(vWp, uFlash.xyz);
-          reflectedLight.directDiffuse += diffuseColor.rgb * vec3(1.0, 0.7, 0.4) * uFlash.w * 2.2 / (1.0 + fd * fd * 0.5); }`);
+        reflectedLight.indirectDiffuse += diffuseColor.rgb * (uLampW * L.z + uLampC * L.w) * 2.0;   // 夜間路燈（白天是 0）
+        reflectedLight.directDiffuse += diffuseColor.rgb * flashLight(vWp) * 2.2;                   // 槍口、爆炸的動態光
+        ${m === 'lamp' ? 'reflectedLight.indirectDiffuse += diffuseColor.rgb * 3.0;' : ''}
+        ${specGlsl(m)}`);
   };
-  mat.customProgramCacheKey = () => 'map' + wear + '_' + grime + (chip ? 'c' : '');
+  mat.customProgramCacheKey = () => 'map' + wear + '_' + grime + (chip ? 'c' : '') + m;
 }
 function buildMapMeshes(aniso) {
   const t0 = performance.now();
   const used = new Set(BOXES.concat(DECOR).map((b) => MAT_OF[b.c] || 'concrete'));
-  const tex = {}; for (const m of used) tex[m] = getTex(m, aniso);
+  const tex = {}; for (const m of used) tex[m] = getTex(m === 'glass' || m === 'lamp' ? 'metal' : m, aniso);
   const t1 = performance.now();
   bakeIndex();
   const groups = {};
@@ -498,7 +505,7 @@ function buildMapMeshes(aniso) {
           u = hu * scale * (ax === 0 && sg > 0 || ax === 2 && sg < 0 ? -1 : 1); v = mat === 'container' && ax !== 1 ? (p[1] - b.min[1]) / 2.6 : hv * scale;
         }
         g.U.push(u, v);
-        g.L.push(...(faceL || [1, 1])); g.M.push(-1, -1);
+        g.L.push(...(faceL || [1, 1, 0, 0])); g.M.push(-1, -1);
         g.O.push(p[0] - b.min[0], p[1] - b.min[1], p[2] - b.min[2]); g.Z.push(size[0], size[1], size[2]);
       }
       // 三角形要朝外（逆時針）：依法線方向決定繞向
@@ -518,7 +525,7 @@ function buildMapMeshes(aniso) {
       f.g.M[k] = (f.ax0 + 1 + i * f.tw) / LW; f.g.M[k + 1] = (f.ay0 + 1 + j * f.th) / LH;
     }
   }
-  const SETTINGS = { concrete: [0.5, 0.25], brick: [0.35, 0.3], floor: [0.0, 0.0], container: [0.9, 0.2], wood: [0.7, 0.2], metal: [0.6, 0.25], plaster: [0.35, 0.4], cobble: [0, 0], gravel: [0, 0] };
+  const SETTINGS = { glass: [0, 0], lamp: [0, 0], concrete: [0.5, 0.25], brick: [0.35, 0.3], floor: [0.0, 0.0], container: [0.9, 0.2], wood: [0.7, 0.2], metal: [0.6, 0.25], plaster: [0.35, 0.4], cobble: [0, 0], gravel: [0, 0] };
   const meshes = [];
   for (const [m, g] of Object.entries(groups)) {
     const geo = new THREE.BufferGeometry();
@@ -526,13 +533,13 @@ function buildMapMeshes(aniso) {
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(g.N, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(g.C, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.U, 2));
-    geo.setAttribute('aLight', new THREE.Float32BufferAttribute(g.L, 2));
+    geo.setAttribute('aLight', new THREE.Float32BufferAttribute(g.L, 4));
     geo.setAttribute('aLm', new THREE.Float32BufferAttribute(g.M, 2));
     geo.setAttribute('aLocal', new THREE.Float32BufferAttribute(g.O, 3));
     geo.setAttribute('aSize', new THREE.Float32BufferAttribute(g.Z, 3));
     geo.setIndex(g.I); geo.computeBoundingSphere();
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, map: tex[m] });
-    const st = SETTINGS[m] || [0.5, 0.2]; patchMapMaterial(mat, st[0], st[1], m === 'container');
+    const st = SETTINGS[m] || [0.5, 0.2]; patchMapMaterial(mat, st[0], st[1], m === 'container', m);
     const mesh = new THREE.Mesh(geo, mat); mesh.name = 'map-' + m; mesh.matrixAutoUpdate = false;
     meshes.push(mesh);
   }
@@ -609,7 +616,8 @@ function buildSky(th) {
   sky.renderOrder = -1;
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cx = cv.getContext('2d');
   const gr = cx.createRadialGradient(64, 64, 4, 64, 64, 64);
-  gr.addColorStop(0, 'rgba(255,250,235,1)'); gr.addColorStop(0.16, 'rgba(255,236,190,.95)'); gr.addColorStop(0.4, 'rgba(255,190,120,.3)'); gr.addColorStop(1, 'rgba(255,160,90,0)');
+  if (MAP.theme.night) { gr.addColorStop(0, 'rgba(240,244,255,1)'); gr.addColorStop(0.1, 'rgba(225,232,250,1)'); gr.addColorStop(0.13, 'rgba(160,180,230,.35)'); gr.addColorStop(0.4, 'rgba(90,110,170,.1)'); gr.addColorStop(1, 'rgba(60,80,140,0)'); }   // 月亮
+  else { gr.addColorStop(0, 'rgba(255,250,235,1)'); gr.addColorStop(0.16, 'rgba(255,236,190,.95)'); gr.addColorStop(0.4, 'rgba(255,190,120,.3)'); gr.addColorStop(1, 'rgba(255,160,90,0)'); }
   cx.fillStyle = gr; cx.fillRect(0, 0, 128, 128);
   const sunS = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthWrite: false, fog: false, blending: THREE.AdditiveBlending, toneMapped: false }));
   sunS.position.copy(SUN_DIR).multiplyScalar(380); sunS.scale.set(80, 80, 1);

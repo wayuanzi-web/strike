@@ -66,7 +66,7 @@ DRAW = """(id) => {
 }"""
 
 async def main():
-    ids = sys.argv[1:] or ['dawn', 'market', 'rail', 'site']
+    ids = sys.argv[1:] or ['dawn', 'market', 'rail', 'site', 'night']
     async with async_playwright() as p:
         browser, page, errors = await open_game(p)
         await page.evaluate("() => { window.__strike.game.manual = true; }")

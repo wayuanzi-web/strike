@@ -1,6 +1,6 @@
 /* ===== 77-ranked：段位賽、2 對 2、軍備競賽（M14，參考 CS2 Premier／Wingman／Arms Race）
    段位賽：對電腦的 5 對 5 炸彈模式。數字評分（Elo：贏強隊加多、輸弱隊扣多，回合差另外加減），對手強度跟著你的分數走；
-     開打前禁選地圖（你禁一張 → 對手禁一張 → 你從剩下兩張選 → 對手選邊）；每月一個賽季，換季時分數往 1000 拉回一半、重打 5 場定級。
+     開打前禁選地圖（你禁一張 → 對手禁一張 → 你從剩下的選 → 對手選邊）；每月一個賽季，換季時分數往 1000 拉回一半、重打 5 場定級。
      中途離開算輸。
    2 對 2：你＋1 個隊友對 2 個敵人，只有一個包點；攻方出生在包點外的集合點、守方在包點，回合短（1 分 30 秒、先贏 6 回合）。
    軍備競賽：8 人人人互打，每殺 2 人自動換下一把槍（步槍 → 卡賓 → 狙擊 → 衝鋒 → 霰彈 → 重手槍 → 手槍），最後一關用黃金手槍擊殺就贏。 */
@@ -102,7 +102,7 @@ function openVeto() {
   renderVeto(); $('rankVeto').hidden = false;
 }
 function closeVeto() { for (const t of RK.timers) clearTimeout(t); RK.timers = []; RK.veto = null; $('rankVeto').hidden = true; }
-const VETO_MSG = { ban: '你先禁一張地圖（點一下）', aiban: '對手正在禁地圖…', pick: '從剩下兩張選一張要打的', side: '對手選邊中…', go: '' };
+const VETO_MSG = { ban: '你先禁一張地圖（點一下）', aiban: '對手正在禁地圖…', pick: '從剩下的地圖選一張要打的', side: '對手選邊中…', go: '' };
 function renderVeto() {
   const V = RK.veto; if (!V) return;
   $('vetoMsg').textContent = V.step === 'go' ? V.goMsg : VETO_MSG[V.step];

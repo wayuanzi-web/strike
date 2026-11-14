@@ -27,7 +27,14 @@ function applyTheme() {
   renderer.toneMappingExposure = t.exposure;
   for (const o of [skyline, sky]) if (o) { scene.remove(o); o.traverse((m) => { if (m.geometry) m.geometry.dispose(); if (m.material) { if (m.material.map) m.material.map.dispose(); m.material.dispose(); } }); }
   skyline = buildSkyline(t.skyline, t.skyTop, t.skyBot); skyline.visible = S.quality !== 'eco'; scene.add(skyline);
-  sky = buildSky(t.sky); scene.add(sky);
+  sky = buildSky(t.sky); scene.add(sky); addStars(sky);
+  applyLightTheme(); buildLampGlow();
+  if (window.VM_READY) applyVmTheme();
+}
+// 手上的槍：夜裡環境光、反射都暗下來（主要靠路燈和槍口火光照亮）
+function applyVmTheme() {
+  const t = MAP.theme, nk = t.night ? 0.3 : 1; VM_HEMI.intensity = 0.8 * nk; VM_FILL.intensity = 0.5 * nk;
+  for (const k in VM_MATS) VM_MATS[k].envMapIntensity = VM_ENVI[k] * (t.night ? 0.25 : 1);
 }
 // 重建地圖網格（換地圖時）：舊的丟掉、新的加進場景
 function rebuildMapMeshes() {
@@ -101,9 +108,12 @@ const VM_MATS = {
   poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.62, envMap: VM_ENV, envMapIntensity: 0.6 }),
   cloth: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.95, envMap: VM_ENV, envMapIntensity: 0.35 }),
 };
-vmScene.add(new THREE.HemisphereLight(0xe2ebf4, 0x4b463e, 0.8));
+const VM_HEMI = new THREE.HemisphereLight(0xe2ebf4, 0x4b463e, 0.8); vmScene.add(VM_HEMI);
 const VM_SUN = new THREE.DirectionalLight(0xfff0d8, 1.7); VM_SUN.position.set(-0.6, 1.0, 0.55); vmScene.add(VM_SUN);
 const VM_FILL = new THREE.DirectionalLight(0xcfe0ff, 0.5); VM_FILL.position.set(0.8, 0.2, -0.4); vmScene.add(VM_FILL);
+const VM_GLOW = new THREE.DirectionalLight(0xffb070, 0); VM_GLOW.position.set(0, 1, 0); vmScene.add(VM_GLOW);   // 路燈、槍口火光、爆炸照到手上的槍
+const VM_ENVI = { metal: 0.9, poly: 0.6, cloth: 0.35 };
+window.VM_READY = true; applyVmTheme();
 // 步槍：通用突擊步槍外形（不是任何一把真槍）。槍身朝 -z，原點在握把附近
 // ---------- 手上的槍：每種武器一組模型，換槍時換掉 gunRig 裡的那組 ----------
 const gunRig = new THREE.Group(); vmScene.add(gunRig);
@@ -283,8 +293,16 @@ function updateViewmodelLight(dt) {
   vmLight = lerp(vmLight, updateViewmodelLight.lit || 1, 1 - Math.exp(-4 * dt));
   const f = vmLight + Math.max(0, W.flashT) * 8;
   for (const k in VM_MATS) VM_MATS[k].color.copy(VM_TINT[k]).multiply(VM_BASE[k]).multiplyScalar(f);   // 底色 × 塗裝顏色 × 陰影明暗
-  VM_SUN.intensity = 1.7 * (vmLight - 0.6) / 0.4;   // 走進陰影：直射光變弱
+  VM_SUN.intensity = 1.7 * (vmLight - 0.6) / 0.4 * (MAP.theme.night ? 0.3 : 1);   // 走進陰影：直射光變弱；夜裡是月光
+  // 路燈（腳下光照貼圖的值）＋別人的槍口火光、爆炸：從最亮那盞的方向照過來
+  const p = camera.position, L = lightAt(p.x, p.z), fl = flashAt(p.x, p.y, p.z, _vmd);
+  const lamp = (L.warm + L.cool) * 1.4;
+  VM_GLOW.color.copy(LIGHT_U.uLampW.value).multiplyScalar(L.warm).add(_lc.copy(LIGHT_U.uLampC.value).multiplyScalar(L.cool));
+  if (fl > 0.05) VM_GLOW.color.lerp(_lc.set(1, 0.7, 0.4), clamp(fl / (fl + lamp + 0.01), 0, 1));
+  VM_GLOW.intensity = Math.min(4, lamp + fl * 1.2);
+  if (fl > 0.05) { _vmd.applyQuaternion(_vmq.copy(camera.quaternion).invert()).normalize(); VM_GLOW.position.copy(_vmd); } else VM_GLOW.position.set(0.2, 1, 0.3);
 }
+const _vmd = new V3(), _vmq = new THREE.Quaternion();
 function starTexture() {
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
   const g = c.createRadialGradient(32, 32, 1, 32, 32, 32);
@@ -451,8 +469,7 @@ function updateBlobShadows() {
 const _yAxis = new V3(0, 1, 0);
 
 // 槍口照亮周圍：地圖材質裡的一個 uniform，最近一次開槍的位置與強度
-function muzzleLight(p, strength) { const u = MAP_UNI.uFlash.value; if (strength >= u.w * 0.8) u.set(p.x, p.y, p.z, strength); }
-function updateMuzzleLight(dt) { MAP_UNI.uFlash.value.w *= Math.exp(-dt * 40); }
+// muzzleLight()、updateMuzzleLight() 在 23-lights.js（同時 4 盞）
 
 // ---------- 音效：多層合成的槍聲事先算好存起來，每發只播放；遠的聲音變悶、變小、慢一點到、分左右 ----------
 let AC = null, noiseBuf = null, master = null, sendBus = null;
@@ -513,19 +530,13 @@ function prerenderSounds() {
   const jobs = [shot(0), shot(1), shot(2), shot(3), ding(), thud()];
   Promise.all(jobs).then((r) => { if (r[0]) { BUF.shot = r.slice(0, 4); BUF.head = r[4]; BUF.hit = r[5]; } }).catch(() => { /* 不支援就用即時合成 */ });
 }
-// 依位置算音量、悶的程度、左右、延遲
-function spatial(pos) {
-  const pp = camera.position, dx = pos.x - pp.x, dz = pos.z - pp.z, d = Math.hypot(dx, dz);
-  const rel = angDiff(camera.rotation.y, Math.atan2(-dx, -dz));
-  return { d, vol: 1 / (1 + d / 12), lp: clamp(18000 * Math.exp(-d / 22), 900, 18000), pan: clamp(-Math.sin(rel) * 0.8, -0.8, 0.8), delay: d / 343 };
-}
+// spatial()（位置 → 音量、悶、左右或 HRTF、延遲）在 41-sound3d.js
 function playBuf(buf, vol, o = {}) {
   const s = AC.createBufferSource(); s.buffer = buf; s.playbackRate.value = o.rate || rand(0.96, 1.04);
   let node = s;
   if (o.lp && o.lp < 17000) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; node.connect(f); node = f; }
-  const g = AC.createGain(); g.gain.value = vol; node.connect(g); node = g;
-  if (o.pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = o.pan; node.connect(p); node = p; }
-  node.connect(master); if (REV.send && o.rev !== false) node.connect(REV.send);   // 殘響
+  const g = AC.createGain(); g.gain.value = vol; node.connect(g);
+  connectOut(g, o.pan, buf.duration / s.playbackRate.value + (o.delay || 0), o.rev !== false);   // 左右或 HRTF＋殘響
   s.start(AC.currentTime + (o.delay || 0));
 }
 function noise(dur, freq, q, vol, type = 'lowpass', at = 0, pan = 0) {
@@ -533,7 +544,7 @@ function noise(dur, freq, q, vol, type = 'lowpass', at = 0, pan = 0) {
   const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
   const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   src.connect(f); f.connect(g);
-  if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(master); if (REV.send) p.connect(REV.send); } else { g.connect(master); if (REV.send) g.connect(REV.send); }
+  connectOut(g, pan, dur + at, true, !!(pan && pan.low));
   src.start(t, Math.random() * 0.4); src.stop(t + dur + 0.02);
 }
 function tone(freq, dur, vol, type = 'square', at = 0, slide = 0) {
@@ -579,7 +590,8 @@ function sfx(kind, vol = 1, o = {}) {
   else if (kind === 'step') {
     // 腳步：低頻的落腳＋鞋底摩擦；依地面材質換聲音，可帶位置（機器人的腳步）
     let v = vol, pan = o.pan || 0;
-    if (o.pos) { const sp = spatial(o.pos); v *= sp.vol * 1.4; pan = sp.pan; }
+    if (o.pos) { const sp = spatial(o.pos); v *= sp.vol * 1.4; pan = sp.pan; if (pan && typeof pan === 'object') pan.low = true; }
+    if (o.pos && v < 0.02) return;
     const surf = MAT_OF[o.surface] || 'floor', r = o.rate || 1;
     noise(0.035, 350 * r, 1.2, 0.35 * v, 'lowpass', 0, pan); noise(0.018, 1800 * r, 1.5, 0.12 * v, 'bandpass', 0.008, pan);
     if (surf === 'container' || surf === 'metal') noise(0.08, 2400 * r, 9, 0.12 * v, 'bandpass', 0.004, pan);
@@ -609,14 +621,18 @@ function updateAmbience(dt) {
   if (!AMB.node) ambStart();
   const on = S.sound && !document.hidden;
   AMB.lfoT += dt;
-  const k = MAP.theme.amb, base = k === 'rail' ? 0.05 : k === 'town' ? 0.025 : 0.04;
+  const k = MAP.theme.amb, base = k === 'rail' ? 0.05 : k === 'town' ? 0.025 : k === 'night' ? 0.028 : 0.04;
   const target = on ? base * (0.7 + 0.3 * Math.sin(AMB.lfoT * 0.35) + 0.15 * Math.sin(AMB.lfoT * 1.3)) : 0;
   AMB.gain.gain.value += (target - AMB.gain.gain.value) * Math.min(1, dt * 2);
-  AMB.filter.frequency.value = k === 'town' ? 700 : k === 'rail' ? 320 : 450;
+  AMB.filter.frequency.value = k === 'town' ? 700 : k === 'rail' ? 320 : k === 'night' ? 300 : 450;
   if (!on || (AMB.nextT -= dt) > 0) return;
   AMB.nextT = rand(6, 16);
   const pan = rand(-0.7, 0.7), r = Math.random();
-  if (k === 'harbor') {
+  if (k === 'night') {
+    if (r < 0.5) { const f = rand(4200, 4800); for (let i = 0; i < 6; i++) tonePan(f, 0.035, 0.012, 'sine', i * 0.07 + (i > 2 ? 0.25 : 0), f * 0.98, pan); }   // 蟲鳴
+    else if (r < 0.8) { tonePan(98, 2.8, 0.035, 'sawtooth', 0, 96, pan, 420); tonePan(123, 2.8, 0.025, 'sawtooth', 0, 121, pan, 420); }   // 遠處船笛
+    else { for (const [f, v] of [[880, 0.02], [1320, 0.008]]) tonePan(f, 3, v, 'sine', 0, f * 0.997, pan); }                              // 浮標的鈴
+  } else if (k === 'harbor') {
     if (r < 0.7) { for (let i = 0; i < 2; i++) tonePan(rand(1500, 1900), 0.18, 0.025, 'triangle', i * 0.22, rand(1100, 1300), pan); }   // 海鷗
     else { tonePan(110, 2.2, 0.04, 'sawtooth', 0, 108, pan, 500); tonePan(138, 2.2, 0.03, 'sawtooth', 0, 136, pan, 500); }               // 遠處船笛
   } else if (k === 'town') {
@@ -633,6 +649,6 @@ function tonePan(freq, dur, vol, type, at, slide, pan, lp) {
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + Math.min(0.15, dur * 0.2)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   let node = o; if (lp) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); node = f; }
   node.connect(g);
-  if (AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = pan; g.connect(p); p.connect(master); } else g.connect(master);
+  connectOut(g, pan, dur + at, typeof pan === 'object');
   o.start(t); o.stop(t + dur + 0.05);
 }
