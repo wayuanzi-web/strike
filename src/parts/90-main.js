@@ -1,5 +1,5 @@
 /* ===== 90-main：遊戲狀態、瞄準輔助與自動開火、主迴圈、螢幕大小與方向 ===== */
-const game = { autoPR: isTouch ? 1.25 : 1.5, slowN: 0, state: 'menu', t: 0, fps: 60, fpsAcc: 0, fpsN: 0, menuT: 0, mode: 'practice', spec: 0, tune: {} };
+const game = { autoPR: isTouch ? 1.25 : 1.5, slowN: 0, state: 'menu', t: 0, fps: 60, fpsAcc: 0, fpsN: 0, menuT: 0, mode: 'practice', sub: '', spec: 0, tune: {} };
 const AIM = { onTarget: false, onT: 0, offT: 0, bot: null, yawErr: 0, pitchErr: 0, near: false };
 
 // ---------- 瞄準輔助、自動開火 ----------
@@ -54,8 +54,12 @@ function startGame(mode = 'practice') {
   if (mode === 'tutorial') { clearNades(); resetBomb(); closeBuy(); startTutorial(); return; }
   TUT.on = false; beacon.visible = false; $('tut').hidden = true;
   clearNades(); resetBomb(); closeBuy(); INV.primary = INV.secondary = null; INV.he = INV.flash = INV.smoke = INV.molotov = 0; INV.kit = false;
-  game.lastMode = mode; leaveMode();
-  if (mode === 'match') { startMatch(); enterPlay(); openBuy(); return; }
+  if (mode === 'ranked') { backToMenu(); openRanked(); return; }   // 段位賽：先看段位、再禁選地圖
+  game.lastMode = mode === 'ranked-go' ? 'ranked' : mode; leaveMode();
+  game.sub = mode === 'ranked-go' ? 'ranked' : mode === 'wingman' ? 'wingman' : mode === 'arms' ? 'arms' : '';
+  if (game.sub === 'ranked') rankBegin();
+  if (mode === 'match' || mode === 'ranked-go' || mode === 'wingman') { startMatch(); enterPlay(); openBuy(); return; }
+  if (mode === 'arms') { startMode('dm'); return; }
   if (mode === 'dm' || mode === 'koth' || mode === 'range') { startMode(mode); return; }
   if (mode === 'rage') { startRage(); return; }
   game.mode = 'practice'; setupBots('practice'); gainReset();
@@ -102,7 +106,7 @@ function pauseGame() {
   if (game.state !== 'play') return;
   closeBuy(); closeRadio();
   game.state = 'pause'; resetTouchState();
-  syncSettingsUI(); $('pause').hidden = false; $('bRespawn').hidden = game.mode === 'duel';   // 好友對戰不能自己重來
+  syncSettingsUI(); $('pause').hidden = false; $('bRespawn').hidden = game.mode === 'duel' || game.sub === 'ranked';   // 好友對戰、段位賽不能自己重來
   if (pointerLocked()) document.exitPointerLock();
 }
 function resumeGame() { if (game.state !== 'pause') return; $('pause').hidden = true; game.state = player.alive ? 'play' : 'dead'; if (game.state === 'dead') game.state = 'play'; }
@@ -124,11 +128,11 @@ let quitArm = -1e9;
 onTap($('bQuit'), () => {
   if (game.fromMenu) return;
   const risky = (game.mode === 'match' && ROUND.phase !== 'over') || (game.mode === 'duel' && NET.on);
-  if (risky && performance.now() - quitArm > 3000) { quitArm = performance.now(); $('bQuit').textContent = '再按一次離開'; setTimeout(() => { $('bQuit').textContent = '回選單'; }, 3000); return; }
+  if (risky && performance.now() - quitArm > 3000) { quitArm = performance.now(); $('bQuit').textContent = game.sub === 'ranked' ? '再按一次離開（算輸）' : '再按一次離開'; setTimeout(() => { $('bQuit').textContent = '回選單'; }, 3000); return; }
   quitArm = -1e9; $('bQuit').textContent = '回選單'; resetTouchState(); backToMenu();
 });
 onTap($('bRespawn'), () => {
-  if (game.fromMenu || game.mode === 'duel') return;
+  if (game.fromMenu || game.mode === 'duel' || game.sub === 'ranked') return;
   $('pause').hidden = true; $('dead').hidden = true; resetTouchState(); startGame(game.mode);   // 重來：從頭開始這個模式
 });
 $('bBuy').addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); openBuy(); });
@@ -244,7 +248,7 @@ function step(dt) {
     player.respawnT -= dt; player.deadT = (player.deadT || 0) + dt;
     if (game.mode === 'match') { $('deadT').textContent = '這回合不能重生，觀戰隊友中'; if (player.deadT > 2) $('dead').hidden = true; }
     else $('deadT').textContent = Math.max(0, player.respawnT).toFixed(1) + ' 秒後重生';
-    if (player.respawnT <= 0) { $('dead').hidden = true; spawnPlayer(modeSpawnFor(player)); }
+    if (player.respawnT <= 0) { $('dead').hidden = true; spawnPlayer(modeSpawnFor(player)); if (game.sub === 'arms') armsArm(player); }
   }
   hudUpdate(dt);
 }
@@ -269,7 +273,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };

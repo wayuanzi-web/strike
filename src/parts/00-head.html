@@ -324,6 +324,26 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 .pga { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; } .pga li { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); display: grid; gap: 2px; opacity: .55; } .pga li.done { opacity: 1; border-color: var(--dawn); } .pga small { color: var(--mute); }
 #pgCode { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); color: var(--bone); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; user-select: text; -webkit-user-select: text; }
 #overX { color: var(--dawn-lt); } #overX small { color: var(--mute); }
+/* M14 段位賽 */
+.btn.rank { background: linear-gradient(180deg, #2d5f8f, #1b3a5a); color: #eaf4ff; border-color: #8fd0ff; font-weight: 800; }
+#rankBody .rkhead { display: flex; gap: calc(var(--u) * 3); align-items: center; }
+#rankBody .rkhead > div { display: grid; gap: 2px; }
+.rkname { font-size: max(16px, calc(var(--u) * 4.2)); color: var(--dawn-lt); } .rknum { font-family: var(--f-num); font-size: max(24px, calc(var(--u) * 8)); line-height: 1; }
+.rkcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: calc(var(--u) * 2); }
+.rkcols h3 { font-size: 13px; color: var(--mute); margin: 4px 0; } .rkhist, .rkpast { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.rkhist li { display: flex; gap: 8px; font-size: 13px; } .rkhist li b { min-width: 3.2em; text-align: right; font-family: var(--f-num); } .rkhist li.w b { color: #9fe8a8; } .rkhist li.l b { color: #ff9a86; }
+.rkpast li { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+#vetoMaps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--u) * 1.6); }
+@media (min-width: 700px) { #vetoMaps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.vmap { position: relative; text-align: left; display: grid; gap: 2px; padding: calc(var(--u) * 1.8) calc(var(--u) * 2.2); min-height: 64px; border-radius: 6px; background: rgba(255,255,255,.06); border: 1px solid var(--line); color: inherit; touch-action: manipulation; }
+.vmap small { color: var(--mute); font-size: 11px; } .vmap i { font-style: normal; font-weight: 800; font-size: 13px; }
+.vmap.ban { opacity: .45; } .vmap.ban b { text-decoration: line-through; } .vmap.ban i { color: #ff9a86; }
+.vmap.pick { border-color: var(--dawn); background: rgba(255,179,71,.18); } .vmap.pick i { color: var(--dawn-lt); }
+#vetoMsg { font-weight: 700; color: var(--dawn-lt); min-height: 1.4em; }
+#rankOpt, #rankVeto { z-index: 9; } #rankOpt .card, #rankVeto .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
+#overR { display: flex; gap: 10px; align-items: center; justify-content: center; font-weight: 700; }
+#overR span { display: grid; gap: 2px; text-align: left; } #overR small { color: var(--mute); font-weight: 400; }
+#overR em { font-style: normal; margin-left: 8px; } #overR em.up { color: #9fe8a8; } #overR em.down { color: #ff9a86; }
 #xh.tick { animation: xhTick .14s ease-out; } @keyframes xhTick { 0% { scale: 1.22; } 100% { scale: 1; } }
 #sv { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
 #sv i { position: absolute; left: calc(var(--u) * -6); top: calc(var(--u) * -6); width: calc(var(--u) * 12); height: calc(var(--u) * 12); border-radius: 50%;
@@ -394,8 +414,8 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div class="card">
       <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>炸彈模式：攻方裝炸彈、守方拆彈，回合之間用賺來的錢買槍。</p></div>
       <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
-      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
-      <div class="row modes"><small>更多模式</small><button class="btn rage" id="bRage">狂暴模式</button><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
+      <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn rank" id="bRanked">段位賽</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
+      <div class="row modes"><small>更多模式</small><button class="btn rage" id="bRage">狂暴模式</button><button class="btn" id="bWing">2 對 2</button><button class="btn" id="bArms">軍備競賽</button><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
       <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button></div>
@@ -467,12 +487,17 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <p class="mnote buyNote">準備時間、開打後 20 秒內在出生區可以買。活下來的人下回合保留裝備；陣亡只剩手槍。</p><div id="buyGrid"></div></div></div>
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
-    <p id="overC"></p><p id="overX"></p>
+    <div id="overR" hidden></div><p id="overC"></p><p id="overX"></p>
     <div class="row"><button class="btn go" id="bRageCont" hidden>從第 1 波繼續</button><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
   <div id="rageOpt" class="ov" hidden><div class="card"><h2>狂暴模式</h2>
     <div class="opt"><span>你這邊</span><div class="seg" id="rageGodSeg"><button data-g="0">一般（3 條命）</button><button data-g="1">無敵（不會死）</button></div></div>
     <p class="mnote" id="rageOptNote"></p>
     <div class="row"><button class="btn go" id="rageGo1">從第 1 波開始</button><button class="btn go" id="rageGoN" hidden>從第 1 波繼續</button><button class="btn" id="rageX">取消</button></div></div></div>
+  <div id="rankOpt" class="ov" hidden><div class="card"><h2>段位賽</h2><div id="rankBody"></div>
+    <div class="row"><button class="btn go" id="rankGo">開始（禁選地圖）</button><button class="btn" id="rankX">取消</button></div></div></div>
+  <div id="rankVeto" class="ov" hidden><div class="card"><h2>禁選地圖</h2><p id="vetoMsg"></p><div id="vetoMaps"></div>
+    <p class="mnote">你禁一張 → 對手禁一張 → 你從剩下兩張選 → 對手選邊。對手會禁你勝率最高的地圖。</p>
+    <div class="row"><button class="btn" id="vetoX">取消</button></div></div></div>
   <div id="tutArrow" hidden></div>
   <div id="rageCombo" hidden></div><div id="rageTint"></div>
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>

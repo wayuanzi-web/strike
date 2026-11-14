@@ -151,7 +151,7 @@ function damagePlayer(dmg, bot, part, weapon) {
     killcamStart(bot);   // 擊殺鏡頭（練習模式會把重生延到播完）    // 對戰模式：這回合不重生，改觀戰
     player.ads = false; INPUT.fire = false; INPUT.use = false; player.useT = 0; closeBuy();
     const w = weapon || bot.wpn || WEAPONS.rifle;
-    if (bot.team !== player.team) { bot.kills++; if (part === 'head') bot.heads++; addMoney(bot, w.reward || 0, '擊殺'); }
+    if (bot.team !== player.team) { bot.kills++; if (part === 'head') bot.heads++; addMoney(bot, w.reward || 0, '擊殺'); if (game.sub === 'arms') armsKill(bot); }
     hudFeed(bot.name, '你', part === 'head', bot.team, 'A', false, w.short);
     showDead(bot.name, part === 'head');
     if (game.mode === 'duel') netOnMyDeath(bot, part, w);

@@ -41,6 +41,7 @@ const ACH = [
   ['nade_kill', '天降正義', '用手榴彈或燃燒彈擊殺'], ['sniper10', '鷹眼', '用狙擊槍累積擊殺 10 人'], ['kills100', '百人斬', '累積擊殺 100 人'],
   ['matches10', '老兵', '打完 10 場對戰'], ['all_maps', '四方征戰', '每張地圖都贏過對戰'], ['dm_win', '獨孤求敗', '個人死鬥拿第一'],
   ['koth_win', '寸土必爭', '贏一場搶點'], ['range_fast', '快手', '練槍場平均反應 500 毫秒內（打倒 20 個以上）'], ['lv10', '十級老手', '升到 10 級'],
+  ['placed', '定級完成', '打完 5 場段位賽定級'], ['wing_win', '最佳拍檔', '贏一場 2 對 2'], ['arms_win', '軍火大師', '軍備競賽拿冠軍'],
 ];
 function unlock(id) {
   if (P().ach[id]) return false;
@@ -122,13 +123,16 @@ function progEvent(ev, d = {}) {
     if (MAP_ORDER.every((id) => STATS.maps[id] && STATS.maps[id].won > 0)) unlock('all_maps');
     dailyEvent('match', d);
   } else if (ev === 'mode') {
-    addXP(40, '打完一場'); if (d.win && d.kind !== 'range') addXP(80, d.kind === 'dm' ? '第一名' : '勝利');
+    addXP(d.kind === 'wingman' ? 50 : 40, '打完一場'); if (d.win && d.kind !== 'range') addXP(80, d.kind === 'dm' ? '第一名' : d.kind === 'arms' ? '冠軍' : '勝利');
+    if (d.kind === 'wingman' && d.win) unlock('wing_win');
+    if (d.kind === 'arms' && d.win) unlock('arms_win');
     if (d.kind === 'range' && d.r) addXP(Math.round(30 * clamp(1 - (d.r.avgMs - 400) / 600, 0, 1) + 20 * d.r.acc), '練槍成績');
     if (d.kind === 'dm' && d.win) unlock('dm_win');
     if (d.kind === 'koth' && d.win) unlock('koth_win');
     if (d.kind === 'range' && d.r && d.r.hit >= 20 && d.r.avgMs <= 500) unlock('range_fast');
     dailyEvent('mode', d);
-  } else if (ev === 'tutorial') { addXP(100, '完成教學'); unlock('tutorial'); }
+  } else if (ev === 'ranked') { if (d.placed) unlock('placed'); }
+  else if (ev === 'tutorial') { addXP(100, '完成教學'); unlock('tutorial'); }
   saveStats();
 }
 

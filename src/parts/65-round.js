@@ -20,8 +20,11 @@ function teamHp(team) {
 const matchUnits = () => [player].concat(bots.filter((b) => b.active));
 function resetBotGear(b) { b.primary = null; b.secondary = null; b.vest = b.helmet = b.kit = false; b.armor = 0; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; }
 function startMatch() {
-  game.mode = 'match'; setupBots('match');
-  ROUND.score = { A: 0, B: 0 }; ROUND.num = 0; ROUND.over = false; ROUND.history = []; ROUND.atk = 'A'; ROUND.loss = { A: 0, B: 0 }; ROUND.swapped = false; ROUND.log = [];
+  const wing = game.sub === 'wingman';
+  game.mode = 'match'; setupBots(wing ? 'wingman' : 'match');
+  Object.assign(ROUND, wing ? WING_ROUND : STD_ROUND);
+  loadTeamSpawns(); if (wing) wingSetup();
+  ROUND.score = { A: 0, B: 0 }; ROUND.num = 0; ROUND.over = false; ROUND.history = []; ROUND.atk = game.sub === 'ranked' ? RK.startAtk : 'A'; ROUND.loss = { A: 0, B: 0 }; ROUND.swapped = false; ROUND.log = [];
   player.kills = player.deaths = player.heads = 0; player.deathStreak = 0; statMatchStart(); gainReset(); ROUND.pistolW = 0;
   for (const u of matchUnits()) { u.money = ECON.start; u.keep = false; if (u !== player) resetBotGear(u); }
   player.alive = false;
@@ -48,7 +51,7 @@ function startRound() {
     list.forEach((b) => { if (!b.keep) resetBotGear(b); });
     const mode = ROUND.eco[team] = teamEcoMode(team, pistolRound);     // 全隊一起決定：全買、強起、半起、存錢
     list.forEach((b, i) => {
-      const s = sp[i + off]; botSpawn(b, s[0], s[1], face(team), s[1]);
+      const s = sp[i + off], lk = game.sub === 'wingman' ? wingLook(team) : [face(team), s[1]]; botSpawn(b, s[0], s[1], lk[0], lk[1]);
       botBuy(b, mode);
       botArm(b);
     });
@@ -56,22 +59,25 @@ function startRound() {
   resetTouchState();
   spawnPlayer(sideOf('A')[0], player.keep); player.spawnT = 0;
   player.yaw = ROUND.atk === 'A' ? -Math.PI / 2 : Math.PI / 2;
+  if (game.sub === 'wingman') { const lk = wingLook('A'), pp = player.body.pos; player.yaw = Math.atan2(-(lk[0] - pp.x), -(lk[1] - pp.z)); }
   game.spec = 0; $('dead').hidden = true;
   // 炸彈：隨機給一個攻方
-  ROUND.plan = { site: Math.random() < 0.5 ? 'A' : 'B', exec: false, execAt: rand(22, 34) };
+  ROUND.plan = { site: game.sub === 'wingman' ? WING.site : Math.random() < 0.5 ? 'A' : 'B', exec: false, execAt: game.sub === 'wingman' ? rand(10, 20) : rand(22, 34) };
   ROUND.tipPlan = '';
   giveBomb(pick(matchUnits().filter((u) => u.team === ROUND.atk)));
   assignPosts();
   // 開打時告訴你隊友這回合怎麼買、怎麼打
   ROUND.tip = `隊友這回合：${ECO_NAME[ROUND.eco[player.team]] || ''}` + (ROUND.tipPlan ? `・${ROUND.tipPlan.replace('隊友打算：', '')}` : '');
   const last = ROUND.score.A + ROUND.score.B + 1 === ROUND.winTo * 2 - 1;
-  const role = ROUND.atk === player.team ? '你們是攻方：把炸彈裝在 A 或 B 點' : '你們是守方：守住 A、B 兩個包點';
-  hudBanner(halftime ? '換邊' : `第 ${ROUND.num} 回合`, (ROUND.num === 1 ? `「${MAP.name}」　` : '') + (last ? '決勝回合　' + role : role), 3);
+  const ws = game.sub === 'wingman' ? WING.site : '';
+  const role = ROUND.atk === player.team ? (ws ? `你們是攻方：把炸彈裝在 ${ws} 點（這場只有 ${ws} 點）` : '你們是攻方：把炸彈裝在 A 或 B 點') : (ws ? `你們是守方：守住 ${ws} 點` : '你們是守方：守住 A、B 兩個包點');
+  const pre = ROUND.num === 1 ? `「${MAP.name}」${game.sub === 'ranked' ? `段位賽・對手 ${RK.opp} 分` : game.sub === 'wingman' ? '2 對 2' : ''}　` : '';
+  hudBanner(halftime ? '換邊' : `第 ${ROUND.num} 回合`, pre + (last ? '決勝回合　' + role : role), 3);
   if (player.alive) openBuy();
 }
 // 有人陣亡：掉炸彈、檢查勝負（炸彈裝好之後，攻方全滅也要等守方拆掉才算贏）
 function onUnitDied(u) {
-  if (game.mode !== 'tutorial' && game.mode !== 'range' && game.mode !== 'rage') dropGunsOf(u);   // 狂暴：人太多，地上不掉槍
+  if (game.mode !== 'tutorial' && game.mode !== 'range' && game.mode !== 'rage' && game.sub !== 'arms') dropGunsOf(u);   // 狂暴：人太多，地上不掉槍
   if (game.mode !== 'match') return;
   dropBomb(u);
   if (ROUND.phase !== 'live') return;
@@ -139,8 +145,15 @@ function showMatchOver() {
   $('overS').textContent = `${ROUND.score.A} : ${ROUND.score.B}`;
   $('overM').textContent = mvp ? `本場最有價值：${mvp.name}（${mvp.kills} 殺 ${mvp.deaths} 死）` : '';
   $('overY').textContent = `你：${player.kills} 殺 · ${player.deaths} 死 · ${player.heads} 爆頭`;
-  statMatchEnd(win, ROUND.score.A, ROUND.score.B, !!(mvp && mvp.me));
-  $('overC').textContent = `生涯：${STATS.matches} 場 ${STATS.wins} 勝（勝率 ${pct(STATS.wins, STATS.matches)}）· 擊殺 ${STATS.kills}`;
+  const ovR = $('overR'); ovR.hidden = true; ovR.innerHTML = '';
+  if (game.sub === 'wingman') {
+    statModeEnd('wingman', win); const M = STATS.modes.wingman;
+    $('overC').textContent = `2 對 2：${M.n} 場 ${M.w} 勝（勝率 ${pct(M.w, M.n)}）`;
+  } else {
+    statMatchEnd(win, ROUND.score.A, ROUND.score.B, !!(mvp && mvp.me));
+    $('overC').textContent = `生涯：${STATS.matches} 場 ${STATS.wins} 勝（勝率 ${pct(STATS.wins, STATS.matches)}）· 擊殺 ${STATS.kills}`;
+    if (game.sub === 'ranked' && RK.live) { rankApply(win, ROUND.score.A - ROUND.score.B); ovR.innerHTML = rankOverHtml(); ovR.hidden = false; }
+  }
   overXpLine();
   $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy(); overClean();
   if (pointerLocked()) document.exitPointerLock();

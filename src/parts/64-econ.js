@@ -26,7 +26,7 @@ function inBuyZone() {
   return Math.hypot(player.body.pos.x - sp[0], player.body.pos.z - sp[1]) < 12;
 }
 function buyOpen() {
-  if (!player.alive || game.state !== 'play') return false;
+  if (!player.alive || game.state !== 'play' || game.sub === 'arms') return false;   // 軍備競賽：槍照關卡發，不能買
   if (freeBuy()) return true;
   if (ROUND.phase === 'freeze') return true;
   return ROUND.phase === 'live' && ROUND.length - ROUND.t < ECON.buyLive && !BOMB.planted && inBuyZone();

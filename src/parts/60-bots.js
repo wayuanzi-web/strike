@@ -92,10 +92,10 @@ function setupBots(mode) {
   const cnt = { A: 0, B: 0 };
   for (const b of bots) {
     b.team = b.baseTeam;
-    b.active = b.rageOnly ? mode === 'rage' : mode === 'rage' ? b.baseTeam === 'B' : mode === 'match' ? true : mode === 'tutorial' || mode === 'range' || mode === 'duel' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : (b.team === 'B' && b.i < 4); b.dummy = false;
+    b.active = b.rageOnly ? mode === 'rage' : mode === 'rage' ? b.baseTeam === 'B' : mode === 'match' ? true : mode === 'tutorial' || mode === 'range' || mode === 'duel' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : mode === 'wingman' ? cnt[b.team]++ < (b.team === 'A' ? 1 : 2) : (b.team === 'B' && b.i < 4); b.dummy = false;
     if (mode === 'dm') b.team = 'D' + b.i;   // 死鬥：每個人自己一隊
     b.kills = b.deaths = b.heads = 0;
-    if (mode !== 'match') { b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b); }
+    if (mode !== 'match' && mode !== 'wingman') { b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b); }
     if (!b.active) { b.alive = false; b.g.visible = false; }
     if (b.hm && mode !== 'rage') setHumanLook(b, 'grunt');
   }
@@ -270,6 +270,7 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
     if (enemy) addMoney(attacker, w.reward || 0, '擊殺');
     hudFeed(attacker === b ? '' : attacker.name, b.name, part === 'head', attacker.team, b.team, byPlayer, w.short);
     if (game.mode === 'rage' && byPlayer) rageOnKill(b, part === 'head');
+    if (enemy && game.sub === 'arms') armsKill(attacker);
     if (typeof onUnitDied === 'function') onUnitDied(b);
     return;
   }
@@ -317,7 +318,10 @@ function tryFlank(b, tgt) {
 }
 // 這隻機器人用的難度：敵人用你選的難度；隊友固定用「普通」但不手下留情
 // 敵人用你選的難度；隊友跟著難度稍微變強（困難時隊友才打得過困難的敵人）
-function botDiff(b) { return b.team !== player.team ? (game.mode === 'rage' ? rageDiff() : DIFF[S.difficulty] || DIFF.normal) : S.difficulty === 'hard' ? DIFF.allyHard : DIFF.ally; }
+function botDiff(b) {
+  if (game.sub === 'ranked' && RK.diff) return b.team !== player.team ? RK.diff : RK.ally;   // 段位賽：強度跟著分數
+  return b.team !== player.team ? (game.mode === 'rage' ? rageDiff() : DIFF[S.difficulty] || DIFF.normal) : S.difficulty === 'hard' ? DIFF.allyHard : DIFF.ally;
+}
 
 const _wish = new V3();
 function updateBot(b, dt) {
@@ -362,7 +366,7 @@ function updateBot(b, dt) {
         const need = Math.abs(angDiff(b.yaw, Math.atan2(-(tgt.body.pos.x - p.x), -(tgt.body.pos.z - p.z))));
         b.react = D.react * rand(0.8, 1.25) * (b.state === 'search' ? 0.85 : 1) + need / Math.PI * 0.45; b.settle = 1;
         // 守點中（槍已經對著入口）：反應快、手比較穩
-        if (b.state === 'hold' && b.holdObj) { b.react *= (hasTrait(b, 'anchor') ? 0.5 : 0.6) * (b.team !== ROUND.atk && MAP.defEdge || 1); b.settle = 0.45; }
+        if (b.state === 'hold' && b.holdObj) { b.react *= (hasTrait(b, 'anchor') ? 0.5 : 0.6) * (b.team !== ROUND.atk && (game.sub === 'wingman' && MAP.wing ? MAP.wing.edge : MAP.defEdge) || 1); b.settle = 0.45; }
         b.state = 'combat'; b.strafeT = 0; b.burst = 0; b.pauseT = 0; b.warnLeft = tgt.isPlayer ? D.warn : 0;
         b.flankCheck = rand(1.0, 2.0);
       } else if (!was || prev !== tgt) {

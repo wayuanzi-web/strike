@@ -3,7 +3,7 @@
    搶點：4 對 4，地圖中央一個圈，只有一隊在圈裡就每秒 +1 分，先到 100 分；陣亡 4 秒後在自己出生區重生。
    練槍場：30 個靶（前 15 個不動、後 15 個左右移動），每個 4 秒內打倒；看反應時間、命中率、爆頭。 */
 const MODE = { kind: '', t: 0, over: false, score: { A: 0, B: 0 }, zone: null, owner: '', rg: null };
-const MODE_NAME = { dm: '個人死鬥', koth: '搶點', range: '練槍場', rage: '狂暴模式' };
+const MODE_NAME = { dm: '個人死鬥', koth: '搶點', range: '練槍場', rage: '狂暴模式', arms: '軍備競賽', wingman: '2 對 2' };
 const isMode = () => game.mode === 'dm' || game.mode === 'koth' || game.mode === 'range';
 const DM = { goal: 25, limit: 300 }, KOTH = { goal: 100, limit: 360, r: 5 }, RANGE = { n: 30, timeout: 4, gap: 0.55 };
 for (let i = 0; i < 12; i++) TEAM_INTEL['D' + i] = { t: -99, pos: new V3() };
@@ -18,14 +18,17 @@ function startMode(kind) {
   for (const b of bots) if (b.active) { b.kills = b.deaths = b.heads = 0; modeLoadout(b); modeRespawn(b, true); }
   if (kind === 'range') { startRange(); }
   else spawnPlayer(modeSpawnFor(player));
+  if (game.sub === 'arms') armsInit();
   player.kills = player.deaths = player.heads = 0;
   W.shots = W.hits = 0;
   enterPlay();
   document.body.classList.add('mode');
-  hudBanner(MODE_NAME[kind], kind === 'dm' ? `先到 ${DM.goal} 殺，人人都是敵人` : kind === 'koth' ? `站進中央的圈圈搶分，先到 ${KOTH.goal} 分` : `${RANGE.n} 個靶，越快打倒越好`, 3);
+  if (game.sub === 'arms') hudBanner('軍備競賽', `每殺 2 人自動換下一把槍，共 ${ARMS_N} 關；最後一關用黃金手槍擊殺就贏`, 3.5);
+  else hudBanner(MODE_NAME[kind], kind === 'dm' ? `先到 ${DM.goal} 殺，人人都是敵人` : kind === 'koth' ? `站進中央的圈圈搶分，先到 ${KOTH.goal} 分` : `${RANGE.n} 個靶，越快打倒越好`, 3);
 }
 // 死鬥機器人每條命隨機拿一把主武器
 function modeLoadout(b) {
+  if (game.sub === 'arms') { armsArm(b); return; }
   if (game.mode === 'dm') {
     const r = Math.random(); b.primary = r < 0.38 ? WEAPONS.rifle : r < 0.62 ? WEAPONS.carbine : r < 0.78 ? WEAPONS.smg : r < 0.9 ? WEAPONS.shotgun : WEAPONS.sniper;
     b.secondary = Math.random() < 0.3 ? WEAPONS.deagle : null; botArm(b);
@@ -148,7 +151,11 @@ function rangeResult() {
 function updateMode(dt) {
   if (!isMode() || MODE.over || game.state !== 'play') return;
   MODE.t += dt;
-  if (game.mode === 'dm') {
+  if (game.sub === 'arms') {
+    W.reserve = WP.reserve;   // 子彈無限
+    if (player.armsDirty && player.alive) { player.armsDirty = false; armsArm(player); }
+    if (ARMS.win || MODE.t >= ARMS.limit) endMode();
+  } else if (game.mode === 'dm') {
     const lead = Math.max(player.kills, ...bots.filter((b) => b.active).map((b) => b.kills));
     if (lead >= DM.goal || MODE.t >= DM.limit) endMode();
   } else if (game.mode === 'koth') {
@@ -167,7 +174,14 @@ function endMode() {
   MODE.over = true; game.state = 'over';
   const kind = game.mode, ov = (id, t) => { $(id).textContent = t; };
   let win = false;
-  if (kind === 'dm') {
+  if (game.sub === 'arms') {
+    const rk = armsRanking(), me = rk.findIndex((u) => u.me) + 1, top = rk[0]; win = me === 1;
+    $('overT').textContent = win ? '冠軍' : `第 ${me} 名`; $('overT').className = win ? 'win' : 'lose';
+    const my = rk[me - 1]; ov('overS', my.lv >= ARMS_N ? '全部完成' : `第 ${my.lv + 1}／${ARMS_N} 關`);
+    ov('overM', ARMS.win ? `冠軍：${top.name}（${fmtClock(ARMS.winT)} 打完 ${ARMS_N} 關）` : `時間到：${top.name} 走得最遠（第 ${Math.min(ARMS_N, top.lv + 1)} 關）`);
+    ov('overY', `你：${player.kills} 殺 · ${player.deaths} 死 · ${player.heads} 爆頭 · 命中率 ${pct(W.hits, W.shots)}`);
+    MODE.result = { t: win && ARMS.win ? ARMS.winT : 0 };
+  } else if (kind === 'dm') {
     const rk = dmRanking(), me = rk.findIndex((u) => u.me) + 1; win = me === 1;
     $('overT').textContent = win ? '第一名' : `第 ${me} 名`; $('overT').className = win ? 'win' : 'lose';
     ov('overS', `${player.kills} 殺`); ov('overM', `最多擊殺：${rk[0].name}（${rk[0].kills} 殺）`);
@@ -184,10 +198,11 @@ function endMode() {
     ov('overY', `打倒 ${r.hit}／${RANGE.n}・漏掉 ${r.miss}・命中率 ${Math.round(r.acc * 100)}%・爆頭 ${r.heads}`);
     MODE.result = r;
   }
-  statModeEnd(kind, win, kind === 'range' ? MODE.result : null);
+  const sk = game.sub === 'arms' ? 'arms' : kind;
+  statModeEnd(sk, win, kind === 'range' || sk === 'arms' ? MODE.result : null);
   if (kind === 'range') setTimeout(() => lbAfterRange(MODE.result), 0);
-  const M = STATS.modes[kind];
-  ov('overC', kind === 'range' ? `練槍場紀錄：最快平均 ${M.bestMs || '—'} 毫秒、最高命中率 ${M.bestAcc ? Math.round(M.bestAcc * 100) + '%' : '—'}（${M.n} 次）`
+  const M = STATS.modes[sk];
+  ov('overC', sk === 'arms' ? `軍備競賽：${M.n} 場 ${M.w} 次冠軍・最快 ${M.best ? fmtClock(M.best) : '—'}` : kind === 'range' ? `練槍場紀錄：最快平均 ${M.bestMs || '—'} 毫秒、最高命中率 ${M.bestAcc ? Math.round(M.bestAcc * 100) + '%' : '—'}（${M.n} 次）`
     : `${MODE_NAME[kind]}：${M.n} 場 ${M.w} 勝`);
   overXpLine();
   $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy(); overClean();
@@ -195,6 +210,9 @@ function endMode() {
   for (const b of bots) if (b.dummy) { b.alive = false; b.g.visible = false; }
 }
 function leaveMode() {
+  if (typeof rankAbandonCheck === 'function') rankAbandonCheck();
+  if (game.sub === 'arms') applyCosmetics();
+  game.sub = '';
   if (game.mode === 'rage' && !MODE.over && RAGE.wave > 0 && !RAGE.god) { STATS.modes.rage.lastWave = RAGE.wave; saveStats(); }   // 狂暴中途離開：記住打到第幾波，下次可以接著打
   removeZone(); $('rageCombo').hidden = true; document.body.classList.remove('frenzy'); if (typeof _hv !== 'undefined') _hv.delete(document.body); MODE.rg = null; MODE.kind = ''; document.body.classList.remove('mode');
   for (const b of bots) { b.dummy = false; if (b.remote) { b.remote = false; b.name = b.baseName || b.name; } }
@@ -205,7 +223,13 @@ function leaveMode() {
 function modeHud() {
   $('mtop').hidden = false; $('ptop').hidden = true; $('bBoard').hidden = game.mode !== 'dm'; $('spec').hidden = true;
   $('pipsA').textContent = ''; $('pipsB').textContent = '';
-  if (game.mode === 'dm') {
+  if (game.sub === 'arms') {
+    const rk = armsRanking(), me = rk.findIndex((u) => u.me) + 1, top = rk[0].me ? rk[1] : rk[0], my = rk[me - 1];
+    $('scA').textContent = Math.min(ARMS_N, my.lv + 1); $('scB').textContent = top ? Math.min(ARMS_N, top.lv + 1) : 0;
+    $('clk').textContent = fmtClock(Math.max(0, ARMS.limit - MODE.t)); $('clk').className = ARMS.limit - MODE.t < 30 ? 'low' : '';
+    $('rnd').textContent = `你：${armsName(my.lv)}（${my.k}/${ARMS.per[Math.min(my.lv, ARMS_N - 1)]}）・第 ${me} 名・領先 ${top ? top.name : ''}`;
+    const show = $('bBoard').classList.contains('on'); $('board').hidden = !show; if (show) drawBoardArms(rk);
+  } else if (game.mode === 'dm') {
     const rk = dmRanking(), me = rk.findIndex((u) => u.me) + 1, top = rk[0].me ? rk[1] : rk[0];
     $('scA').textContent = player.kills; $('scB').textContent = top ? top.kills : 0;
     $('clk').textContent = fmtClock(Math.max(0, DM.limit - MODE.t)); $('clk').className = DM.limit - MODE.t < 30 ? 'low' : '';
@@ -221,6 +245,10 @@ function modeHud() {
     $('clk').textContent = `${Math.min(RANGE.n, R ? Math.max(1, R.i) : 1)}/${RANGE.n}`; $('clk').className = '';
     $('rnd').textContent = r && r.hit ? `平均 ${r.avgMs} 毫秒・命中率 ${Math.round(r.acc * 100)}%` : '打倒得越快越好'; $('board').hidden = true;
   }
+}
+function drawBoardArms(rk) {
+  const rows = rk.map((u, i) => `<tr class="${u.me ? 'A me' : 'B'}"><td>${i + 1}. ${u.name}</td><td>${armsName(u.lv)}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td></tr>`).join('');
+  $('board').innerHTML = `<table><tr><th>軍備競賽</th><th>關卡</th><th>殺</th><th>死</th></tr>${rows}</table>`;
 }
 function drawBoardFFA(rk) {
   const rows = rk.map((u, i) => `<tr class="${u.me ? 'A me' : 'B'}"><td>${i + 1}. ${u.name}</td><td class="n">${u.kills}</td><td class="n">${u.deaths}</td><td class="n">${u.heads || 0}</td></tr>`).join('');

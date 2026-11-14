@@ -37,7 +37,7 @@ function stage2Of(S) {
 
 // ---------- 回合開始：攻方選打法、守方分配、清掉指令 ----------
 function pickTactic() {
-  const w = [['exec', 3], ['rush', 1.4], ['split', 2], ['fake', 1.6], ['slow', 1.4]];
+  const w = game.sub === 'wingman' ? [['exec', 3], ['rush', 1.6], ['slow', 1.2]] : [['exec', 3], ['rush', 1.4], ['split', 2], ['fake', 1.6], ['slow', 1.4]];   // 2 對 2：人少、只有一點，不分兵、不佯攻
   // 剛輸的打法換掉（同一種不要連著用）
   const last = ROUND.lastTactic, tot = w.reduce((a, [k, v]) => a + (k === last ? 0 : v), 0);
   let r = Math.random() * tot; for (const [k, v] of w) { if (k === last) continue; if ((r -= v) <= 0) return k; }
@@ -51,7 +51,7 @@ function assignPosts() {
   // 每回合守點的順序打亂一點：前三個常用守點之外，高處守點（有的話）也有機會排到
   const order = {}; for (const k of ['A', 'B']) { const n = SITES[k].holds.length, base = [0, 1, 2].filter((i) => i < n), extra = []; for (let i = 3; i < n; i++) if (SITES[k].holds[i][4]) extra.push(i);
     if (extra.length && Math.random() < 0.5) base.splice(1 + Math.floor(Math.random() * 2), 0, pick(extra)); order[k] = base; }
-  list.forEach((b, i) => { const s = i % 2 ? (first === 'A' ? 'B' : 'A') : first; b.post = s; const o = order[s]; b.holdIdx = o[cnt[s]++ % o.length]; b.rotN = -1; });
+  list.forEach((b, i) => { const s = game.sub === 'wingman' ? WING.site : i % 2 ? (first === 'A' ? 'B' : 'A') : first; b.post = s; const o = order[s]; b.holdIdx = o[cnt[s]++ % o.length]; b.rotN = -1; });
   // 攻方：打法、分組、誰佯攻
   const P = ROUND.plan, type = P.type = pickTactic(); ROUND.lastTactic = type;
   P.otherSite = P.site === 'A' ? 'B' : 'A';

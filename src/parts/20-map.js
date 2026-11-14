@@ -17,6 +17,7 @@ const STD_SPAWN = {
 const MAPS = {
   // ---------- 1. 曙光倉區：破曉的貨櫃倉庫區 ----------
   dawn: {
+    wing: { site: 'A', edge: 0.9 },   // 2 對 2：用哪一點、守點反應係數（模擬調過）
     id: 'dawn', name: '曙光倉區', sub: '破曉・倉庫與貨櫃場', floor: 'floor',
     theme: { sun: [0.82, 0.22, 0.28], sunColor: '#ffc792', sunI: 2.5, hemi: ['#c4d0ea', '#8a6e56', 1.45], fog: ['#d9c2b0', 45, 190], exposure: 1.0,
       sky: { zen: '#3f6fa6', mid: '#a9bad6', hor: '#ffc79a', low: '#6b6168', warm: '#ffdba8' }, skyline: 'industrial', skyTop: '#a7a2ad', skyBot: '#6b6772', amb: 'harbor' },
@@ -82,6 +83,7 @@ const MAPS = {
   },
   // ---------- 2. 正午舊城：石板路的老市集、鐘樓廣場 ----------
   market: {
+    wing: { site: 'A', edge: 1.5 },   // 2 對 2：用哪一點、守點反應係數（模擬調過）
     id: 'market', name: '正午舊城', sub: '正午・石板街、鐘樓、市集', floor: 'cobble', defEdge: 0.85,
     theme: { sun: [0.38, 0.82, 0.42], sunColor: '#fff1d6', sunI: 2.3, hemi: ['#cfe0f5', '#9c8466', 1.35], fog: ['#dfe6ee', 60, 220], exposure: 0.95,
       sky: { zen: '#2f6fc0', mid: '#8fb7e6', hor: '#d9e6f2', low: '#8a8478', warm: '#fff4dc' }, skyline: 'town', skyTop: '#b9b2a6', skyBot: '#8b8378', amb: 'town' },
@@ -126,6 +128,7 @@ const MAPS = {
   },
   // ---------- 3. 黃昏鐵道：調車場、月台、吊車 ----------
   rail: {
+    wing: { site: 'B', edge: 0.71 },   // 2 對 2：用哪一點、守點反應係數（模擬調過）
     id: 'rail', name: '黃昏鐵道', sub: '黃昏・調車場與月台', floor: 'gravel', defEdge: 0.76,
     theme: { sun: [-0.84, 0.3, -0.34], sunColor: '#ffa468', sunI: 2.9, hemi: ['#a99fd0', '#8a6a56', 1.75], fog: ['#b98f8a', 55, 230], exposure: 1.12,
       sky: { zen: '#2b2f6a', mid: '#8a6fa8', hor: '#ff9a6a', low: '#4a3a44', warm: '#ffb070' }, skyline: 'rail', skyTop: '#5d5068', skyBot: '#3a3142', amb: 'rail' },
@@ -167,6 +170,7 @@ const MAPS = {
   },
   // ---------- 4. 烈日工地：蓋到一半的兩層樓、天橋、鷹架平台、墊高的 B 點 ----------
   site: {
+    wing: { site: 'A', edge: 1.3 },   // 2 對 2：用哪一點、守點反應係數（模擬調過）
     id: 'site', name: '烈日工地', sub: '午後・兩層樓、天橋與鷹架', floor: 'floor', defEdge: 1.3, koth: [0, -10],
     theme: { sun: [0.45, 0.7, -0.35], sunColor: '#fff0d6', sunI: 2.6, hemi: ['#cfdff0', '#9a8a70', 1.5], fog: ['#d6d2c6', 60, 230], exposure: 1.0,
       sky: { zen: '#3a76c0', mid: '#9cc0e6', hor: '#ebe4d4', low: '#8a8478', warm: '#fff2cc' }, skyline: 'rail', skyTop: '#b4b9c2', skyBot: '#7a7e86', amb: 'harbor' },
