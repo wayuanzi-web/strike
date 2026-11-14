@@ -573,6 +573,7 @@ function botShoot(b, tg, dist, D) {
     _bd.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     const wl = rayWorld(_be, _bd, 160);
     let t = wl ? wl.t : 160;
+    if (SMOKES.length) smokeBullet(_be, _bd, t);
     // 子彈打到這條線上最近的敵隊單位（不一定是瞄的那個）
     let hitU = null, hitPart = null;
     if (!forceMiss) for (const u of enemiesOf(b.team)) { const h = rayBody(_be, _bd, u.boxes, t); if (h) { t = h.t; hitU = u; hitPart = h.part; } }

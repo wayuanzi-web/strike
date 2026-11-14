@@ -70,17 +70,19 @@ function explodeBomb() {
   sfx('bombboom', 1.2, { pos: p });
   endRound(ROUND.atk, '炸彈爆炸', 'bomb');      // 先判勝負，炸死的人不會再觸發「全滅」
   // 傷害：10 公尺內幾乎必死，20 公尺外沒事
+  // 衝擊波沿著地圖擴散（參考 CS2 2026 年 7 月的改動）：看得到炸彈用直線距離，被牆擋住就要繞路，躲在牆後比較安全
+  const D = navDistFrom(p, 45); startBlastWave(p, D); smokeBlast(p, 9);
   const units = [player].concat(bots.filter((b) => b.active && b.alive));
   for (const u of units) {
     if (!u.alive) continue;
-    const d = Math.hypot(u.body.pos.x - p.x, u.body.pos.z - p.z, (u.body.pos.y - p.y) * 0.5);
+    const d = blastDist(D, p, u);
     let dmg = 420 * Math.exp(-(d / 8.5) * (d / 8.5)); if (u === player ? INV.vest : u.vest) { wearArmor(u, dmg * 0.25); dmg *= 0.75; }
     if (dmg < 2) continue;
     if (u === player) damagePlayer(dmg, BOMB.planter || bots[0], 'body', { short: '炸彈', reward: 0 });
     else damageBot(u, dmg, 'body', _v3.set(0, 1, 0).clone(), BOMB.planter && BOMB.planter !== u ? BOMB.planter : u, { short: '炸彈', reward: 0 }, true);
   }
-  const dc = camera.position.distanceTo(p);
-  if (dc < 40) { player.punchPV += (40 - dc) * 1.8; player.punchYV += rand(-1, 1) * (40 - dc) * 0.8; }
+  const dc = player.alive ? blastDist(D, p, player) : camera.position.distanceTo(p);   // 衝擊波傳到你這邊才震
+  if (dc < 40) { BLAST.shakeAt = dc / BLAST_SPEED; BLAST.shakeK = 40 - dc; BLAST.on = true; }
 }
 // 每一步：炸彈倒數、嗶聲、撿炸彈
 function updateBomb(dt) {

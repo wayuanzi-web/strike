@@ -278,6 +278,7 @@ function shoot() {
 function traceShot(o, d, range) {
   const w = rayWorld(o, d, range);
   let t = w ? w.t : range, bot = null, part = null;
+  if (SMOKES.length) smokeBullet(o, d, t);   // 子彈穿過煙：打出一條短暫的洞
   for (const b of bots) {
     if (!b.active || !b.alive || b.team === player.team) continue;   // 子彈會穿過隊友（不會誤傷）；死鬥每個機器人自己一隊
     const h = rayBody(o, d, b.boxes, t);
