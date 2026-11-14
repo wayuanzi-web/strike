@@ -107,7 +107,7 @@ function netRecv(m) {
     if (m.w && (!b.wpn || b.wpn.id !== m.w) && WEAPONS[m.w]) { if (WEAPONS[m.w].slot === 'primary') { b.primary = WEAPONS[m.w]; b.secondary = null; } else { b.primary = null; b.secondary = WEAPONS[m.w]; } botArm(b); }
     b.hp = m.h; b.reloadT = m.r ? 0.5 : 0; if (m.r) b.wpn.reload = Math.max(b.wpn.reload, 0.5);
     NET.theirK = Math.max(NET.theirK, m.k | 0);   // 延遲時舊封包帶的舊分數不要蓋掉新的
-    if (!m.a && b.alive) { b.alive = false; b.hp = 0; b.deadT = 0; b.fallDir = 1; b.deathKind = 'fwd'; b.respawnT = Infinity; }   // 自己炸死自己之類
+    if (!m.a && b.alive) { b.alive = false; b.hp = 0; b.deadT = 0; b.dd = null; b.respawnT = Infinity; }   // 自己炸死自己之類
     if (m.a && !b.alive) { const s = m.p; botSpawn(b, s[0], s[2]); b.phys.pos.y = s[1]; b.respawnT = Infinity; b.blindT = 999; }
   } else if (m.t === 'f') {   // 對手開槍：曳光、槍口火光、槍聲
     const o = _v1.fromArray(m.o), e = _v2.fromArray(m.e);
@@ -119,7 +119,7 @@ function netRecv(m) {
     if (player.alive && player.spawnT <= 0) damagePlayer(m.d, b, m.p, WEAPONS[m.w] || NADES[m.w] || WEAPONS.rifle);
   } else if (m.t === 'x') {   // 對手陣亡（被我殺）
     if (b.alive) {
-      b.alive = false; b.hp = 0; b.deadT = 0; b.fallDir = Math.sign(Math.random() - 0.5); b.deathKind = m.p === 'head' ? 'back' : pick(['fwd', 'side', 'spin']); b.respawnT = Infinity;
+      b.alive = false; b.hp = 0; b.deadT = 0; humanDie(b, m.p, null); b.respawnT = Infinity;
       if (m.by === 'me') { NET.myK = m.k; player.kills = m.k; if (m.p === 'head') player.heads++; hudFeed('你', NET.peer, m.p === 'head', 'A', 'B', true, WEAPONS[m.w] || NADES[m.w]); hudHit(m.p === 'head' ? 'kill head' : 'kill'); sfx('kill'); statKill(WEAPONS[m.w] || NADES[m.w], m.p === 'head'); }
       onUnitDied(b);
     }

@@ -70,7 +70,7 @@ async def main():
         # 8 對戰：沒錢的機器人去撿地上的槍；丟炸彈；買卡賓槍、重手槍、燃燒彈
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; s.startGame('match'); s.game.freezeBots = false; R.phase = 'live'; R.t = 100; R.liveT = 5;
           const b = s.bots.find((x) => x.active && x.team === 'B'); b.primary = null; s.botArm(b); b.blindT = 999;
-          for (const o of s.bots) if (o !== b && o.team !== 'B') { o.alive = false; o.g.visible = false; }
+          for (const o of s.bots) if (o !== b && o.team !== 'B') { o.alive = false; o.respawnT = Infinity; o.g.visible = false; }
           s.player.alive = false; const p = b.phys.pos; s.spawnDrop(s.WEAPONS.rifle, 30, 90, p.x + 6, p.y, p.z + 2);
           for (let i = 0; i < 60 * 12; i++) s.step(1/60); const got = s.bots.filter((x) => x.active && x.primary === s.WEAPONS.rifle); return [got.length ? 'rifle' : null, s.DROPS.length]; }""")
         ok('8a 對戰：沒有主武器的機器人會去撿地上的槍', r[0] == 'rifle', r)

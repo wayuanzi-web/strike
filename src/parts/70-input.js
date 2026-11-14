@@ -153,6 +153,7 @@ tapBtn('bCrouch', () => { if (S.crouchMode === 'hold') { INPUT.crouch = true; HO
   let tm = null, longDone = false;
   tapBtn('bSwap', (el) => {
     el.classList.add('down'); longDone = false; clearTimeout(tm);
+    if (game.mode === 'rage') { longDone = true; rageCycleWeapon(1); return; }   // 狂暴：一按就換下一把（不用開購買選單）
     tm = setTimeout(() => { longDone = true; el.classList.remove('down'); buzz(20); if (!playerDropGun() && INV.bomb) playerDropBomb(); }, 850);   // 長按 0.85 秒丟槍（0.55 秒太容易誤觸）
   }, false, (el) => { clearTimeout(tm); el.classList.remove('down'); if (!longDone) swapWeapon(); });
 })();
@@ -193,7 +194,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyC' || e.code === 'ControlLeft') INPUT.crouch = true;
   if (e.code === 'Escape') { if (!$('buy').hidden) closeBuy(); else pauseGame(); }
   if (e.code === 'Digit1') equip('primary'); if (e.code === 'Digit2') equip('secondary');
-  if (e.code === 'KeyQ') swapWeapon(); if (e.code === 'KeyG' || e.code === 'Digit3' || e.code === 'Digit4') cycleNade();
+  if (e.code === 'KeyQ') { if (game.mode === 'rage') rageCycleWeapon(1); else swapWeapon(); } if (e.code === 'KeyG' || e.code === 'Digit3' || e.code === 'Digit4') cycleNade();
   if (e.code === 'KeyE') INPUT.use = true;
   if (e.code === 'KeyF') { if (!playerDropGun() && INV.bomb) playerDropBomb(); }
   if (e.code === 'KeyX') playerDropBomb();

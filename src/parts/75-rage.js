@@ -33,11 +33,21 @@ function startRage() {
   setupBots('rage'); removeZone();
   for (const b of bots) if (b.active) { b.alive = false; b.g.visible = false; b.respawnT = Infinity; b.deadT = 9; b.rageKind = ''; b.name = b.baseName; }   // 全部先下場，由波次一個一個叫上來
   Object.assign(RAGE, { wave: 0, left: 0, spawned: 0, total: 0, breakT: 2.5, lives: RAGE_LIVES, deadSeen: false, deathsSeen: 0, combo: 0, comboT: 0, best: 0, frenzy: 0, regenT: 0, nadeT: 0, kills: 0, overT: -1 });
-  spawnPlayer(); rageGear(true);
+  spawnPlayer(); rageGear(true); RAGE.wIdx = 0;
   W.shots = W.hits = 0;
   enterPlay();
   document.body.classList.add('mode');
   hudBanner('狂暴模式', '武器全免費、子彈無限。敵人一波比一波多、一波比一波強', 3, 'rage');
+}
+// 狂暴換槍：換槍鍵一按就換下一把，依序輪流；出槍很快（0.15 秒）
+const RAGE_ARSENAL = ['rifle', 'carbine', 'smg', 'shotgun', 'sniper', 'deagle'];
+function rageCycleWeapon(dir) {
+  if (game.mode !== 'rage' || !player.alive) return;
+  RAGE.wIdx = ((RAGE.wIdx || 0) + dir + RAGE_ARSENAL.length) % RAGE_ARSENAL.length;
+  const def = WEAPONS[RAGE_ARSENAL[RAGE.wIdx]], slot = def.id === 'deagle' ? 'secondary' : 'primary';
+  INV[slot] = newItem(def); INV.cur = ''; equip(slot, true); W.deployT = 0.15; sfx('magin', 0.6);
+  const strip = RAGE_ARSENAL.map((k, i) => (i === RAGE.wIdx ? `【${WEAPONS[k].short}】` : WEAPONS[k].short)).join(' ');
+  hudTip(strip, 1.2);
 }
 // 你的裝備：一開始給步槍＋重手槍＋全套投擲物；每條命都有滿護甲
 function rageGear(fresh) {
@@ -63,6 +73,7 @@ function rageSpawnOne() {
   b.secondary = WEAPONS.deagle; b.nades = { he: w >= 4 && Math.random() < 0.3 ? 1 : 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b);
   b.respawnT = Infinity; respawnBot(b); b.respawnT = Infinity;
   b.hp = rageHp(w) * (boss ? 8 : elite ? 2.5 : 1); b.maxHp = b.hp; b.rageKind = boss ? 'boss' : elite ? 'elite' : '';
+  setHumanLook(b, boss ? 'boss' : elite ? 'elite' : 'grunt');   // 精英穿黑色特戰服、魔王是高級軍官（大盤帽、金肩章）
   b.name = boss ? '魔王・' + b.baseName : elite ? '精英・' + b.baseName : b.baseName;
   b.state = 'patrol'; b.path = null; b.goalTag = null;
   RAGE.spawned++;

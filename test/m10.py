@@ -23,16 +23,16 @@ async def main():
         # 2 人物動作（裝彈的姿勢在真的對戰裡測）
         await ev("""() => { const s = window.__strike; s.startGame('match'); const R = s.ROUND; R.phase = 'live'; R.t = 90; s.game.freezeBots = false;
           const b = s.bots.find((x) => x.active && x.team === R.atk); s.giveBomb(b); const S = s.SITES.A; b.phys.pos.set(S.plants[0][0], 0, S.plants[0][1]); b.state = 'plant'; b.useT = 0; b.blindT = 99;
-          for (let i = 0; i < 40; i++) s.step(1/60); window.__usePose = [+b.gunP.rotation.x.toFixed(2), +b.upper.rotation.x.toFixed(2), b.state]; s.startGame('practice'); s.game.freezeBots = true; }""")
+          for (let i = 0; i < 40; i++) s.step(1/60); window.__usePose = [+b.gunP.rotation.x.toFixed(2), +(-b.hm.bones[6].rotation.x).toFixed(2), b.state]; s.startGame('practice'); s.game.freezeBots = true; }""")
         r = await ev("""() => { const s = window.__strike, b = s.bots.find((x) => x.active); const st = (n) => { for (let i = 0; i < n; i++) s.step(1/60); };
-          s.game.freezeBots = false; b.blindT = 99; b.state = 'hold'; b.holdT = 99; b.holdYaw = 0; b.reloadT = b.wpn.reload; st(40); const rl = [+b.gunP.rotation.x.toFixed(2), +b.upper.rotation.x.toFixed(2)];
-          b.reloadT = 0; const use = window.__usePose; s.damageBot(b, 5, 'legs', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); st(2); const legs = +b.bodyGroup.position.y.toFixed(3);
-          s.damageBot(b, 5, 'body', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); st(2); const body = +b.bodyGroup.rotation.y.toFixed(2);
-          const kinds = new Set(); for (let k = 0; k < 30; k++) { const c = s.bots[k % 4]; c.alive = true; c.hp = 1; s.damageBot(c, 9, ['head', 'body', 'legs'][k % 3], c.phys.pos.clone().set(Math.cos(k), 0, Math.sin(k)), s.player, s.WEAPONS.rifle); kinds.add(c.deathKind); }
-          const d = s.bots[0]; d.alive = true; d.hp = 1; s.damageBot(d, 9, 'body', d.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); d.respawnT = 99; st(10); const early = +d.upper.position.y.toFixed(2); st(60);
-          const tilt = Math.abs(d.g.rotation.x) + Math.abs(d.g.rotation.z); s.game.freezeBots = true;
+          s.game.freezeBots = false; b.blindT = 99; b.state = 'hold'; b.holdT = 99; b.holdYaw = 0; b.reloadT = b.wpn.reload; st(40); const rl = [+b.gunP.rotation.x.toFixed(2), +(-b.hm.bones[6].rotation.x).toFixed(2)];
+          b.reloadT = 0; const use = window.__usePose; s.damageBot(b, 5, 'legs', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); st(2); const legs = +(b.hm.bones[1].position.y - 0.95).toFixed(3);
+          s.damageBot(b, 5, 'body', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); st(2); const body = +b.hs.sy.x.toFixed(2);
+          const kinds = new Set(); for (let k = 0; k < 30; k++) { const c = s.bots[k % 4]; c.alive = true; c.hp = 1; s.damageBot(c, 9, ['head', 'body', 'legs'][k % 3], c.phys.pos.clone().set(Math.cos(k), 0, Math.sin(k)), s.player, s.WEAPONS.rifle); kinds.add(Math.round(((c.dd.ang % 6.283) + 6.283) % 6.283 * 2)); }
+          const d = s.bots[0]; d.alive = true; d.hp = 1; s.damageBot(d, 9, 'body', d.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); d.respawnT = 99; st(10); const early = +(d.hm.bones[1].position.y - 0.95).toFixed(2); st(60);
+          const tilt = d.dd.th; s.game.freezeBots = true;
           return [rl, use, legs, body, [...kinds], early, +tilt.toFixed(2)]; }""")
-        ok('2 人物動作：換彈槍往下、拆彈彎腰槍朝下、打腳身子一沉、打身體會轉、倒法 3 種以上、先腿軟再倒地', r[0][0] < -0.3 and r[1][0] < -0.8 and r[1][1] > 0.15 and r[2] < -0.02 and abs(r[3]) > 0.1 and len(r[4]) >= 3 and r[5] < -0.1 and r[6] > 1.2, r)
+        ok('2 人物動作：換彈槍往下、拆彈彎腰槍朝下、打腳身子一沉、打身體會轉、順著子彈方向往不同方向倒、先腿軟再倒地', r[0][0] < -0.3 and r[1][0] < -0.8 and r[1][1] > 0.15 and r[2] < -0.02 and abs(r[3]) > 0.04 and len(r[4]) >= 3 and r[5] < -0.1 and r[6] > 1.2, r)
         # 3 命中回饋：準星每發都跳、打到頭盔沒死「叮」、爆頭擊殺多一層聲音
         r = await ev("""() => { const s = window.__strike, b = s.bots.find((x) => x.active); window.__sfxLog = []; b.alive = true; b.hp = 100; b.helmet = true; b.armor = 100;
           s.damageBot(b, 20, 'head', b.phys.pos.clone().set(1, 0, 0), s.player, s.WEAPONS.rifle); const tick = document.getElementById('xh').classList.contains('tick');

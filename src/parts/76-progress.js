@@ -150,7 +150,7 @@ const myLv = () => levelOf(P().xp).lv;
 function applyCosmetics() {
   const sk = SKINS.find((s) => s.id === P().skin && s.lv <= myLv()) || SKINS[0], k = sk.bright || 1;
   VM_TINT.poly.set(sk.poly).multiplyScalar(k); VM_TINT.metal.set(sk.metal).multiplyScalar(k);
-  VM_MATS.poly.color.copy(VM_TINT.poly); VM_MATS.metal.color.copy(VM_TINT.metal);
+  VM_MATS.poly.color.copy(VM_TINT.poly).multiply(VM_BASE.poly); VM_MATS.metal.color.copy(VM_TINT.metal).multiply(VM_BASE.metal);
   const tc = TEAMC.find((t) => t.id === P().team && t.lv <= myLv()) || TEAMC[0];
   for (const b of bots) if (b.mat && b.mat.userData.rimU) { if (b.baseTeam === 'A') b.mat.userData.rimU.value.setRGB(...tc.rim); }
 }

@@ -109,7 +109,7 @@ for (const [id, k, out] of [['edSize', 's', 'oEdSize'], ['edOp', 'o', 'oEdOp']])
 }
 onTap($('edReset'), () => { S.layout = null; saveSettings(); applyHand(); selectEdit(null); hudTip('按鈕位置已恢復預設', 1.2); });
 onTap($('edDone'), closeLayoutEdit);
-onTap($('bLayout'), openLayoutEdit);
+onTap($('bLayout'), openLayoutEdit); onTap($('bLayoutQ'), openLayoutEdit);   // 暫停畫面最上面也有一顆，不用往下找
 window.addEventListener('resize', () => setTimeout(applyLayout, 50));
 
 // ---------- 陀螺儀瞄準 ----------
