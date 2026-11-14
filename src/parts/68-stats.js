@@ -4,7 +4,7 @@ const STATS_KEY = 'strike.stats';
 function emptyStats() {
   return { v: 1, matches: 0, wins: 0, losses: 0, roundsW: 0, roundsL: 0, kills: 0, deaths: 0, heads: 0, shots: 0, hits: 0,
     plants: 0, defuses: 0, mvp: 0, bestKills: 0, practiceKills: 0, tutorialDone: false, maps: {}, weapons: {}, recent: [],
-    modes: { dm: { n: 0, w: 0, best: 0 }, koth: { n: 0, w: 0 }, range: { n: 0, bestMs: 0, bestAcc: 0 }, rage: { n: 0, w: 0, bestWave: 0, bestKills: 0, bestCombo: 0 } } };
+    modes: { dm: { n: 0, w: 0, best: 0 }, koth: { n: 0, w: 0 }, range: { n: 0, bestMs: 0, bestAcc: 0 }, rage: { n: 0, w: 0, bestWave: 0, bestKills: 0, bestCombo: 0, lastWave: 0 } } };
 }
 let STATS = emptyStats();
 // 讀進來的戰績照 emptyStats 的樣子清一遍（prog 另外在 76-progress 清）

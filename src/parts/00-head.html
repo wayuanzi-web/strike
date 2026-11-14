@@ -272,6 +272,7 @@ body.frenzy #rageTint { opacity: 1; animation: rageGlow 0.9s ease-in-out infinit
 @keyframes rageGlow { 50% { opacity: .65; } }
 #banner.rage #bnT { color: #ffd36a; text-shadow: 0 0 16px rgba(255,190,60,.7), 0 2px 4px #000; }
 .btn.rage { background: linear-gradient(180deg, #c8402a, #8e2414); color: #fff3e6; border-color: #ff8a5a; font-weight: 800; }
+#rageGodSeg button.on { background: var(--dawn); color: #1a1408; }
 #tutArrow { position: absolute; top: 45%; z-index: 4; padding: 6px 12px; border-radius: 6px; background: rgba(255,214,90,.9); color: #1a1408; font-weight: 800; font-size: max(13px, calc(var(--u) * 3.2)); pointer-events: none; animation: tutPulse 1s ease-in-out infinite; }
 #tutArrow.l { left: 27%; } #tutArrow.r { right: 29%; }   /* 放在搖桿和右邊按鈕之間，不蓋住按鈕 */
 @keyframes tutPulse { 50% { opacity: .55; } }
@@ -463,7 +464,11 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <button id="bBoard" aria-label="計分板" hidden><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 4v16"/></svg></button>
   <div id="over" class="ov" hidden><div class="card"><h2 id="overT">勝利</h2><div id="overS">7 : 0</div><p id="overM"></p><p id="overY"></p>
     <p id="overC"></p><p id="overX"></p>
-    <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
+    <div class="row"><button class="btn go" id="bRageCont" hidden>從第 1 波繼續</button><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
+  <div id="rageOpt" class="ov" hidden><div class="card"><h2>狂暴模式</h2>
+    <div class="opt"><span>你這邊</span><div class="seg" id="rageGodSeg"><button data-g="0">一般（3 條命）</button><button data-g="1">無敵（不會死）</button></div></div>
+    <p class="mnote" id="rageOptNote"></p>
+    <div class="row"><button class="btn go" id="rageGo1">從第 1 波開始</button><button class="btn go" id="rageGoN" hidden>從第 1 波繼續</button><button class="btn" id="rageX">取消</button></div></div></div>
   <div id="tutArrow" hidden></div>
   <div id="rageCombo" hidden></div><div id="rageTint"></div>
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>

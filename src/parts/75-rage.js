@@ -26,18 +26,32 @@ function rageDiffFor(w) {
 // 敵人有沒有比較強：給 botDiff 用
 const rageDiff = () => RAGE.diff || DIFF.hard;
 
+// 開打前的選項：一般／無敵、從第 1 波或從上次死掉的那一波繼續
+function openRageOpt() {
+  const last = STATS.modes.rage.lastWave || 0, el = $('rageOpt');
+  for (const b of $('rageGodSeg').children) b.classList.toggle('on', (b.dataset.g === '1') === !!S.rageGod);
+  $('rageGoN').hidden = last < 2; $('rageGoN').textContent = `從第 ${last} 波繼續`;
+  $('rageOptNote').textContent = (S.rageGod ? '無敵：敵人照樣打你、看得到中彈方向，但不扣血、不會死。' : '一般：3 條命，打倒魔王多 1 條。') + '只有「一般、從第 1 波開始」的成績會記進紀錄。';
+  $('menu').hidden = true; el.hidden = false;
+}
+for (const b of $('rageGodSeg').children) onTap(b, () => { S.rageGod = b.dataset.g === '1'; saveSettings(); openRageOpt(); });
+onTap($('rageGo1'), () => { $('rageOpt').hidden = true; startGame('rage'); });
+onTap($('rageGoN'), () => { $('rageOpt').hidden = true; RAGE.nextStart = STATS.modes.rage.lastWave || 1; startGame('rage'); });
+onTap($('rageX'), () => { $('rageOpt').hidden = true; $('menu').hidden = false; });
+onTap($('bRageCont'), () => { $('over').hidden = true; RAGE.nextStart = RAGE.wave || 1; startGame('rage'); });
 function startRage() {
   ensureRageBots();
+  const startWave = Math.max(1, RAGE.nextStart || 1); RAGE.nextStart = 0;
   game.mode = 'rage'; game.lastMode = 'rage'; MODE.kind = 'rage'; MODE.t = 0; MODE.over = false;
   player.team = 'A'; player.kills = player.deaths = player.heads = 0; player.money = 0; gainReset();
   setupBots('rage'); removeZone();
   for (const b of bots) if (b.active) { b.alive = false; b.g.visible = false; b.respawnT = Infinity; b.deadT = 9; b.rageKind = ''; b.name = b.baseName; }   // 全部先下場，由波次一個一個叫上來
-  Object.assign(RAGE, { wave: 0, left: 0, spawned: 0, total: 0, breakT: 2.5, lives: RAGE_LIVES, deadSeen: false, deathsSeen: 0, combo: 0, comboT: 0, best: 0, frenzy: 0, regenT: 0, nadeT: 0, kills: 0, overT: -1 });
+  Object.assign(RAGE, { startWave, god: !!S.rageGod, wave: startWave - 1, left: 0, spawned: 0, total: 0, breakT: 2.5, lives: RAGE_LIVES, deadSeen: false, deathsSeen: 0, combo: 0, comboT: 0, best: 0, frenzy: 0, regenT: 0, nadeT: 0, kills: 0, overT: -1 });
   spawnPlayer(); rageGear(true); RAGE.wIdx = 0;
   W.shots = W.hits = 0;
   enterPlay();
   document.body.classList.add('mode');
-  hudBanner('狂暴模式', '武器全免費、子彈無限。敵人一波比一波多、一波比一波強', 3, 'rage');
+  hudBanner('狂暴模式', (startWave > 1 ? `從第 ${startWave} 波繼續・` : '') + (RAGE.god ? '無敵・' : '') + '武器全免費、子彈無限、換槍鍵一按就換', 3, 'rage');
 }
 // 狂暴換槍：換槍鍵一按就換下一把，依序輪流；出槍很快（0.15 秒）
 const RAGE_ARSENAL = ['rifle', 'carbine', 'smg', 'shotgun', 'sniper', 'deagle'];
@@ -143,8 +157,8 @@ function updateRage(dt) {
   if (player.alive && RAGE.deadSeen) { RAGE.deadSeen = false; rageGear(false); RAGE.regenT = 0; }
   if (RAGE.overT > 0) { RAGE.overT -= dt; if (RAGE.overT <= 0) { endRage(); return; } }
   // 波次
-  if (RAGE.wave === 0 || (RAGE.left <= 0 && RAGE.spawned >= RAGE.total)) {
-    if (RAGE.breakT <= 0 && RAGE.wave > 0) { RAGE.breakT = 4; hudTip(`第 ${RAGE.wave} 波清光！喘口氣`, 2.5); sfx('win', 0.6); player.hp = 100; }
+  if (RAGE.wave === RAGE.startWave - 1 || (RAGE.left <= 0 && RAGE.spawned >= RAGE.total)) {
+    if (RAGE.breakT <= 0 && RAGE.wave >= RAGE.startWave) { RAGE.breakT = 4; hudTip(`第 ${RAGE.wave} 波清光！喘口氣`, 2.5); sfx('win', 0.6); player.hp = 100; }
     RAGE.breakT -= dt; if (RAGE.breakT <= 0) { rageNextWave(); RAGE.breakT = 0; }
     return;
   }
@@ -154,15 +168,17 @@ function updateRage(dt) {
 }
 function endRage() {
   MODE.over = true; game.state = 'over';
-  const M = STATS.modes.rage, prevBest = M.bestWave || 0;
-  const win = RAGE.wave > prevBest;
+  const M = STATS.modes.rage, prevBest = M.bestWave || 0, counts = RAGE.startWave === 1 && !RAGE.god;   // 從中間繼續或無敵的不算紀錄
+  const win = counts && RAGE.wave > prevBest;
+  if (!RAGE.god) M.lastWave = RAGE.wave;
   $('overT').textContent = win ? '新紀錄' : '狂暴結束'; $('overT').className = 'win';
   $('overS').textContent = `撐到第 ${RAGE.wave} 波`;
   $('overM').textContent = `殺了 ${RAGE.kills} 個・最高連殺 ${RAGE.best}・爆頭 ${player.heads}`;
   $('overY').textContent = `命中率 ${pct(W.hits, W.shots)}・玩了 ${fmtClock(MODE.t)}`;
-  M.bestWave = Math.max(prevBest, RAGE.wave); M.bestKills = Math.max(M.bestKills || 0, RAGE.kills); M.bestCombo = Math.max(M.bestCombo || 0, RAGE.best);
+  if (counts) { M.bestWave = Math.max(prevBest, RAGE.wave); M.bestKills = Math.max(M.bestKills || 0, RAGE.kills); M.bestCombo = Math.max(M.bestCombo || 0, RAGE.best); }
   statModeEnd('rage', win, null);
-  $('overC').textContent = `狂暴紀錄：最高第 ${M.bestWave} 波・一場最多 ${M.bestKills} 殺・最高連殺 ${M.bestCombo}（${M.n} 場）`;
+  $('overC').textContent = `狂暴紀錄：最高第 ${M.bestWave} 波・一場最多 ${M.bestKills} 殺・最高連殺 ${M.bestCombo}（${M.n} 場）` + (counts ? '' : '　這場從中間繼續或開了無敵，不算紀錄');
+  $('bRageCont').hidden = false; $('bRageCont').textContent = `從第 ${RAGE.wave} 波繼續`; $('bAgain').textContent = '從第 1 波重來';
   overXpLine();
   $('over').hidden = false; $('touch').hidden = true; resetTouchState(); closeBuy(); overClean();
   $('rageCombo').hidden = true; tgl(document.body, 'frenzy', false);
@@ -170,9 +186,9 @@ function endRage() {
 }
 function rageHud() {
   $('mtop').hidden = false; $('ptop').hidden = true; $('bBoard').hidden = true; $('spec').hidden = true; $('board').hidden = true;
-  $('pipsA').textContent = '♥'.repeat(Math.max(0, RAGE.lives)); $('pipsB').textContent = '';
+  $('pipsA').textContent = RAGE.god ? '無敵' : '♥'.repeat(Math.max(0, RAGE.lives)); $('pipsB').textContent = '';
   $('scA').textContent = RAGE.kills; $('scB').textContent = RAGE.wave;
   $('clk').textContent = RAGE.wave ? `剩 ${RAGE.left}` : '準備'; $('clk').className = RAGE.frenzy > 0 ? 'low' : '';
   $('rnd').textContent = RAGE.frenzy > 0 ? `狂暴中 ${RAGE.frenzy.toFixed(1)} 秒` : `第 ${RAGE.wave} 波・連殺 ${RAGE.combo}・最高 ${RAGE.best}`;
 }
-onTap($('bRage'), () => startGame('rage'));
+onTap($('bRage'), openRageOpt);

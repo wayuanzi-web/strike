@@ -116,7 +116,7 @@ function surfaceAt(p) {
 
 function damagePlayer(dmg, bot, part, weapon) {
   if (!player.alive) return;
-  if (game.mode === 'rage') dmg *= rageTakenMul();   // 狂暴中受傷減半
+  if (game.mode === 'rage') dmg *= RAGE.god ? 0 : rageTakenMul();   // 狂暴中受傷減半；選了無敵就不扣血（中彈方向照樣顯示）
   player.hp = Math.max(0, player.hp - dmg); player.hurtT = 0.35;
   const t = player.taken[bot.name] || (player.taken[bot.name] = { dmg: 0, hits: 0 }); t.dmg += dmg; t.hits++;
   // CS 式受擊：視角往上抖、移動變慢

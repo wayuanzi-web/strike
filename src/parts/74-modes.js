@@ -195,6 +195,7 @@ function endMode() {
   for (const b of bots) if (b.dummy) { b.alive = false; b.g.visible = false; }
 }
 function leaveMode() {
+  if (game.mode === 'rage' && !MODE.over && RAGE.wave > 0 && !RAGE.god) { STATS.modes.rage.lastWave = RAGE.wave; saveStats(); }   // 狂暴中途離開：記住打到第幾波，下次可以接著打
   removeZone(); $('rageCombo').hidden = true; document.body.classList.remove('frenzy'); if (typeof _hv !== 'undefined') _hv.delete(document.body); MODE.rg = null; MODE.kind = ''; document.body.classList.remove('mode');
   for (const b of bots) { b.dummy = false; if (b.remote) { b.remote = false; b.name = b.baseName || b.name; } }
   if (typeof NET !== 'undefined') { NET.on = false; NET.remote = null; }

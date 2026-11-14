@@ -9,10 +9,12 @@ async def main():
         await ev("() => { const s = window.__strike; s.game.manual = true; s.S.autoFire = false; window.__sfxLog = []; }")
         # 1 從選單按「狂暴模式」
         await ev("() => document.getElementById('bRage').click()")
+        opt = await ev("() => [!document.getElementById('rageOpt').hidden, document.getElementById('rageGoN').hidden]")
+        await ev("() => document.getElementById('rageGo1').click()")
         r = await ev("""() => { const s = window.__strike; for (let i = 0; i < 60 * 4; i++) s.step(1/60);
           const act = s.bots.filter((b) => b.active), alive = act.filter((b) => b.alive);
           return [s.game.mode, s.game.state, s.RAGE.wave, s.RAGE.lives, act.length, alive.length, alive.every((b) => b.team === 'B'), document.getElementById('scB').textContent]; }""")
-        ok('1 狂暴模式開始：3 條命、第 1 波敵人上場（只有敵人、沒有隊友）', r[0] == 'rage' and r[1] == 'play' and r[2] == 1 and r[3] == 3 and r[4] >= 18 and r[5] >= 4 and r[6] and r[7] == '1', r)
+        ok('1 按狂暴模式先出現選項（沒玩過就沒有「繼續」），開始後 3 條命、第 1 波敵人上場', opt == [True, True] and r[0] == 'rage' and r[1] == 'play' and r[2] == 1 and r[3] == 3 and r[4] >= 18 and r[5] >= 4 and r[6] and r[7] == '1', r)
         # 2 子彈無限：一直開火，彈匣不會少、不會換彈
         r = await ev("""() => { const s = window.__strike; s.game.freezeBots = true; s.player.pitch = -1.2; s.INPUT.fire = true; for (let i = 0; i < 120; i++) s.step(1/60); s.INPUT.fire = false;
           return [s.W.shots, s.W.ammo, s.W.reloadT]; }""")
@@ -51,6 +53,18 @@ async def main():
           return [s.game.state, document.getElementById('overT').textContent, document.getElementById('overS').textContent, s.STATS().modes.rage.bestWave, s.STATS().modes.rage.n, s.RAGE.lives, s.player.alive, s.RAGE.overT, s.player.respawnT]; }""")
         await page.screenshot(path=str(OUT / 'rage_over.png'))
         ok('7 三條命用完就結束：顯示撐到第幾波、紀錄寫進戰績', r[0] == 'over' and '第 5 波' in r[2] and r[3] == 5 and r[4] == 1, r)
+        # 9 結算有「從第 5 波繼續」：按了從第 5 波開打、3 條命；這場不算紀錄
+        r = await ev("""() => { const s = window.__strike; const b = document.getElementById('bRageCont'); const t = b.hidden ? '' : b.textContent; b.click();
+          for (let i = 0; i < 60 * 4; i++) { s.player.hp = 100; s.step(1/60); } return [t, s.RAGE.wave, s.RAGE.lives, s.RAGE.startWave]; }""")
+        ok('9 死了可以從同一波繼續（不用從第 1 波重來）', r[0] == '從第 5 波繼續' and r[1] == 5 and r[2] == 3 and r[3] == 5, r)
+        # 10 中途回選單：下次選單裡有「從第 5 波繼續」；無敵：被打不扣血、不會死
+        r = await ev("""() => { const s = window.__strike; s.backToMenu(); document.getElementById('bRage').click();
+          const n = document.getElementById('rageGoN'), t = n.hidden ? '' : n.textContent;
+          document.querySelector('#rageGodSeg [data-g="1"]').click(); n.click(); for (let i = 0; i < 60 * 4; i++) s.step(1/60);
+          const e = s.bots.find((x) => x.active && x.team === 'B'); for (let k = 0; k < 5; k++) s.damagePlayer(80, e, 'head', s.WEAPONS.rifle);
+          for (let i = 0; i < 30; i++) s.step(1/60); const res = [t, s.RAGE.god, s.player.alive, Math.round(s.player.hp), document.getElementById('pipsA').textContent, s.RAGE.wave];
+          s.S.rageGod = false; return res; }""")
+        ok('10 中途離開下次可以接著打；無敵模式被打不扣血、不會死', r[0] == '從第 5 波繼續' and r[1] is True and r[2] is True and r[3] == 100 and r[4] == '無敵' and r[5] == 5, r)
         # 8 回選單再打別的模式：狂暴專用的敵人不會跑出來
         r = await ev("""() => { const s = window.__strike; s.backToMenu(); s.startGame('match'); for (let i = 0; i < 5; i++) s.step(1/60);
           return [s.bots.filter((b) => b.active).length, s.bots.filter((b) => b.rageOnly && b.active).length, document.body.classList.contains('frenzy')]; }""")
