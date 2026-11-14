@@ -1,7 +1,7 @@
 /* ===== 76-progress：成長——等級與經驗、成就、每日挑戰、外觀（槍的塗裝、隊友外框色）、擊殺鏡頭、回合 MVP、戰績匯出匯入
    全部存在 STATS.prog（跟戰績一起存、一起匯出）。 */
 const LV_MAX = 30;
-function emptyProg() { return { xp: 0, ach: {}, daily: null, skin: 'base', team: 'cyan', c: { kills: 0, sniper: 0, nade: 0 } }; }
+function emptyProg() { return { xp: 0, ach: {}, daily: null, skin: 'base', team: 'cyan', charm: 'none', stk: 'none|none|none', c: { kills: 0, sniper: 0, nade: 0 } }; }
 function ensureProg() {
   const raw = isObj(STATS.prog) ? STATS.prog : {}, pr = cleanLike(raw, emptyProg());
   pr.xp = Math.max(0, pr.xp); pr.c = cleanLike(raw.c, emptyProg().c); pr.daily = isObj(raw.daily) ? raw.daily : null;
@@ -149,7 +149,10 @@ const TEAMC = [
   { id: 'violet', name: '紫羅蘭', lv: 7, rim: [0.8, 0.55, 1.0], hex: '#cc8cff' }, { id: 'gold', name: '金色', lv: 12, rim: [1.0, 0.85, 0.35], hex: '#ffd85a' },
   { id: 'white', name: '雪白', lv: 15, rim: [1.0, 1.0, 1.0], hex: '#ffffff' },
 ];
-function unlocksAt(lv) { return SKINS.filter((s) => s.lv === lv).map((s) => `塗裝「${s.name}」`).concat(TEAMC.filter((t) => t.lv === lv).map((t) => `隊友外框「${t.name}」`)); }
+function unlocksAt(lv) {
+  const ex = window.ARMORY_READY ? CHARMS.filter((c) => c.lv === lv && c.id !== 'none').map((c) => `掛飾「${c.name}」`).concat(STICKERS.filter((s) => s.lv === lv && s.id !== 'none').map((s) => `貼紙「${s.name}」`)) : [];
+  return SKINS.filter((s) => s.lv === lv).map((s) => `塗裝「${s.name}」`).concat(TEAMC.filter((t) => t.lv === lv).map((t) => `隊友外框「${t.name}」`), ex);
+}
 const myLv = () => levelOf(P().xp).lv;
 function applyCosmetics() {
   const sk = SKINS.find((s) => s.id === P().skin && s.lv <= myLv()) || SKINS[0], k = sk.bright || 1;
@@ -157,6 +160,7 @@ function applyCosmetics() {
   VM_MATS.poly.color.copy(VM_TINT.poly).multiply(VM_BASE.poly); VM_MATS.metal.color.copy(VM_TINT.metal).multiply(VM_BASE.metal);
   const tc = TEAMC.find((t) => t.id === P().team && t.lv <= myLv()) || TEAMC[0];
   for (const b of bots) if (b.mat && b.mat.userData.rimU) { if (b.baseTeam === 'A') b.mat.userData.rimU.value.setRGB(...tc.rim); }
+  if (window.ARMORY_READY) applyArmory();   // 花紋、掛飾、貼紙（79-armory）
 }
 function equipCosmetic(kind, id) {
   const list = kind === 'skin' ? SKINS : TEAMC, it = list.find((x) => x.id === id);
@@ -247,7 +251,7 @@ function renderProg() {
   $('pgAchN').textContent = `${got} / ${ACH.length}`;
   $('pgAch').innerHTML = ACH.map(([id, n, t]) => `<li class="${P().ach[id] ? 'done' : ''}"><b>${P().ach[id] ? '✓ ' : ''}${n}</b><small>${t}${P().ach[id] ? '・' + P().ach[id] : ''}</small></li>`).join('');
   const sw = (list, kind, cur) => list.map((x) => `<button class="sk${x.id === cur ? ' on' : ''}" data-kind="${kind}" data-id="${x.id}" ${x.lv > L.lv ? 'disabled' : ''}><i style="background:${kind === 'skin' ? `linear-gradient(135deg, ${x.poly} 50%, ${x.metal} 50%)` : x.hex}"></i><b>${x.name}</b><small>${x.lv > L.lv ? `${x.lv} 級解鎖` : x.id === cur ? '使用中' : '可用'}</small></button>`).join('');
-  $('pgSkin').innerHTML = sw(SKINS, 'skin', P().skin); $('pgTeam').innerHTML = sw(TEAMC, 'team', P().team);
+  $('pgTeam').innerHTML = sw(TEAMC, 'team', P().team);
   for (const b of $('prog').querySelectorAll('.sk')) onTap(b, () => { if (equipCosmetic(b.dataset.kind, b.dataset.id)) { sfx('cash'); renderProg(); } });
 }
 function openProg() { renderProg(); lbRender(); $('pgCode').value = ''; $('pgMsg').textContent = ''; $('prog').hidden = false; }

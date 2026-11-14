@@ -280,7 +280,7 @@ function shoot() {
   }
   muzzleLight(_mz, WP.scope || n > 1 ? 1.8 : 1.3); player.firedAt = game.t;
   W.flashT = 0.045;
-  W.kickV += WP.kick; W.roll = (Math.random() - 0.5) * 0.04 * WP.kick / 2.2;
+  W.kickV += WP.kick; CHARM.kick += 1; W.roll = (Math.random() - 0.5) * 0.04 * WP.kick / 2.2;
   W.vpv += WP.vkick + Math.random() * 3;
   if (n > 1) W.pumpT = 0.55;
   if (!(n > 1) && !WP.scope) ejectShell();

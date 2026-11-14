@@ -166,6 +166,7 @@ function frame(now) {
   const raw = Math.min(1, Math.max(0.001, dt));      // 實際經過的時間（算幀數用）
   if (dt > 0.05) dt = 0.05; if (dt <= 0) dt = 0.001;
   if (!game.manual) step(dt);
+  if (ARM.open) updateArmoryPreview(dt);
   render();
   perfFrame(raw * 1000);
   game.fpsAcc += raw; game.fpsN++;
@@ -241,7 +242,7 @@ function step(dt) {
       player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? -(player.leanA || 0) * LEAN_ROLL : 0.25);
   }
   if (!killcamActive()) { camera.fov = spec ? BASE_FOV : lerp(BASE_FOV, adsFov, player.adsT); camera.updateProjectionMatrix(); }
-  updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt);
+  updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt); updateCharm(dt);
   if (!player.alive) {
     const kb = bots.find((b) => b.name === player.killer);
     if (kb) { const ty = Math.atan2(-(kb.phys.pos.x - p.x), -(kb.phys.pos.z - p.z)); player.yaw += angDiff(player.yaw, ty) * (1 - Math.exp(-3 * dt)); player.pitch *= 1 - Math.min(1, 3 * dt); }
@@ -257,7 +258,7 @@ function render() {
   const sb = game.specBot, sv = sb && sb.g.visible; if (sb) sb.g.visible = false;   // 觀戰時別看到自己身體的內側
   if (killcamActive()) killcamRender(() => renderer.render(scene, camera)); else renderer.render(scene, camera);
   if (sb) sb.g.visible = sv;
-  if (game.state !== 'menu' && player.alive) { renderer.clearDepth(); renderer.render(vmScene, vmCam); }
+  if ((game.state !== 'menu' && player.alive) || ARM.open) { renderer.clearDepth(); renderer.render(vmScene, vmCam); }
 }
 
 // ---------- 開始 ----------
@@ -273,7 +274,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };

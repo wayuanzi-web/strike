@@ -205,7 +205,7 @@ function armsArm(u) {
     if (armsFinal(u.armsLv)) armsGold(); else applyCosmetics();
   } else { u.primary = w; u.secondary = null; botArm(u); }
 }
-function armsGold() { const g = SKINS.find((s) => s.id === 'gold'); VM_TINT.poly.set(g.poly); VM_TINT.metal.set(g.metal); VM_MATS.poly.color.copy(VM_TINT.poly).multiply(VM_BASE.poly); VM_MATS.metal.color.copy(VM_TINT.metal).multiply(VM_BASE.metal); }
+function armsGold() { PAT_U.uPat.value = 0; const g = SKINS.find((s) => s.id === 'gold'); VM_TINT.poly.set(g.poly); VM_TINT.metal.set(g.metal); VM_MATS.poly.color.copy(VM_TINT.poly).multiply(VM_BASE.poly); VM_MATS.metal.color.copy(VM_TINT.metal).multiply(VM_BASE.metal); }
 // 有人擊殺：殺滿這一關的數量就升一關；最後一關擊殺＝贏
 function armsKill(killer) {
   if (game.sub !== 'arms' || ARMS.win || !killer) return;

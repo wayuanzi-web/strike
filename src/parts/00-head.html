@@ -342,6 +342,15 @@ body.editing #hud, body.editing #bPause, body.editing #bBuy, body.editing #bRadi
 .vmap.ban { opacity: .45; } .vmap.ban b { text-decoration: line-through; } .vmap.ban i { color: #ff9a86; }
 .vmap.pick { border-color: var(--dawn); background: rgba(255,179,71,.18); } .vmap.pick i { color: var(--dawn-lt); }
 #vetoMsg { font-weight: 700; color: var(--dawn-lt); min-height: 1.4em; }
+/* M16 軍械庫：左邊透明（看得到放大的槍），右邊選單 */
+#armory { position: fixed; inset: 0; z-index: 9; display: flex; background: linear-gradient(90deg, rgba(8,10,14,.25), rgba(8,10,14,.55) 45%, rgba(8,10,14,.92) 52%); }
+#armory[hidden] { display: none; }
+#arView { flex: 1 1 48%; touch-action: none; cursor: grab; }
+#armory .arcard { flex: 0 0 52%; max-width: 640px; overflow-y: auto; touch-action: pan-y; padding: calc(var(--sb) + 10px) calc(var(--sr) + 14px) 14px 14px; color: var(--bone); }
+#arGuns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+#arGuns button, .arslots button { min-height: 36px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: inherit; font: inherit; font-size: 13px; }
+#arGuns button.on, .arslots button.on { border-color: var(--dawn); background: rgba(255,179,71,.2); }
+.arslots { flex-basis: 100%; display: flex; gap: 6px; } .arslots small { display: block; color: var(--mute); font-size: 11px; }
 #rankOpt, #rankVeto { z-index: 9; } #rankOpt .card, #rankVeto .card { width: min(100%, 860px); max-height: 100%; overflow-y: auto; touch-action: pan-y; }
 #overR { display: flex; gap: 10px; align-items: center; justify-content: center; font-weight: 700; }
 #overR span { display: grid; gap: 2px; text-align: left; } #overR small { color: var(--mute); font-weight: 400; }
@@ -420,7 +429,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
       <div class="row modes"><small>更多模式</small><button class="btn rage" id="bRage">狂暴模式</button><button class="btn" id="bWing">2 對 2</button><button class="btn" id="bArms">軍備競賽</button><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
-      <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button></div>
+      <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button><button class="btn" id="bArmory">軍械庫</button></div>
       <div class="install" id="installBox" hidden><span id="installT"></span><button class="btn" id="bInstall" hidden>安裝到主畫面</button></div>
       <ul class="help help-t">
         <li><b>左半邊</b>按住拖：移動，推到底是跑</li>
@@ -501,6 +510,9 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <div id="rankVeto" class="ov" hidden><div class="card"><h2>禁選地圖</h2><p id="vetoMsg"></p><div id="vetoMaps"></div>
     <p class="mnote">你禁一張 → 對手禁一張 → 你從剩下的地圖選 → 對手選邊。對手會禁你勝率最高的地圖。</p>
     <div class="row"><button class="btn" id="vetoX">取消</button></div></div></div>
+  <div id="armory" hidden><div id="arView" aria-label="拖曳旋轉槍"></div><div class="arcard">
+    <div class="row sticky-head" style="justify-content:space-between"><h2>軍械庫</h2><button class="btn go" id="arX">好了</button></div>
+    <div class="row" id="arTabs"></div><div id="arGuns"></div><div class="sks" id="arList"></div><p class="mnote" id="arNote"></p></div></div>
   <div id="tutArrow" hidden></div>
   <div id="rageCombo" hidden></div><div id="rageTint"></div>
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>
@@ -532,7 +544,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
   <div id="prog" class="ov" hidden><div class="card"><div class="row sticky-head" style="justify-content:space-between"><h2>成長・成就・外觀</h2><button class="btn go" id="pgX">好了</button></div>
     <div class="pglv"><strong id="pgLv">1</strong><div><small>等級</small><span class="pb big"><i id="pgBar"></i></span><small id="pgXp"></small></div></div>
     <section><h3>每日挑戰<small>（每天午夜換新，完成一個 +150 經驗）</small></h3><ul class="pgd" id="pgDaily"></ul></section>
-    <section><h3>外觀・槍的塗裝<small>（手上的槍）</small></h3><div class="sks" id="pgSkin"></div>
+    <section><h3>外觀・槍<small>（塗裝、掛飾、貼紙都在軍械庫）</small></h3><button class="btn" id="pgArmory">打開軍械庫</button>
       <h3>外觀・隊友外框色<small>（隊友身上的光）</small></h3><div class="sks" id="pgTeam"></div></section>
     <section><h3>成就 <small id="pgAchN"></small></h3><ul class="pga" id="pgAch"></ul></section>
     <section id="pgLb" hidden><h3>排行榜</h3>
