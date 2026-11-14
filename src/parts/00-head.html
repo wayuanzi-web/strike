@@ -261,6 +261,17 @@ body.buying #tut { z-index: 8; top: auto; bottom: calc(var(--sb) + 6px); width: 
 #stats th { text-align: left; color: var(--mute); font-weight: 600; padding: 2px 4px; } #stats td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.06); }
 #stats tr.w td:nth-child(3) { color: var(--ally); } #stats tr.l td:nth-child(3) { color: var(--enemy); }
 #touch .tb { scale: var(--bs, 1); }
+/* 狂暴模式：連殺數字、狂暴時金光 */
+#rageCombo { position: absolute; right: calc(var(--sr) + 30%); top: 26%; z-index: 4; pointer-events: none; text-align: center; color: #ffd36a; text-shadow: 0 0 12px rgba(255,190,60,.8), 0 2px 4px #000; font-family: var(--f-num); line-height: 1; }
+#rageCombo b { display: block; font-size: max(34px, calc(var(--u) * 10)); }
+#rageCombo small { font-size: max(12px, calc(var(--u) * 3)); letter-spacing: .2em; color: #fff3cf; }
+#rageCombo.pop { animation: ragePop .28s ease-out; }
+@keyframes ragePop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
+#rageTint { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .3s; background: radial-gradient(ellipse at center, rgba(255,210,90,0) 45%, rgba(255,190,60,.38) 100%); }
+body.frenzy #rageTint { opacity: 1; animation: rageGlow 0.9s ease-in-out infinite; }
+@keyframes rageGlow { 50% { opacity: .65; } }
+#banner.rage #bnT { color: #ffd36a; text-shadow: 0 0 16px rgba(255,190,60,.7), 0 2px 4px #000; }
+.btn.rage { background: linear-gradient(180deg, #c8402a, #8e2414); color: #fff3e6; border-color: #ff8a5a; font-weight: 800; }
 #tutArrow { position: absolute; top: 45%; z-index: 4; padding: 6px 12px; border-radius: 6px; background: rgba(255,214,90,.9); color: #1a1408; font-weight: 800; font-size: max(13px, calc(var(--u) * 3.2)); pointer-events: none; animation: tutPulse 1s ease-in-out infinite; }
 #tutArrow.l { left: 27%; } #tutArrow.r { right: 29%; }   /* 放在搖桿和右邊按鈕之間，不蓋住按鈕 */
 @keyframes tutPulse { 50% { opacity: .55; } }
@@ -379,7 +390,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
       <div class="brand"><span class="tag">Dawn Strike</span><h1>破曉突擊</h1><p>炸彈模式：攻方裝炸彈、守方拆彈，回合之間用賺來的錢買槍。</p></div>
       <p class="mnote hint" id="firstHint" hidden>第一次玩？先試「新手教學」（約 2 分鐘）。</p>
       <div class="row"><button class="btn go" id="bMatch">對戰 5v5</button><button class="btn" id="bStart">練習</button><button class="btn" id="bTut">新手教學</button><button class="btn" id="bStats">戰績</button><button class="btn" id="bSet1">設定</button></div>
-      <div class="row modes"><small>更多模式</small><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
+      <div class="row modes"><small>更多模式</small><button class="btn rage" id="bRage">狂暴模式</button><button class="btn" id="bDM">個人死鬥</button><button class="btn" id="bKoth">搶點 4v4</button><button class="btn" id="bRange">練槍場</button><button class="btn" id="bDuel">好友 1 對 1</button></div>
       <div class="maps" id="mapSel" role="radiogroup" aria-label="地圖"></div>
       <div class="opt mdiff"><span>難度</span><div class="seg" data-k="difficulty"><button data-v="easy">簡單</button><button data-v="normal">普通</button><button data-v="hard">困難</button></div></div>
       <div class="mlv"><b id="mLv">1 級</b><span class="pb"><i id="mXp"></i></span><small id="mDaily"></small><button class="btn" id="bProg">成長・成就・外觀</button></div>
@@ -454,6 +465,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <p id="overC"></p><p id="overX"></p>
     <div class="row"><button class="btn go" id="bAgain">再來一場</button><button class="btn" id="bMenu">回選單</button></div></div></div>
   <div id="tutArrow" hidden></div>
+  <div id="rageCombo" hidden></div><div id="rageTint"></div>
   <div id="tut" hidden><div><span id="tutN">1 / 10</span><b id="tutT">移動</b><button id="tutSkip">跳過這步</button></div><p id="tutX"></p></div>
   <div id="tutDone" class="ov" hidden><div class="card"><h2>教學完成</h2><p class="mnote">對戰時：準備時間先買東西；攻方帶炸彈去 A 或 B 點裝，守方守住或拆彈。活下來的人下回合保留裝備。</p>
     <div class="row"><button class="btn go" id="tutMatch">開始對戰</button><button class="btn" id="tutMenu">回選單</button></div></div></div>

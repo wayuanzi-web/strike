@@ -43,7 +43,7 @@ async def main():
         ok('5 個性：狙擊手買狙擊（隊上已經有人拿狙擊就不重複）；每隻都有個性；錢少的回合沒人買槍', r[0] == 'sniper' and r[1] == 9 and r[2] == 0 and 'eco' in r[3].values(), r)
         # 6 指令：跟我、守這裡、打 B
         r = await ev("""() => { const s = window.__strike, R = s.ROUND; s.startGame('match'); s.game.freezeBots = false; R.phase = 'live'; R.t = 100; R.liveT = 1;
-          for (const b of s.bots) if (b.team === 'B') { b.phys.pos.set(34, 0, 24 - b.i); b.blindT = 999; b.alive = false; b.g.visible = false; }
+          for (const b of s.bots) if (b.team === 'B') { b.phys.pos.set(34, 0, 24 - b.i); b.blindT = 999; b.alive = false; b.respawnT = Infinity; b.g.visible = false; }   // respawnT：不然下一格就被當成「該重生了」
           s.player.alive = true; s.player.body.pos.set(-20, 0, 6);
           s.giveOrder('follow'); for (let i = 0; i < 60 * 14; i++) { s.player.body.pos.set(-20, 0, 6); s.step(1/60); }
           const al = s.bots.filter((b) => b.team === 'A' && b.alive), d1 = al.map((b) => +Math.hypot(b.phys.pos.x + 20, b.phys.pos.z - 6).toFixed(1));

@@ -97,6 +97,7 @@ function progEvent(ev, d = {}) {
   if (ev === 'kill') {
     // 練習可以免費拿任何槍、敵人不太會反擊：只給一點經驗，不算成就和每日挑戰
     if (m === 'practice') { addXP(2, '練習擊殺'); unlock('first_kill'); return; }
+    if (m === 'rage') { addXP(3, '狂暴擊殺'); unlock('first_kill'); return; }   // 狂暴：武器免費、子彈無限，不算其它成就和每日挑戰
     addXP(m === 'match' ? 10 : 6, '擊殺'); if (d.head) addXP(5, '爆頭');
     c.kills++; if (d.w && d.w.id === 'sniper') c.sniper++; if (d.w && (d.w.id === 'he' || d.w.id === 'molotov')) c.nade++;
     unlock('first_kill');

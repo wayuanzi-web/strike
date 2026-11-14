@@ -53,6 +53,7 @@ let boardT = 0;
 function hudMatch(dt) {
   if (game.mode === 'duel') { duelHud(); return; }
   if (isMode()) { modeHud(); return; }
+  if (game.mode === 'rage') { rageHud(); return; }
   const m = game.mode === 'match';
   $('mtop').hidden = !m; $('ptop').hidden = m; $('bBoard').hidden = !m;
   if (!m) { $('board').hidden = true; $('spec').hidden = true; return; }
@@ -100,7 +101,7 @@ function hudUpdate(dt) {
   if (ar !== +arE.dataset.v || arE.classList.contains('helm') !== !!INV.helmet) { arE.dataset.v = ar; arE.hidden = !ar; $('arN').textContent = ar; arE.classList.toggle('helm', !!INV.helmet); }
   if (hp !== lastHp) { lastHp = hp; $('hpN').textContent = hp; $('hpI').style.width = hp + '%'; $('hp').classList.toggle('low', hp < 30); }
   if (W.isNade) { if (lastAmmo !== -2) { lastAmmo = -2; $('ammoN').textContent = INV[INV.nade]; $('ammoR').textContent = ''; $('ammo').classList.remove('low'); } }
-  else if (W.ammo * 1000 + W.reserve !== lastAmmo) { lastAmmo = W.ammo * 1000 + W.reserve; $('ammoN').textContent = W.ammo; $('ammoR').textContent = '/ ' + W.reserve; $('ammo').classList.toggle('low', W.ammo <= 6); }
+  else if (W.ammo * 1000 + W.reserve !== lastAmmo) { lastAmmo = W.ammo * 1000 + W.reserve; $('ammoN').textContent = W.ammo; $('ammoR').textContent = game.mode === 'rage' ? '/ ∞' : '/ ' + W.reserve; $('ammo').classList.toggle('low', W.ammo <= 6); }
   drawRadar(dt); hudMatch(dt);
   if (bannerT > 0) { bannerT -= dt; if (bannerT < 0.4) $('banner').style.opacity = Math.max(0, bannerT / 0.4); if (bannerT <= 0) $('banner').hidden = true; }
   if (player.kills !== lastK) { lastK = player.kills; $('sK').textContent = player.kills; }

@@ -82,7 +82,7 @@ function renderBuy() {
 // 購買選單上方：錢＋還能買幾秒（選單會蓋住畫面上的倒數）
 function buyHead() {
   const left = game.mode === 'match' ? (ROUND.phase === 'freeze' ? ROUND.t : null) : null;
-  const t = (freeBuy() ? (game.mode === 'tutorial' ? '教學：免費' : '練習：免費') : '$ ' + (player.money || 0)) + (left != null ? `　準備時間還有 ${Math.ceil(left)} 秒` : '');
+  const t = (freeBuy() ? (game.mode === 'tutorial' ? '教學：免費' : game.mode === 'rage' ? '狂暴：全部免費' : '練習：免費') : '$ ' + (player.money || 0)) + (left != null ? `　準備時間還有 ${Math.ceil(left)} 秒` : '');
   const el = $('buyMoney'); if (hv(el, 't', t)) el.textContent = t;
 }
 function buildBuyMenu() {

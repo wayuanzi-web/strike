@@ -120,7 +120,7 @@ function setupBots(mode) {
   const cnt = { A: 0, B: 0 };
   for (const b of bots) {
     b.team = b.baseTeam;
-    b.active = mode === 'match' ? true : mode === 'tutorial' || mode === 'range' || mode === 'duel' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : (b.team === 'B' && b.i < 4); b.dummy = false;
+    b.active = b.rageOnly ? mode === 'rage' : mode === 'rage' ? b.baseTeam === 'B' : mode === 'match' ? true : mode === 'tutorial' || mode === 'range' || mode === 'duel' ? false : mode === 'dm' ? b.i < 7 : mode === 'koth' ? cnt[b.team]++ < (b.team === 'A' ? 3 : 4) : (b.team === 'B' && b.i < 4); b.dummy = false;
     if (mode === 'dm') b.team = 'D' + b.i;   // 死鬥：每個人自己一隊
     b.kills = b.deaths = b.heads = 0;
     if (mode !== 'match') { b.primary = WEAPONS.rifle; b.secondary = null; b.vest = b.helmet = true; b.armor = 100; b.nades = { he: 0, flash: 0, smoke: 0, molotov: 0 }; botArm(b); }
@@ -278,6 +278,7 @@ function botsHearShot(pos, team = 'A') {
 function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
   if (b.remote) { netHitRemote(b, dmg, part, weapon || WP); return; }   // 好友對戰：傷害交給對方那台算
   if (!b.alive) return;
+  if (game.mode === 'rage' && attacker === player) dmg *= rageDmgMul();   // 狂暴中傷害 2 倍
   b.hp -= dmg;
   const byPlayer = attacker === player, w = weapon || (byPlayer ? WP : attacker.wpn) || WEAPONS.rifle;
   if (b.hp <= 0) {
@@ -296,6 +297,7 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
     if (enemy) roundKill(attacker);
     if (enemy) addMoney(attacker, w.reward || 0, '擊殺');
     hudFeed(attacker === b ? '' : attacker.name, b.name, part === 'head', attacker.team, b.team, byPlayer, w.short);
+    if (game.mode === 'rage' && byPlayer) rageOnKill(b, part === 'head');
     if (typeof onUnitDied === 'function') onUnitDied(b);
     return;
   }
@@ -303,7 +305,7 @@ function damageBot(b, dmg, part, dir, attacker = player, weapon = null) {
   // 中彈硬直：準度變差、連發中斷，先打中的人佔優勢
   b.hitPart = part; b.hitSide = dir ? Math.sign(dir.x * -Math.cos(b.yaw) - dir.z * -Math.sin(b.yaw)) || 1 : 1;   // 中彈部位、從哪一側
   b.flinchT = part === 'head' ? 0.6 : 0.35; b.tagT = 1.5; b.hitAnim = part === 'head' ? 0.2 : 0.15; b.hitHead = part === 'head'; b.settle = Math.min(1, b.settle + 0.5); if (b.burst > 1) b.burst = 1;
-  if (b.hp < 55 && (b.coverUsed || 0) < 2 && b.state === 'combat' && Math.random() < 0.75) { if (seekCover(b, attacker)) return; }
+  if (game.mode !== 'rage' && b.hp < 55 && (b.coverUsed || 0) < 2 && b.state === 'combat' && Math.random() < 0.75) { if (seekCover(b, attacker)) return; }
   // 被打到：轉頭面向攻擊者，過去找
   if (b.state !== 'combat' && b.state !== 'plant' && b.state !== 'defuse' && leashOK(b, attacker.body.pos)) {
     b.lastSeen.copy(attacker.body.pos); b.state = 'search'; b.searchT = 8; setPath(b, b.lastSeen.x, b.lastSeen.z);
@@ -342,7 +344,7 @@ function tryFlank(b, tgt) {
 }
 // 這隻機器人用的難度：敵人用你選的難度；隊友固定用「普通」但不手下留情
 // 敵人用你選的難度；隊友跟著難度稍微變強（困難時隊友才打得過困難的敵人）
-function botDiff(b) { return b.team !== player.team ? (DIFF[S.difficulty] || DIFF.normal) : S.difficulty === 'hard' ? DIFF.allyHard : DIFF.ally; }
+function botDiff(b) { return b.team !== player.team ? (game.mode === 'rage' ? rageDiff() : DIFF[S.difficulty] || DIFF.normal) : S.difficulty === 'hard' ? DIFF.allyHard : DIFF.ally; }
 
 const _wish = new V3();
 function updateBot(b, dt) {
@@ -509,6 +511,8 @@ function updateBot(b, dt) {
     botObjective(b, dt);
   } else if (game.mode === 'koth') {
     kothObjective(b, dt);
+  } else if (game.mode === 'rage') {
+    rageObjective(b, dt);
   } else {
     // 巡邏：練習模式走到隨機遠處；對戰時往前推進，到了有時守一下
     if (b.waitT > 0) { b.waitT -= dt; b.yaw += Math.sin(b.waitT * 2) * dt * 0.8; }

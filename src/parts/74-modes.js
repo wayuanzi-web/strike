@@ -3,7 +3,7 @@
    搶點：4 對 4，地圖中央一個圈，只有一隊在圈裡就每秒 +1 分，先到 100 分；陣亡 4 秒後在自己出生區重生。
    練槍場：30 個靶（前 15 個不動、後 15 個左右移動），每個 4 秒內打倒；看反應時間、命中率、爆頭。 */
 const MODE = { kind: '', t: 0, over: false, score: { A: 0, B: 0 }, zone: null, owner: '', rg: null };
-const MODE_NAME = { dm: '個人死鬥', koth: '搶點', range: '練槍場' };
+const MODE_NAME = { dm: '個人死鬥', koth: '搶點', range: '練槍場', rage: '狂暴模式' };
 const isMode = () => game.mode === 'dm' || game.mode === 'koth' || game.mode === 'range';
 const DM = { goal: 25, limit: 300 }, KOTH = { goal: 100, limit: 360, r: 5 }, RANGE = { n: 30, timeout: 4, gap: 0.55 };
 for (let i = 0; i < 12; i++) TEAM_INTEL['D' + i] = { t: -99, pos: new V3() };
@@ -195,7 +195,7 @@ function endMode() {
   for (const b of bots) if (b.dummy) { b.alive = false; b.g.visible = false; }
 }
 function leaveMode() {
-  removeZone(); MODE.rg = null; MODE.kind = ''; document.body.classList.remove('mode');
+  removeZone(); $('rageCombo').hidden = true; document.body.classList.remove('frenzy'); if (typeof _hv !== 'undefined') _hv.delete(document.body); MODE.rg = null; MODE.kind = ''; document.body.classList.remove('mode');
   for (const b of bots) { b.dummy = false; if (b.remote) { b.remote = false; b.name = b.baseName || b.name; } }
   if (typeof NET !== 'undefined') { NET.on = false; NET.remote = null; }
 }
