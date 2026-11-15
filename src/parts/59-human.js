@@ -93,14 +93,15 @@ function patchHumanMat(m, rim, camo) {
   const C = m.userData.camoU = camo.map((c) => ({ value: new THREE.Color(c) }));
   m.userData.skinU = { value: new THREE.Color(pick(SKIN_TONES)) };
   m.userData.lampU = { value: new THREE.Color(0, 0, 0) };
-  m.userData.headTU = { value: mhHeadTex(0) }; m.userData.browU = { value: new THREE.Vector4(0.1, 0.07, 0.05, 0) };   // 寫實的頭：皮膚＋眼睛貼圖、眉毛顏色與第幾列   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
+  m.userData.headTU = { value: mhHeadTex(0) }; m.userData.headNU = { value: mhHeadTex(0, 1) }; m.userData.blinkU = { value: 0 }; m.userData.gazeU = { value: new THREE.Vector2() }; m.userData.browU = { value: new THREE.Vector4(0.1, 0.07, 0.05, 0) };   // 寫實的頭：皮膚＋眼睛貼圖、眉毛顏色與第幾列   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
+  const MH_AT = typeof MH_ATLAS !== 'undefined' ? MH_ATLAS : [640, 1344, 1088];
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; });
     sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU; sh.uniforms.uLampH = m.userData.lampU; sh.uniforms.uFl = LIGHT_U.uFl;
-    sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH }; sh.uniforms.uHeadT = m.userData.headTU; sh.uniforms.uBrow = m.userData.browU; sh.uniforms.uBrowT = { value: mhBrowTex() };
-    sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nattribute vec2 aUvH;\nvarying vec2 vUvH;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM; vUvH = aUvH;')
+    sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH }; sh.uniforms.uHeadT = m.userData.headTU; sh.uniforms.uHeadN = m.userData.headNU; sh.uniforms.uBlink = m.userData.blinkU; sh.uniforms.uGaze = m.userData.gazeU; sh.uniforms.uBrow = m.userData.browU; sh.uniforms.uBrowT = { value: mhBrowTex() };
+    sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nattribute vec2 aUvH;\nattribute vec3 aBlink;\nuniform float uBlink;\nvarying vec2 vUvH;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += aBlink * uBlink;\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM; vUvH = aUvH;')
       .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvHw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uBrowT; uniform vec4 uBrow;
+    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
 varying vec2 vUvH; varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw; varying vec2 vRM;
 ${FL_GLSL}
 // 布料凹凸：織紋（細）＋皺褶（沿著四肢的橫向褶子、關節處多）
@@ -120,7 +121,7 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       .replace('#include <color_fragment>', `#include <color_fragment>
   {
     vec3 base0 = diffuseColor.rgb;
-    vec3 headTx = texture2D(uHeadT, vUvH).rgb; vec2 bq = vec2(vRest.x / 0.14 + 0.5, (1.72 - vRest.y) / 0.035);   // 貼圖在條件式外面取樣（不然手機上會取到錯的解析度層）
+    vec3 headTx = texture2D(uHeadT, vUvH + step(4.5, vCamo) * uGaze / vec2(${MH_AT[0]}.0, ${MH_AT[1]}.0)).rgb; vec2 bq = vec2(vRest.x / 0.14 + 0.5, (1.72 - vRest.y) / 0.035);   // 貼圖在條件式外面取樣（不然手機上會取到錯的解析度層）
     float browTx = texture2D(uBrowT, vec2(clamp(bq.x, 0.0, 1.0), (uBrow.a + clamp(bq.y, 0.0, 1.0)) * 0.25)).r;
     vec3 w = abs(vRN); w /= (w.x + w.y + w.z + 1e-4);
     vec4 t = texture2D(uCamoT, vRest.zy * 2.9) * w.x + texture2D(uCamoT, vRest.xz * 2.9) * w.y + texture2D(uCamoT, vRest.xy * 2.9) * w.z;
@@ -156,12 +157,19 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x; if (vCamo > 1.5 && vCamo < 4.5) roughnessFactor *= 0.92 + 0.2 * texture2D(uCamoT, vRest.xy * 21.0 + vRest.z * 13.0).a;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRM.y;')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  { vec2 nuv = vec2(vUvH.x, vUvH.y * ${(MH_AT[1] / MH_AT[2]).toFixed(5)}); vec3 mapN = texture2D(uHeadN, nuv).xyz * 2.0 - 1.0;   // 寫實的頭：毛孔、鬍渣、皺紋的法線貼圖（沒有切線，用螢幕微分算）
+    if (vCamo > 2.5 && vCamo < 4.5 && nuv.y < 0.995) {
+      vec3 q0 = dFdx(-vViewPosition), q1 = dFdy(-vViewPosition); vec2 st0 = dFdx(nuv), st1 = dFdy(nuv);
+      vec3 q1p = cross(q1, normal), q0p = cross(normal, q0); vec3 Tn = q1p * st0.x + q0p * st1.x, Bn = q1p * st0.y + q0p * st1.y;
+      float dt2 = max(dot(Tn, Tn), dot(Bn, Bn)), sc = dt2 == 0.0 ? 0.0 : inversesqrt(dt2);
+      normal = normalize(Tn * (mapN.x * sc * 0.8) + Bn * (mapN.y * sc * 0.8) + normal * mapN.z);
+    } }
   { float cwN = clamp(vCamo, 0.0, 1.0) * (1.0 - step(1.5, vCamo)); if (cwN > 0.5 || vRM.x > 0.85) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0016);
     else if (vCamo > 1.5 && vCamo < 4.5) { vec3 aw = abs(vRN); aw /= (aw.x + aw.y + aw.z + 1e-4); vec3 sp = vRest * 34.0;
       float ph = texture2D(uCamoT, sp.zy).a * aw.x + texture2D(uCamoT, sp.xz).a * aw.y + texture2D(uCamoT, sp.xy).a * aw.z;
       float hmN = clamp(1.0 - abs(vCamo - 3.5) * 2.5, 0.0, 1.0), lipN = smoothstep(3.6, 4.0, vCamo);
       ph += hmN * texture2D(uCamoT, vRest.xy * 47.0 + vRest.zz * 31.0).a * 4.0;   // 髮根的顆粒
-      normal = bumpN(normal, -vViewPosition, ph, 0.00016); }   // 皮膚毛孔
+      normal = bumpN(normal, -vViewPosition, ph, vCamo > 2.5 ? 0.00005 : 0.00016); }   // 皮膚毛孔
     else if (vRM.x > 0.7 && vRM.y < 0.5) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0009); }   // 尼龍裝備的織紋`)
       .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26 * smoothstep(1.5, 5.0, -vViewPosition.z);   // 邊緣光：貼近看時淡掉（近看才不會每個邊都一圈白）
 if (vCamo > 4.5) { vec3 eR = reflect(-normalize(vViewPosition), normalize(normal));   // 眼球：角膜上的反光點（一大一小），眼睛才有神
@@ -170,7 +178,7 @@ if (vCamo > 1.5 && vCamo < 4.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.
 outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human13'; return m;
+  m.customProgramCacheKey = () => 'human15'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();
@@ -230,10 +238,10 @@ function hCyl(r, h, x, y, z, color, bone, rx = 0, rz = 0, seg = 10) {
 }
 // 寫實的頭（58-heads，MakeHuman 資料）：解開成一個零件，帶自己的頂點顏色、種類、頭／脖子兩根骨頭的權重
 const MH_CACHE = {}, MH_TEX = {};
-function mhHeadTex(fi) {
-  if (typeof MH_HEADS === 'undefined') return null; const H = MH_HEADS[fi % MH_HEADS.length];
-  if (!MH_TEX[H.name]) { const t = new THREE.TextureLoader().load(H.tex); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 4; MH_TEX[H.name] = t; }
-  return MH_TEX[H.name];
+function mhHeadTex(fi, nrm) {
+  if (typeof MH_HEADS === 'undefined') return null; const H = MH_HEADS[fi % MH_HEADS.length], k = H.name + (nrm ? 'n' : '');
+  if (!MH_TEX[k]) { const t = new THREE.TextureLoader().load(nrm ? H.ntex : H.tex); t.colorSpace = nrm ? THREE.NoColorSpace : THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 4; MH_TEX[k] = t; }
+  return MH_TEX[k];
 }
 function mhBrowTex() {
   if (!MH_TEX.brow) { const t = new THREE.TextureLoader().load(MH_BROW_TEX); t.colorSpace = THREE.NoColorSpace; t.flipY = false; t.anisotropy = 4; MH_TEX.brow = t; }
@@ -244,14 +252,14 @@ function mhHeadPart(fi) {
   if (!MH_CACHE[H.name]) {
     const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
     const p = b64(H.p, Uint16Array), n = b64(H.nrm, Uint8Array), c = b64(H.c, Uint8Array), k = b64(H.k, Uint8Array), wn = b64(H.wn, Uint8Array), tri = b64(H.tri || MH_HEADS[0].tri, Uint16Array);
-    const uvq = b64(MH_HEAD_UV, Uint16Array), uv = new Float32Array(tri.length * 2);
+    const uvq = b64(MH_HEAD_UV, Uint16Array), uv = new Float32Array(tri.length * 2), blq = b64(H.bl, Uint8Array), bl = new Float32Array(tri.length * 3);
     const N = tri.length, pos = new Float32Array(N * 3), nrm = new Float32Array(N * 3), col = new Float32Array(N * 3), kind = new Float32Array(N), w = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       const v = tri[i];
       for (let a = 0; a < 3; a++) { pos[i * 3 + a] = p[v * 3 + a] / 65535 * 0.4 - 0.2 + (a === 1 ? 1.65 : 0); nrm[i * 3 + a] = n[v * 3 + a] / 255 * 2 - 1; col[i * 3 + a] = c[v * 3 + a] / 255; }
-      kind[i] = k[v] / 10; w[i] = wn[v] / 255; uv[i * 2] = uvq[v * 2] / 65535; uv[i * 2 + 1] = uvq[v * 2 + 1] / 65535;
+      kind[i] = k[v] / 10; w[i] = wn[v] / 255; uv[i * 2] = uvq[v * 2] / 65535; uv[i * 2 + 1] = uvq[v * 2 + 1] / 65535; for (let a = 0; a < 3; a++) { const q = blq[v * 3 + a]; bl[i * 3 + a] = Math.abs(q - 127.5) < 1 ? 0 : q / 255 * 0.04 - 0.02; }
     }
-    MH_CACHE[H.name] = { pos, nrm, col, kind, w, uv };
+    MH_CACHE[H.name] = { pos, nrm, col, kind, w, uv, bl };
   }
   const D = MH_CACHE[H.name], g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(D.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(D.nrm, 3));
@@ -259,7 +267,7 @@ function mhHeadPart(fi) {
   return g;
 }
 function mergeSkinned(parts) {
-  const P = [], N = [], C = [], SI = [], SW = [], CA = [], RM = [], UVH = [], c = new THREE.Color();
+  const P = [], N = [], C = [], SI = [], SW = [], CA = [], RM = [], UVH = [], BLK = [], c = new THREE.Color();
   for (const p0 of parts) {
     const pr = p0.parameters; if (HLOD && pr && pr.depth !== undefined && Math.max(pr.width, pr.height, pr.depth) < 0.05) continue;   // 遠處看不到的小零件
     const g = p0.index ? p0.toNonIndexed() : p0; c.set(p0.userData.color || '#ffffff');
@@ -268,7 +276,7 @@ function mergeSkinned(parts) {
     if (raw) {   // 寫實的頭：顏色、種類、權重都是每個頂點自己的
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(raw.col[i], raw.col[i + 1], raw.col[i + 2]);
-        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); RM.push(raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
+        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); BLK.push(raw.bl[i], raw.bl[i + 1], raw.bl[i + 2]); RM.push(raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
       }
       continue;
     }
@@ -277,12 +285,12 @@ function mergeSkinned(parts) {
     for (let i = 0; i < pa.length; i += 3) {
       const ao = 1 - Math.max(0, -na[i + 1]) * 0.28 - (pa[i + 1] < 0.3 ? 0.06 : 0);   // 朝下的面、腳邊比較暗（接觸陰影）
       P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(c.r * ao, c.g * ao, c.b * ao);
-      SI.push(bn, 0, 0, 0); SW.push(1, 0, 0, 0); CA.push(cm); RM.push(rm[0], rm[1]); UVH.push(0, 0);
+      SI.push(bn, 0, 0, 0); SW.push(1, 0, 0, 0); CA.push(cm); RM.push(rm[0], rm[1]); UVH.push(0, 0); BLK.push(0, 0, 0);
     }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('aCamo', new THREE.Float32BufferAttribute(CA, 1)); g.setAttribute('aRM', new THREE.Float32BufferAttribute(RM, 2)); g.setAttribute('aUvH', new THREE.Float32BufferAttribute(UVH, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('aCamo', new THREE.Float32BufferAttribute(CA, 1)); g.setAttribute('aRM', new THREE.Float32BufferAttribute(RM, 2)); g.setAttribute('aUvH', new THREE.Float32BufferAttribute(UVH, 2)); g.setAttribute('aBlink', new THREE.Float32BufferAttribute(BLK, 3));
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(SI, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(SW, 4));
   g.computeBoundingSphere(); g.boundingSphere.radius = 1.6; g.boundingSphere.center.set(0, 0.9, 0);   // 倒地、彎腰時也不會被誤裁掉
   return g;
@@ -463,7 +471,7 @@ function makeHuman(team, look = 'grunt') {
     if (HB_PARENT[i] >= 0) bones[HB_PARENT[i]].add(bn);
   });
   const face = HUMAN_SEQ++ % MH_HEADS.length; mat.userData.skinU.value.set(MH_HEADS[face].tone);
-  mat.userData.headTU.value = mhHeadTex(face); { const bc = new THREE.Color(MH_HEADS[face].brow); mat.userData.browU.value.set(bc.r, bc.g, bc.b, face % MH_HEADS.length); }
+  mat.userData.headTU.value = mhHeadTex(face); mat.userData.headNU.value = mhHeadTex(face, 1); { const bc = new THREE.Color(MH_HEADS[face].brow); mat.userData.browU.value.set(bc.r, bc.g, bc.b, face % MH_HEADS.length); }
   const mesh = new THREE.SkinnedMesh(humanGeo(team, look, 0, face), mat);
   mesh.add(bones[0]); mesh.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(bones));
@@ -533,6 +541,16 @@ function humanPose(b, dt) {
   // 遠近換模型：22 公尺外用簡化版（三角形少一半多）
   const lod = d2 > 22 * 22 ? 1 : 0;
   if (b.hm.lod !== lod) { b.hm.lod = lod; b.hm.mesh.geometry = humanGeo(b.baseTeam, b.hm.look, lod, b.hm.face); }
+  if (!lod) {   // 眨眼（每 2.5–6 秒一次、約 0.17 秒）、眼球小幅掃視；倒地後半閉
+    const E = b.hm.eye || (b.hm.eye = { t: 1 + Math.random() * 4, b: -1, g: 0.5, gx: 0, gy: 0 }), U = b.hm.mat.userData;
+    if (!b.alive) U.blinkU.value += (0.8 - U.blinkU.value) * Math.min(1, dt * 4);
+    else {
+      if (E.b >= 0) { E.b += dt; const k = E.b < 0.06 ? E.b / 0.06 : 1 - (E.b - 0.06) / 0.11; U.blinkU.value = Math.max(0, k) * 1.05; if (E.b > 0.17) { E.b = -1; U.blinkU.value = 0; } }
+      else if ((E.t -= dt) <= 0) { E.t = 2.5 + Math.random() * 3.5; E.b = 0; }
+      if ((E.g -= dt) <= 0) { E.g = 0.5 + Math.random() * 1.8; E.gx = (Math.random() - 0.5) * 14; E.gy = (Math.random() - 0.5) * 6; }
+      U.gazeU.value.x += (E.gx - U.gazeU.value.x) * Math.min(1, dt * 22); U.gazeU.value.y += (E.gy - U.gazeU.value.y) * Math.min(1, dt * 22);
+    }
+  }
   for (const k in H) hSpring(H[k], 0, dt);
   if (b.alive === false && b.lastYaw !== undefined) b.lastYaw = undefined;
   // 共用：重設
