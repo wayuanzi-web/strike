@@ -17,7 +17,7 @@ async def main():
         # 2 雙手握槍：右手、左手骨頭的位置離槍上的握點 12 公分內
         r = await ev("""(bi) => { const s = window.__strike, b = s.bots[bi], V = s.player.body.pos.constructor; b.g.updateMatrixWorld(true);
           const hr = b.hm.bones[15].getWorldPosition(new V()), hl = b.hm.bones[12].getWorldPosition(new V());
-          const gr = b.gunM.localToWorld(new V(0.16, 1.27, -0.43)), gl = b.gunM.localToWorld(new V(0.16, 1.33, -0.64));
+          const ht = s.HAND_T[b.wpn && b.wpn.vm || 'rifle'], gr = b.gunM.localToWorld(new V(...ht[0])), gl = b.gunM.localToWorld(new V(...ht[1]));
           return [+hr.distanceTo(gr).toFixed(3), +hl.distanceTo(gl).toFixed(3)]; }""", bi)
         ok('2 兩隻手握在槍上（握把、護木）', r[0] < 0.12 and r[1] < 0.12, r)
         # 3 中彈反應：身體被推、往後踉蹌
