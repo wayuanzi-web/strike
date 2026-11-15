@@ -246,7 +246,7 @@ function updateSpring(dt) {
 const _o = new V3(), _d = new V3(), _hit = new V3(), _mz = new V3();
 const _pel = new Map();
 function shoot() {
-  W.ammo--; W.since = 0; W.idx = Math.min(29, W.idx + 1); W.shots++;
+  W.ammo--; W.since = 0; W.idx = Math.min(29, W.idx + 1); W.shots++; W.heat = Math.min(20, (W.heat || 0) + 1);
   const spreadDeg = currentSpread(), n = WP.pellets || 1;
   W.bloom = Math.min(WP.bloomMax, W.bloom + WP.bloomAdd);
   eyePos(_o); muzzleWorld(_mz); _pel.clear();
@@ -315,6 +315,33 @@ function muzzleWorld(out) {
   gunRig.updateMatrixWorld(true); camera.updateMatrixWorld();
   const m = gun.localToWorld(_v3.copy(gun.userData.muzzle)).project(vmCam);
   return out.set(m.x, m.y, 0.5).unproject(camera).sub(camera.position).normalize().multiplyScalar(1.2).add(camera.position);
+}
+
+// ---------- 槍管冒煙：連續開火後，槍口飄出細細的白煙（手上槍的場景裡） ----------
+// 每發 +1 熱度、每秒退 0.7；熱度超過 4 才開始冒，停火後慢慢變淡
+const BSMOKE = [];
+for (let i = 0; i < 14; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false, color: 0xb8b4ae })); sp.visible = false; vmScene.add(sp); BSMOKE.push({ sp, life: 0, max: 1, vx: 0, vy: 0, vz: 0, a: 0 }); }
+let bsI = 0, bsT = 0;
+const _bsP = new V3();
+function updateBarrelSmoke(dt, lookDX) {
+  W.heat = Math.max(0, (W.heat || 0) - dt * 0.7);
+  const k = clamp((W.heat - 4) / 10, 0, 1) * clamp((W.since - 0.08) / 0.3, 0, 1);
+  bsT -= dt;
+  if (k > 0.02 && bsT <= 0 && gun && gun.visible && !(WP.scope && player.adsT > 0.5) && !W.reloadT) {
+    bsT = 0.07;
+    gunRig.updateMatrixWorld(true); gun.localToWorld(_bsP.copy(gun.userData.muzzle));
+    const q = BSMOKE[bsI++ % BSMOKE.length];
+    q.sp.position.copy(_bsP); q.life = q.max = rand(0.9, 1.4); q.a = 0.5 * k; q.vx = rand(-0.01, 0.01); q.vy = rand(0.09, 0.15); q.vz = rand(-0.01, 0.01); q.sp.visible = true;
+  }
+  for (const q of BSMOKE) {
+    if (!q.sp.visible) continue;
+    q.life -= dt; if (q.life <= 0) { q.sp.visible = false; continue; }
+    const t = 1 - q.life / q.max;
+    // 往上飄、轉視角時往反方向拖（煙留在空氣裡，槍轉走了）
+    q.sp.position.x += (q.vx + Math.sin(t * 9 + q.max * 7) * 0.012) * dt - (lookDX || 0) * 0.0015;
+    q.sp.position.y += q.vy * dt; q.sp.position.z += q.vz * dt;
+    const sc = 0.018 + t * 0.07; q.sp.scale.set(sc, sc, 1); q.sp.material.opacity = q.a * Math.sin(Math.PI * Math.min(1, t * 1.6 + 0.05)) * (1 - t);
+  }
 }
 
 // ---------- 拋殼：黃銅小方塊從機匣右側彈出去（手上槍的場景裡） ----------
