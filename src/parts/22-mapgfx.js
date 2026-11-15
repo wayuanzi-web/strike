@@ -8,13 +8,13 @@ const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'co
   house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'glass', lampw: 'lamp', lampc: 'lamp', roof: 'brick', door: 'wood',
   awn1: 'plaster', awn2: 'plaster', water: 'floor', clock: 'plaster', sill: 'concrete',
   // 鐵道：碎石地、車廂、鐵軌、枕木
-  gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
+  cone: 'floor', sign: 'floor', gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
   wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
   house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#2c3846', lampw: '#ffe2b0', lampc: '#e4f0ff', roof: '#b0573a', door: '#6b4a32',
   awn1: '#c8423a', awn2: '#f0e8d8', water: '#4f8fa8', clock: '#f2ede2', sill: '#d8d0c0',
-  gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
+  cone: '#e2582a', sign: '#e8c23a', gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
 };
 
 // 每張地圖都有的：依方塊顏色自動加的裝飾（貨櫃凸條、牆頂壓條、外牆壁柱、房子窗戶與屋簷、車廂細節）
@@ -62,6 +62,32 @@ function wallProps(b) {
   const P = (c0, c1, d0, d1, h0, h1, col) => { const q0 = pl + sg * d0, q1 = pl + sg * d1;
     if (ax === 2) D(c0, q0, c1, q1, h0, h1, col); else D(q0, c0, q1, c1, h0, h1, col); };
   P(a0, a1, -0.06, 0.05, 0, 0.32, 'trim');                     // 勒腳
+  // 牆頂刮刀刺網：短立柱（往裡斜的那段用小方塊階梯模擬）＋三條鐵絲
+  if (MAP.id !== 'market') {
+    for (let c = a0 + 1.5; c < a1; c += 4) P(c - 0.02, c + 0.02, 0.0, 0.05, y1 + 0.1, y1 + 0.6, 'dark');
+    for (const [d, h] of [[0.02, y1 + 0.25], [0.03, y1 + 0.42], [0.08, y1 + 0.57]]) P(a0, a1, d, d + 0.012, h, h + 0.012, 'rail');
+  }
+  // 地上的雜物：棧板堆、交通錐；貼著牆、腳邊空著才放（裝飾不擋人，所以只放牆邊不擋路的地方）
+  const free = (c0, c1, d0, d1, h) => { const q0 = pl + sg * d0, q1 = pl + sg * d1, lo = [ax === 2 ? c0 : Math.min(q0, q1), 0, ax === 2 ? Math.min(q0, q1) : c0], hi = [ax === 2 ? c1 : Math.max(q0, q1), h, ax === 2 ? Math.max(q0, q1) : c1];
+    for (const o of BOXES) if (o !== b && o.min[0] < hi[0] + 0.1 && o.max[0] > lo[0] - 0.1 && o.min[2] < hi[2] + 0.1 && o.max[2] > lo[2] - 0.1 && o.min[1] < hi[1] && o.max[1] > 0.02) return false; return true; };
+  for (let c = (ax === 2 ? -33 : -21) + 3; c < a1 - 2; c += 6) {
+    const r = hash1(Math.round(c * 17 + pl * 11 + 3)), r2 = hash1(Math.round(c * 5 - pl * 13));
+    if (r < 0.35) {                                             // 棧板堆 1–4 層（1.2×0.8）
+      const n = 1 + Math.floor(r2 * 4), m = c + 0.3, H = n * 0.144;
+      if (!free(m - 0.62, m + 0.62, 0.15, 1.0, H)) continue;
+      for (let i = 0; i < n; i++) { const y = i * 0.144;
+        for (const t of [-0.5, 0, 0.5]) P(m + t - 0.05, m + t + 0.05, 0.18, 0.98, y, y + 0.1, 'stall');
+        for (const j of i === n - 1 ? [0, 2, 4] : [0, 4]) { const d = 0.2 + j * 0.185; P(m - 0.6, m + 0.6, d - 0.05, d + 0.05, y + 0.1, y + 0.122, 'crate'); }
+        if (i === n - 1) for (let j = 0; j < 5; j++) { const t = -0.54 + j * 0.27; P(m + t - 0.045, m + t + 0.045, 0.18, 0.98, y + 0.122, y + 0.144, 'crate'); } }
+    } else if (r < 0.55) {                                      // 交通錐兩三個（底座＋四段收窄＋白色反光帶）
+      for (let i = 0, n = 2 + (r2 > 0.5 ? 1 : 0); i < n; i++) { const m = c - 0.4 + i * 0.55, d = 0.35 + (i % 2) * 0.25, e = (w, h0, h1, col) => P(m - w, m + w, d - w, d + w, h0, h1, col);
+        if (!free(m - 0.2, m + 0.2, d - 0.2, d + 0.2, 0.7)) continue;
+        e(0.18, 0, 0.03, 'hazard'); e(0.12, 0.03, 0.2, 'cone'); e(0.095, 0.2, 0.3, 'awn2'); e(0.075, 0.3, 0.45, 'cone'); e(0.055, 0.45, 0.52, 'awn2'); e(0.035, 0.52, 0.66, 'cone'); }
+    } else if (r < 0.8) {                                       // 牆上的警示牌（黃底黑框）
+      const m = c + (r2 - 0.5);
+      P(m - 0.24, m + 0.24, 0, 0.015, 1.5, 1.95, 'hazard'); P(m - 0.21, m + 0.21, 0.015, 0.022, 1.53, 1.92, 'sign'); P(m - 0.05, m + 0.05, 0.022, 0.026, 1.6, 1.82, 'hazard'); P(m - 0.12, m + 0.12, 0.022, 0.026, 1.58, 1.61, 'hazard');
+    }
+  }
   const first = ax === 2 ? -30 : -18;
   for (let c = first; c < a1 - 3; c += 6) {
     const r = hash1(Math.round(c * 13 + pl * 7)), r2 = hash1(Math.round(c * 31 - pl * 5));

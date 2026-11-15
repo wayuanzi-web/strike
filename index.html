@@ -617,7 +617,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261115-1845';   // 建置時換成日期時間
+const BUILD = '20261115-2030';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -1063,13 +1063,13 @@ const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'co
   house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'glass', lampw: 'lamp', lampc: 'lamp', roof: 'brick', door: 'wood',
   awn1: 'plaster', awn2: 'plaster', water: 'floor', clock: 'plaster', sill: 'concrete',
   // 鐵道：碎石地、車廂、鐵軌、枕木
-  gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
+  cone: 'floor', sign: 'floor', gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
   wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
   house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#2c3846', lampw: '#ffe2b0', lampc: '#e4f0ff', roof: '#b0573a', door: '#6b4a32',
   awn1: '#c8423a', awn2: '#f0e8d8', water: '#4f8fa8', clock: '#f2ede2', sill: '#d8d0c0',
-  gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
+  cone: '#e2582a', sign: '#e8c23a', gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
 };
 
 // 每張地圖都有的：依方塊顏色自動加的裝飾（貨櫃凸條、牆頂壓條、外牆壁柱、房子窗戶與屋簷、車廂細節）
@@ -1117,6 +1117,32 @@ function wallProps(b) {
   const P = (c0, c1, d0, d1, h0, h1, col) => { const q0 = pl + sg * d0, q1 = pl + sg * d1;
     if (ax === 2) D(c0, q0, c1, q1, h0, h1, col); else D(q0, c0, q1, c1, h0, h1, col); };
   P(a0, a1, -0.06, 0.05, 0, 0.32, 'trim');                     // 勒腳
+  // 牆頂刮刀刺網：短立柱（往裡斜的那段用小方塊階梯模擬）＋三條鐵絲
+  if (MAP.id !== 'market') {
+    for (let c = a0 + 1.5; c < a1; c += 4) P(c - 0.02, c + 0.02, 0.0, 0.05, y1 + 0.1, y1 + 0.6, 'dark');
+    for (const [d, h] of [[0.02, y1 + 0.25], [0.03, y1 + 0.42], [0.08, y1 + 0.57]]) P(a0, a1, d, d + 0.012, h, h + 0.012, 'rail');
+  }
+  // 地上的雜物：棧板堆、交通錐；貼著牆、腳邊空著才放（裝飾不擋人，所以只放牆邊不擋路的地方）
+  const free = (c0, c1, d0, d1, h) => { const q0 = pl + sg * d0, q1 = pl + sg * d1, lo = [ax === 2 ? c0 : Math.min(q0, q1), 0, ax === 2 ? Math.min(q0, q1) : c0], hi = [ax === 2 ? c1 : Math.max(q0, q1), h, ax === 2 ? Math.max(q0, q1) : c1];
+    for (const o of BOXES) if (o !== b && o.min[0] < hi[0] + 0.1 && o.max[0] > lo[0] - 0.1 && o.min[2] < hi[2] + 0.1 && o.max[2] > lo[2] - 0.1 && o.min[1] < hi[1] && o.max[1] > 0.02) return false; return true; };
+  for (let c = (ax === 2 ? -33 : -21) + 3; c < a1 - 2; c += 6) {
+    const r = hash1(Math.round(c * 17 + pl * 11 + 3)), r2 = hash1(Math.round(c * 5 - pl * 13));
+    if (r < 0.35) {                                             // 棧板堆 1–4 層（1.2×0.8）
+      const n = 1 + Math.floor(r2 * 4), m = c + 0.3, H = n * 0.144;
+      if (!free(m - 0.62, m + 0.62, 0.15, 1.0, H)) continue;
+      for (let i = 0; i < n; i++) { const y = i * 0.144;
+        for (const t of [-0.5, 0, 0.5]) P(m + t - 0.05, m + t + 0.05, 0.18, 0.98, y, y + 0.1, 'stall');
+        for (const j of i === n - 1 ? [0, 2, 4] : [0, 4]) { const d = 0.2 + j * 0.185; P(m - 0.6, m + 0.6, d - 0.05, d + 0.05, y + 0.1, y + 0.122, 'crate'); }
+        if (i === n - 1) for (let j = 0; j < 5; j++) { const t = -0.54 + j * 0.27; P(m + t - 0.045, m + t + 0.045, 0.18, 0.98, y + 0.122, y + 0.144, 'crate'); } }
+    } else if (r < 0.55) {                                      // 交通錐兩三個（底座＋四段收窄＋白色反光帶）
+      for (let i = 0, n = 2 + (r2 > 0.5 ? 1 : 0); i < n; i++) { const m = c - 0.4 + i * 0.55, d = 0.35 + (i % 2) * 0.25, e = (w, h0, h1, col) => P(m - w, m + w, d - w, d + w, h0, h1, col);
+        if (!free(m - 0.2, m + 0.2, d - 0.2, d + 0.2, 0.7)) continue;
+        e(0.18, 0, 0.03, 'hazard'); e(0.12, 0.03, 0.2, 'cone'); e(0.095, 0.2, 0.3, 'awn2'); e(0.075, 0.3, 0.45, 'cone'); e(0.055, 0.45, 0.52, 'awn2'); e(0.035, 0.52, 0.66, 'cone'); }
+    } else if (r < 0.8) {                                       // 牆上的警示牌（黃底黑框）
+      const m = c + (r2 - 0.5);
+      P(m - 0.24, m + 0.24, 0, 0.015, 1.5, 1.95, 'hazard'); P(m - 0.21, m + 0.21, 0.015, 0.022, 1.53, 1.92, 'sign'); P(m - 0.05, m + 0.05, 0.022, 0.026, 1.6, 1.82, 'hazard'); P(m - 0.12, m + 0.12, 0.022, 0.026, 1.58, 1.61, 'hazard');
+    }
+  }
   const first = ax === 2 ? -30 : -18;
   for (let c = first; c < a1 - 3; c += 6) {
     const r = hash1(Math.round(c * 13 + pl * 7)), r2 = hash1(Math.round(c * 31 - pl * 5));
@@ -3243,7 +3269,7 @@ function updateShells(dt) {
 }
 
 // ---------- 手上的槍動畫：走路晃、跑步下沉、轉向甩、開火後座、落地下沉、出槍、換彈 ----------
-const VM = { bobT: 0, swayX: 0, swayY: 0, landY: 0, landV: 0 };
+const VM = { bobT: 0, swayX: 0, swayY: 0, swVX: 0, swVY: 0, landY: 0, landV: 0, latV: 0, fwdV: 0, sprint: 0, breath: 0 };
 const HIP = new V3(0.2, -0.205, -0.46), ADS = new V3(0, -0.078, -0.3);
 // 各武器拿的位置（腰射、開鏡）
 const VM_POS = {
@@ -3254,19 +3280,33 @@ const VM_POS = {
 VM_POS.flash = VM_POS.smoke = VM_POS.molotov = VM_POS.he; VM_POS.carbine = VM_POS.rifle; VM_POS.deagle = VM_POS.pistol;
 function viewmodelLand(v) { VM.landV -= Math.min(0.5, v * 0.04); }
 function updateViewmodel(dt, lookDX, lookDY) {
-  const sp = playerSpeed(), moving = player.body.onGround ? Math.min(1, sp / RUN_SPEED) : 0;
-  VM.bobT += dt * (5 + sp * 1.2) * (moving > 0.05 ? 1 : 0);
-  VM.swayX = lerp(VM.swayX, clamp(-lookDX * 0.003, -0.04, 0.04), 1 - Math.exp(-8 * dt));
-  VM.swayY = lerp(VM.swayY, clamp(lookDY * 0.003, -0.035, 0.035), 1 - Math.exp(-8 * dt));
+  const sp = playerSpeed(), og = player.body.onGround, moving = og ? Math.min(1, sp / RUN_SPEED) : 0;
+  // 擺動跟腳步同步：每一步（0.34×跑速/速度 秒）槍沉一次，左右兩步畫一個 8 字
+  if (moving > 0.05) VM.bobT += dt * Math.PI * sp / (0.34 * RUN_SPEED);
+  // 轉視角的慣性：彈簧（會稍微甩過頭再回來），不是單純跟隨
+  const tx = clamp(-lookDX * 0.003, -0.045, 0.045), ty = clamp(lookDY * 0.003, -0.04, 0.04);
+  VM.swVX += ((tx - VM.swayX) * 160 - VM.swVX * 17) * dt; VM.swayX += VM.swVX * dt;
+  VM.swVY += ((ty - VM.swayY) * 160 - VM.swVY * 17) * dt; VM.swayY += VM.swVY * dt;
+  // 身體移動的慣性：往右走槍落後到左邊、往前走槍稍微往後
+  const v = player.body.vel, cy = Math.cos(player.yaw), sy = Math.sin(player.yaw);
+  const lat = (v.x * cy - v.z * sy) / RUN_SPEED, fwd = (-v.x * sy - v.z * cy) / RUN_SPEED, fk = 1 - Math.exp(-7 * dt);
+  VM.latV = lerp(VM.latV, og ? lat : lat * 0.5, fk); VM.fwdV = lerp(VM.fwdV, og ? fwd : 0, fk);
+  // 全速往前跑、沒在開槍：槍斜拿往下（戰術跑）
+  const wantSprint = moving > 0.92 && fwd > 0.8 && player.adsT < 0.05 && W.since > 0.45 && !W.reloadT && !W.isNade && !player.crouch;
+  VM.sprint = lerp(VM.sprint, wantSprint ? 1 : 0, 1 - Math.exp(-(wantSprint ? 6 : 14) * dt));
+  VM.breath += dt * 1.7;
   VM.landV += (-180 * VM.landY - 22 * VM.landV) * dt; VM.landY += VM.landV * dt;
-  const k = player.adsT, bobA = moving * (1 - k * 0.8);
+  const k = player.adsT, bobA = moving * (1 - k * 0.85), sk = VM.sprint * (1 - k), ik = (1 - moving) * (1 - k * 0.7);
   const vp = VM_POS[W.isNade ? INV.nade : WP.vm] || VM_POS.rifle;
   gunRig.position.lerpVectors(vp[0], vp[1], k);
-  gunRig.position.x += Math.sin(VM.bobT) * 0.012 * bobA + VM.swayX * (1 - k) * 0.6;
-  gunRig.position.y += -Math.abs(Math.cos(VM.bobT)) * 0.012 * bobA + VM.swayY * (1 - k) * 0.4 - (player.body.onGround ? 0 : 0.02)
-    - 0.015 * moving * (1 - k) + VM.landY * (1 - k * 0.7);
-  gunRig.position.z += W.kick * lerp(0.04, 0.02, k);
-  gunRig.rotation.set(W.kick * lerp(0.06, 0.02, k) + VM.swayY, VM.swayX * 1.5, W.roll);
+  const bs = Math.sin(VM.bobT), bc = Math.cos(VM.bobT), dip = Math.abs(bc);
+  gunRig.position.x += bs * 0.013 * bobA + VM.swayX * (1 - k) * 0.6 - VM.latV * 0.022 * (1 - k * 0.8) + sk * 0.03;
+  gunRig.position.y += (-dip * dip * 0.016 + 0.004) * bobA + VM.swayY * (1 - k) * 0.4 - (og ? 0 : 0.02)
+    - 0.012 * moving * (1 - k) + VM.landY * (1 - k * 0.7) + Math.sin(VM.breath) * 0.0018 * ik - sk * 0.05;
+  gunRig.position.z += W.kick * lerp(0.04, 0.02, k) + VM.fwdV * 0.012 * (1 - k) + sk * 0.02;
+  gunRig.rotation.set(W.kick * lerp(0.06, 0.02, k) + VM.swayY + Math.sin(VM.breath * 0.5) * 0.004 * ik - sk * 0.24 - dip * 0.012 * bobA,
+    VM.swayX * 1.5 + bs * 0.01 * bobA + sk * 0.36,
+    W.roll + VM.latV * 0.06 * (1 - k * 0.8) + bs * 0.018 * bobA + sk * 0.3);
   // 出槍：從畫面下方抬起來
   if (W.deployT > 0) { const d = Math.min(1, W.deployT / 0.6); gunRig.position.y -= d * d * 0.25; gunRig.rotation.x -= d * d * 0.6; }
   // 換彈：槍往下歪、彈匣拔出再插回去

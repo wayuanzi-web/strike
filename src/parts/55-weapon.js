@@ -330,7 +330,7 @@ function updateShells(dt) {
 }
 
 // ---------- 手上的槍動畫：走路晃、跑步下沉、轉向甩、開火後座、落地下沉、出槍、換彈 ----------
-const VM = { bobT: 0, swayX: 0, swayY: 0, landY: 0, landV: 0 };
+const VM = { bobT: 0, swayX: 0, swayY: 0, swVX: 0, swVY: 0, landY: 0, landV: 0, latV: 0, fwdV: 0, sprint: 0, breath: 0 };
 const HIP = new V3(0.2, -0.205, -0.46), ADS = new V3(0, -0.078, -0.3);
 // 各武器拿的位置（腰射、開鏡）
 const VM_POS = {
@@ -341,19 +341,33 @@ const VM_POS = {
 VM_POS.flash = VM_POS.smoke = VM_POS.molotov = VM_POS.he; VM_POS.carbine = VM_POS.rifle; VM_POS.deagle = VM_POS.pistol;
 function viewmodelLand(v) { VM.landV -= Math.min(0.5, v * 0.04); }
 function updateViewmodel(dt, lookDX, lookDY) {
-  const sp = playerSpeed(), moving = player.body.onGround ? Math.min(1, sp / RUN_SPEED) : 0;
-  VM.bobT += dt * (5 + sp * 1.2) * (moving > 0.05 ? 1 : 0);
-  VM.swayX = lerp(VM.swayX, clamp(-lookDX * 0.003, -0.04, 0.04), 1 - Math.exp(-8 * dt));
-  VM.swayY = lerp(VM.swayY, clamp(lookDY * 0.003, -0.035, 0.035), 1 - Math.exp(-8 * dt));
+  const sp = playerSpeed(), og = player.body.onGround, moving = og ? Math.min(1, sp / RUN_SPEED) : 0;
+  // 擺動跟腳步同步：每一步（0.34×跑速/速度 秒）槍沉一次，左右兩步畫一個 8 字
+  if (moving > 0.05) VM.bobT += dt * Math.PI * sp / (0.34 * RUN_SPEED);
+  // 轉視角的慣性：彈簧（會稍微甩過頭再回來），不是單純跟隨
+  const tx = clamp(-lookDX * 0.003, -0.045, 0.045), ty = clamp(lookDY * 0.003, -0.04, 0.04);
+  VM.swVX += ((tx - VM.swayX) * 160 - VM.swVX * 17) * dt; VM.swayX += VM.swVX * dt;
+  VM.swVY += ((ty - VM.swayY) * 160 - VM.swVY * 17) * dt; VM.swayY += VM.swVY * dt;
+  // 身體移動的慣性：往右走槍落後到左邊、往前走槍稍微往後
+  const v = player.body.vel, cy = Math.cos(player.yaw), sy = Math.sin(player.yaw);
+  const lat = (v.x * cy - v.z * sy) / RUN_SPEED, fwd = (-v.x * sy - v.z * cy) / RUN_SPEED, fk = 1 - Math.exp(-7 * dt);
+  VM.latV = lerp(VM.latV, og ? lat : lat * 0.5, fk); VM.fwdV = lerp(VM.fwdV, og ? fwd : 0, fk);
+  // 全速往前跑、沒在開槍：槍斜拿往下（戰術跑）
+  const wantSprint = moving > 0.92 && fwd > 0.8 && player.adsT < 0.05 && W.since > 0.45 && !W.reloadT && !W.isNade && !player.crouch;
+  VM.sprint = lerp(VM.sprint, wantSprint ? 1 : 0, 1 - Math.exp(-(wantSprint ? 6 : 14) * dt));
+  VM.breath += dt * 1.7;
   VM.landV += (-180 * VM.landY - 22 * VM.landV) * dt; VM.landY += VM.landV * dt;
-  const k = player.adsT, bobA = moving * (1 - k * 0.8);
+  const k = player.adsT, bobA = moving * (1 - k * 0.85), sk = VM.sprint * (1 - k), ik = (1 - moving) * (1 - k * 0.7);
   const vp = VM_POS[W.isNade ? INV.nade : WP.vm] || VM_POS.rifle;
   gunRig.position.lerpVectors(vp[0], vp[1], k);
-  gunRig.position.x += Math.sin(VM.bobT) * 0.012 * bobA + VM.swayX * (1 - k) * 0.6;
-  gunRig.position.y += -Math.abs(Math.cos(VM.bobT)) * 0.012 * bobA + VM.swayY * (1 - k) * 0.4 - (player.body.onGround ? 0 : 0.02)
-    - 0.015 * moving * (1 - k) + VM.landY * (1 - k * 0.7);
-  gunRig.position.z += W.kick * lerp(0.04, 0.02, k);
-  gunRig.rotation.set(W.kick * lerp(0.06, 0.02, k) + VM.swayY, VM.swayX * 1.5, W.roll);
+  const bs = Math.sin(VM.bobT), bc = Math.cos(VM.bobT), dip = Math.abs(bc);
+  gunRig.position.x += bs * 0.013 * bobA + VM.swayX * (1 - k) * 0.6 - VM.latV * 0.022 * (1 - k * 0.8) + sk * 0.03;
+  gunRig.position.y += (-dip * dip * 0.016 + 0.004) * bobA + VM.swayY * (1 - k) * 0.4 - (og ? 0 : 0.02)
+    - 0.012 * moving * (1 - k) + VM.landY * (1 - k * 0.7) + Math.sin(VM.breath) * 0.0018 * ik - sk * 0.05;
+  gunRig.position.z += W.kick * lerp(0.04, 0.02, k) + VM.fwdV * 0.012 * (1 - k) + sk * 0.02;
+  gunRig.rotation.set(W.kick * lerp(0.06, 0.02, k) + VM.swayY + Math.sin(VM.breath * 0.5) * 0.004 * ik - sk * 0.24 - dip * 0.012 * bobA,
+    VM.swayX * 1.5 + bs * 0.01 * bobA + sk * 0.36,
+    W.roll + VM.latV * 0.06 * (1 - k * 0.8) + bs * 0.018 * bobA + sk * 0.3);
   // 出槍：從畫面下方抬起來
   if (W.deployT > 0) { const d = Math.min(1, W.deployT / 0.6); gunRig.position.y -= d * d * 0.25; gunRig.rotation.x -= d * d * 0.6; }
   // 換彈：槍往下歪、彈匣拔出再插回去
