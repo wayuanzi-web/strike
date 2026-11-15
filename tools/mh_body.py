@@ -131,10 +131,44 @@ kneew = GWu[:, [HB['kneeL'], HB['kneeR']]].sum(1); k = np.clip((0.31 - P[:, 1]) 
 P[:, 0] = ax + (P[:, 0] - ax) * (1 - 0.5 * k); P[:, 2] = 0.02 + (P[:, 2] - 0.02) * (1 - 0.5 * k)
 N = normals(P, T)
 o = np.argsort(-GWu, 1)[:, :2]; w0 = np.take_along_axis(GWu, o, 1); w0 = w0 / w0.sum(1, keepdims=True)
+kind = (np.clip(hand * 1.5, 0, 1) > 0.5).astype(int)          # 0＝衣服、1＝手套、2＝背心
+# ---- 背心：照軀幹的形狀外推 3 公分的殼，前後胸板壓成接近平面（硬的防彈板），邊緣往內收一圈 ----
+torso = GWu[:, HB['chest']] + GWu[:, HB['spine']]; arm = GWu[:, [HB['shL'], HB['shR']]].sum(1); ax_ = np.abs(P[:, 0])
+vm = (torso > 0.55) & (arm < 0.3) & (P[:, 1] > 1.12) & (((P[:, 1] < 1.44) & (ax_ < 0.2)) | ((P[:, 1] < 1.5) & (ax_ > 0.065) & (ax_ < 0.16)))
+vm &= ~((P[:, 1] > 1.39) & (ax_ < 0.065))                       # 領口
+VT_ = T[vm[T].all(1)]; vu = np.unique(VT_.ravel()); vmap = -np.ones(len(P), int); vmap[vu] = len(P) + np.arange(len(vu))
+Pv = P[vu] + N[vu] * 0.03
+fr = np.clip((-N[vu, 2] - 0.45) / 0.3, 0, 1) * (np.abs(Pv[:, 0]) < 0.15) * (Pv[:, 1] > 1.15) * (Pv[:, 1] < 1.45); Pv[:, 2] += (-0.16 - Pv[:, 2]) * 0.8 * fr
+bk = np.clip((N[vu, 2] - 0.45) / 0.3, 0, 1) * (np.abs(Pv[:, 0]) < 0.15) * (Pv[:, 1] > 1.15) * (Pv[:, 1] < 1.47); Pv[:, 2] += (0.13 - Pv[:, 2]) * 0.8 * bk
+# 邊緣：殼的邊界往身體收（接到身體表面外 4 毫米）
+from collections import Counter
+ec = Counter(); 
+for t in VT_:
+    for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])): ec[(min(a, b), max(a, b))] += 1
+bverts = sorted({v for e, c in ec.items() if c == 1 for v in e}); bmap = {v: len(P) + len(vu) + i for i, v in enumerate(bverts)}
+Pr = P[bverts] + N[bverts] * 0.004
+rimT = []
+for t in VT_:
+    for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+        if ec[(min(a, b), max(a, b))] == 1: rimT.append([vmap[a], bmap[a], vmap[b]]); rimT.append([vmap[b], bmap[a], bmap[b]])
+allv = np.concatenate([np.arange(len(P)), vu, np.array(bverts, int)])
+P = np.concatenate([P, Pv, Pr]); o = o[allv]; w0 = w0[allv]; kind = np.concatenate([kind, np.full(len(vu) + len(bverts), 2)])
+T = np.concatenate([T, vmap[VT_], np.array(rimT, int).reshape(-1, 3)]); N = normals(P, T)
+print('背心：頂點', len(vu), '邊緣', len(bverts), '三角形', len(VT_) + len(rimT))
 print('頂點', len(P), '三角形', len(T), '範圍', P.min(0).round(3), P.max(0).round(3))
 b64 = lambda a: base64.b64encode(a.tobytes()).decode()
 q16 = lambda A, lo, hi: np.clip(np.round((A - lo) / (hi - lo) * 65535), 0, 65535).astype(np.uint16)
-out = dict(n=len(P), p=b64(q16(P, -1.2, 2.2)), nrm=b64(np.clip(np.round((N + 1) * 127.5), 0, 255).astype(np.uint8)), bi=b64(o.astype(np.uint8)), bw=b64(np.round(w0[:, 0] * 255).astype(np.uint8)),
-           hand=b64(np.round(np.clip(hand * 1.5, 0, 1) * 255).astype(np.uint8)), tri=b64(T.astype(np.uint16)))
-js = '/* ===== 57-body：身體和手（tools/mh_body.py 用 MakeHuman 的 CC0 人體資料產生，不要手改）\n   位置（uint16，-1.2–2.2 公尺）、法線、兩根骨頭的索引與第一根的權重、是不是手、三角形索引 */\nconst MH_BODY = ' + json.dumps(out, separators=(',', ':')) + ';\n'
+def pack(P, N, o, w0, kind, T):
+    return dict(n=len(P), p=b64(q16(P, -1.2, 2.2)), nrm=b64(np.clip(np.round((N + 1) * 127.5), 0, 255).astype(np.uint8)), bi=b64(o.astype(np.uint8)), bw=b64(np.round(w0[:, 0] * 255).astype(np.uint8)),
+                kind=b64(kind.astype(np.uint8)), tri=b64(T.astype(np.uint16)))
+# ---- 遠處用的簡化版：把頂點併到 3.5 公分的格子裡（同一格、同種類、同一根主骨頭的併成一個） ----
+def cluster(cell):
+    key = np.concatenate([np.floor(P / cell).astype(int), kind[:, None], o[:, :1]], 1); _, first, inv = np.unique(key, axis=0, return_index=True, return_inverse=True); inv = inv.ravel()
+    Pc = np.zeros((len(first), 3)); cnt = np.zeros(len(first)); np.add.at(Pc, inv, P); np.add.at(cnt, inv, 1); Pc /= cnt[:, None]
+    Tc = inv[T]; Tc = Tc[(Tc[:, 0] != Tc[:, 1]) & (Tc[:, 1] != Tc[:, 2]) & (Tc[:, 0] != Tc[:, 2])]
+    _, ui = np.unique(np.sort(Tc, 1), axis=0, return_index=True); Tc = Tc[np.sort(ui)]
+    return Pc, normals(Pc, Tc), o[first], w0[first], kind[first], Tc
+L = cluster(0.06); print('簡化版：頂點', len(L[0]), '三角形', len(L[5]))
+js = ('/* ===== 57-body：身體、手、背心（tools/mh_body.py 用 MakeHuman 的 CC0 人體資料產生，不要手改）\n   位置（uint16，-1.2–2.2 公尺）、法線、兩根骨頭的索引與第一根的權重、種類（0 衣服、1 手套、2 背心）、三角形索引；MH_BODY_L 是遠處用的簡化版 */\n'
+      'const MH_BODY = ' + json.dumps(pack(P, N, o, w0, kind, T), separators=(',', ':')) + ';\nconst MH_BODY_L = ' + json.dumps(pack(*L), separators=(',', ':')) + ';\n')
 open(OUT, 'w').write(js); print('寫出', OUT, round(len(js) / 1024), 'KB')

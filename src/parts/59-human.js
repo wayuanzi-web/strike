@@ -306,20 +306,21 @@ function mhHeadPart(fi) {
   return g;
 }
 // 身體和手（57-body，MakeHuman 資料）：衣服直接用身體的形狀（已經外推一點），手是手套
-let MH_BODY_C = null;
-function mhBodyPart(glove) {
-  if (!MH_BODY_C) {
+const MH_BODY_C = {};
+function mhBodyPart(glove, vest, lod) {
+  const key = lod ? 'l' : 'h';
+  if (!MH_BODY_C[key]) {
     const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
-    const B = MH_BODY, p = b64(B.p, Uint16Array), n = b64(B.nrm, Uint8Array), bi = b64(B.bi, Uint8Array), bw = b64(B.bw, Uint8Array), hd = b64(B.hand, Uint8Array), tri = b64(B.tri, Uint16Array);
-    const N = tri.length, pos = new Float32Array(N * 3), nrm = new Float32Array(N * 3), si = new Uint8Array(N * 2), sw = new Float32Array(N), hand = new Float32Array(N);
+    const B = lod ? MH_BODY_L : MH_BODY, p = b64(B.p, Uint16Array), n = b64(B.nrm, Uint8Array), bi = b64(B.bi, Uint8Array), bw = b64(B.bw, Uint8Array), kd = b64(B.kind, Uint8Array), tri = b64(B.tri, Uint16Array);
+    const N = tri.length, pos = new Float32Array(N * 3), nrm = new Float32Array(N * 3), si = new Uint8Array(N * 2), sw = new Float32Array(N), kind = new Uint8Array(N);
     for (let i = 0; i < N; i++) { const v = tri[i];
       for (let a = 0; a < 3; a++) { pos[i * 3 + a] = p[v * 3 + a] / 65535 * 3.4 - 1.2; nrm[i * 3 + a] = n[v * 3 + a] / 127.5 - 1; }
-      si[i * 2] = bi[v * 2]; si[i * 2 + 1] = bi[v * 2 + 1]; sw[i] = bw[v] / 255; hand[i] = hd[v] / 255; }
-    MH_BODY_C = { pos, nrm, si, sw, hand };
+      si[i * 2] = bi[v * 2]; si[i * 2 + 1] = bi[v * 2 + 1]; sw[i] = bw[v] / 255; kind[i] = kd[v]; }
+    MH_BODY_C[key] = { pos, nrm, si, sw, kind };
   }
-  const D = MH_BODY_C, g = new THREE.BufferGeometry();
+  const D = MH_BODY_C[key], g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(D.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(D.nrm, 3));
-  g.userData = { color: '#ffffff', bone: HB.chest, camo: 1, body: D, glove };
+  g.userData = { color: '#ffffff', bone: HB.chest, camo: 1, body: D, glove, vest };
   return g;
 }
 function mergeSkinned(parts) {
@@ -329,12 +330,13 @@ function mergeSkinned(parts) {
     const g = p0.index ? p0.toNonIndexed() : p0; c.set(p0.userData.color || '#ffffff');
     const pa = g.attributes.position.array, na = g.attributes.normal.array, bn = p0.userData.bone, cm = p0.userData.camo || 0;
     const raw = p0.userData.raw, bd = p0.userData.body;
-    if (bd) {   // 身體：每個頂點兩根骨頭；手套的地方用手套顏色、不是迷彩
-      const gc = new THREE.Color(p0.userData.glove), grm = RM_BY_COLOR[String(p0.userData.glove).toLowerCase()] || [0.8, 0];
+    if (bd) {   // 身體：每個頂點兩根骨頭；種類 0 衣服（迷彩）、1 手套、2 背心（vest＝[顏色, 是不是迷彩布]；沒給就不畫）
+      const gc = new THREE.Color(p0.userData.glove), grm = RM_BY_COLOR[String(p0.userData.glove).toLowerCase()] || [0.8, 0], vs = p0.userData.vest, vc = new THREE.Color(vs ? vs[0] : '#ffffff');
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
-        const h = bd.hand[v] > 0.5, ao = 1 - Math.max(0, -na[i + 1]) * 0.22;
-        P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(h ? gc.r * ao : ao, h ? gc.g * ao : ao, h ? gc.b * ao : ao);
-        SI.push(bd.si[v * 2], bd.si[v * 2 + 1], 0, 0); SW.push(bd.sw[v], 1 - bd.sw[v], 0, 0); CA.push(h ? 0 : 1); RM.push(h ? grm[0] : 0.93, h ? grm[1] : 0); UVH.push(0, 0); BLK.push(0, 0, 0);
+        const k = bd.kind[v]; if (k === 2 && !vs) continue;
+        const ao = 1 - Math.max(0, -na[i + 1]) * 0.22, cl = k === 1 ? gc : k === 2 ? vc : null, cam = k === 0 || (k === 2 && vs[1]) ? 1 : 0;
+        P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(cl ? cl.r * ao : ao, cl ? cl.g * ao : ao, cl ? cl.b * ao : ao);
+        SI.push(bd.si[v * 2], bd.si[v * 2 + 1], 0, 0); SW.push(bd.sw[v], 1 - bd.sw[v], 0, 0); CA.push(cam); RM.push(k === 1 ? grm[0] : cam ? 0.93 : 0.82, k === 1 ? grm[1] : 0); UVH.push(0, 0); BLK.push(0, 0, 0);
       }
       continue;
     }
@@ -375,13 +377,13 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
   const band = boss ? '#c8202a' : elite ? '#d8262e' : PAL.band, gold = '#d9a93a';
   const parts = [];
   const add = (...a) => parts.push(...a);
-  const body = mh && typeof MH_BODY !== 'undefined', nb = (...a) => { if (!body) parts.push(...a); };   // nb：有 MakeHuman 身體時就不畫的零件（程式拼的四肢、軀幹、手）
+  const body = !elite && typeof MH_BODY !== 'undefined', nb = (...a) => { if (!body) parts.push(...a); };   // nb：有 MakeHuman 身體時就不畫的零件（程式拼的四肢、軀幹、手）
   // 腳：大腿（寬鬆的作戰褲、膝上布料堆積＋側口袋）、小腿（褲管塞進靴子的皺褶、護膝、戰術靴）
   for (const s of [-1, 1]) {
     const x = 0.1 * s, th = s < 0 ? HB.thighL : HB.thighR, kn = s < 0 ? HB.kneeL : HB.kneeR;
     nb(hLimb(0.094, [x, 0.92, 0], [x * 1.02, 0.52, -0.005], W, th, 1), hEll(0.082, 0.07, 0.085, x * 1.02, 0.56, -0.004, W, th, 1, 10, 6)); add(hBox(0.05, 0.13, 0.12, x + 0.075 * s, 0.7, 0, W, th, 1), hBox(0.052, 0.012, 0.125, x + 0.076 * s, 0.77, 0, strap, th));
     if (s > 0 && !boss) add(hBox(0.05, 0.16, 0.1, x + 0.085, 0.8, 0.01, strap, th), hBox(0.03, 0.12, 0.05, x + 0.11, 0.82, -0.01, '#1e2024', th));   // 右大腿槍套
-    nb(hLimb(0.074, [x, 0.5, 0], [x, 0.16, 0.02], W, kn, 1)); add(hEll(0.076, 0.035, 0.08, x, 0.275, 0.014, W, kn, 1, 12, 6), hEll(0.07, 0.03, 0.074, x, 0.315, 0.01, W, kn, 1, 12, 6), hBox(0.11, 0.1, 0.05, x, 0.47, -0.07, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 0.15));
+    nb(hLimb(0.074, [x, 0.5, 0], [x, 0.16, 0.02], W, kn, 1)); add(hEll(0.076, 0.035, 0.08, x, 0.275, 0.014, W, kn, 1, 12, 6), hEll(0.07, 0.03, 0.074, x, 0.315, 0.01, W, kn, 1, 12, 6), lod ? hBox(0.11, 0.1, 0.05, x, 0.47, -0.07, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 0.15) : hEll(0.06, 0.068, 0.04, x, 0.47, -0.068, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 12, 8));
     if (lod) add(hBox(0.12, 0.13, 0.25, x, 0.065, -0.035, boot, kn), hBox(0.125, 0.03, 0.27, x, 0.014, -0.04, sole, kn), hBox(0.1, 0.06, 0.06, x, 0.12, -0.13, boot, kn, 0, 0.5), hLimb(0.07, [x, 0.2, 0.02], [x, 0.12, 0.02], boot, kn, 0, 8));
     else add(...hBoot(x, kn, boot, sole, boss ? '#1a1a1c' : us ? '#7a6446' : '#1c1916'));
     if (!lod) {
@@ -407,7 +409,7 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
   }
   // 腰、胸（衣服）
   nb(hTorso(0.17, 0.165, 0.24, 0, 1.12, 0, W, HB.spine, 1, 0.64), hTorso(0.205, 0.175, 0.32, 0, 1.33, 0, W, HB.chest, 1, 0.62), hEll(0.2, 0.07, 0.13, 0, 1.47, 0, W, HB.chest, 1, 10, 5));
-  if (body) add(mhBodyPart(glove));
+  if (body) add(mhBodyPart(glove, boss ? null : [us ? '#ffffff' : vest, us ? 1 : 0], lod));
   if (boss) {
     // 軍官：制服外套（前襟、口袋、金扣、勳章、肩章）、斜背帶
     add(hBox(0.012, 0.36, 0.02, 0, 1.25, -0.128, '#141a24', HB.chest), hBox(0.012, 0.22, 0.02, 0, 1.08, -0.11, '#141a24', HB.spine));
@@ -419,9 +421,9 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
   } else {
     // 防彈背心：前後板、側邊、彈匣袋、無線電、肩帶、背包
     const vk = us ? 1 : 0, vC = us ? W : vest, vD = us ? W : vestD, pC = us ? W : pouch;   // 美軍：背心、彈匣袋都是迷彩布
-    add(hBox(0.33, 0.33, 0.05, 0, 1.31, -0.125, vC, HB.chest, vk), hBox(0.31, 0.31, 0.012, 0, 1.31, -0.153, vD, HB.chest, vk),
+    nb(hBox(0.33, 0.33, 0.05, 0, 1.31, -0.125, vC, HB.chest, vk), hBox(0.31, 0.31, 0.012, 0, 1.31, -0.153, vD, HB.chest, vk),
       hBox(0.33, 0.35, 0.05, 0, 1.31, 0.12, vC, HB.chest, vk), hBox(0.06, 0.22, 0.2, -0.19, 1.25, 0, vD, HB.chest, vk), hBox(0.06, 0.22, 0.2, 0.19, 1.25, 0, vD, HB.chest, vk),
-      hBox(0.07, 0.03, 0.26, -0.13, 1.47, 0, vC, HB.chest, vk), hBox(0.07, 0.03, 0.26, 0.13, 1.47, 0, vC, HB.chest, vk));
+      hBox(0.07, 0.03, 0.26, -0.13, 1.47, 0, vC, HB.chest, vk), hBox(0.07, 0.03, 0.26, 0.13, 1.47, 0, vC, HB.chest, vk));   // 有 MakeHuman 身體時，背心是照身體外推的殼（57-body）
     for (let k = 0; k < 3; k++) add(hBox(0.085, 0.12, 0.05, -0.095 + k * 0.095, 1.2, -0.17, pC, HB.chest, vk), hBox(0.087, 0.03, 0.052, -0.095 + k * 0.095, 1.25, -0.172, vD, HB.chest, vk));
     if (us) {
       for (let k = 0; k < 3; k++) add(hBox(0.06, 0.035, 0.022, -0.095 + k * 0.095, 1.272, -0.168, '#3d4a35', HB.chest));                       // 露出來的彈匣

@@ -9,7 +9,7 @@ async def main():
           for (const id of ['hud', 'touch']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } }""")
         # 相機位置（相對機器人）、看的高度、隊伍、外觀、機器人朝向
         for nm, cx, cy, cz, ly, team, look in [('f1', 0.25, 1.67, -0.55, 1.62, 'B', 'grunt'), ('f2', 0.9, 1.4, -1.9, 1.15, 'B', 'grunt'), ('f3', -0.3, 1.66, -0.6, 1.6, 'A', 'grunt'), ('f7', 0.0, 1.68, -0.42, 1.66, 'A', 'grunt'), ('f8', 0.9, 1.4, -1.9, 1.15, 'A', 'grunt'),
-                                               ('f4', 0.6, 1.5, -2.4, 1.2, 'B', 'boss'), ('f9', 0.28, 0.22, -0.42, 0.1, 'A', 'grunt'), ('fa', 0.7, 0.9, -1.1, 0.7, 'A', 'grunt'), ('f5', -1.2, 1.55, -0.6, 1.5, 'B', 'grunt'), ('f6', 1.5, 1.6, -6.5, 1.0, 'B', 'grunt')]:
+                                               ('f4', 0.6, 1.5, -2.4, 1.2, 'B', 'boss'), ('fb', 23.0, 1.6, -3.0, 1.0, 'A', 'grunt'), ('f9', 0.28, 0.22, -0.42, 0.1, 'A', 'grunt'), ('fa', 0.7, 0.9, -1.1, 0.7, 'A', 'grunt'), ('f5', -1.2, 1.55, -0.6, 1.5, 'B', 'grunt'), ('f6', 1.5, 1.6, -6.5, 1.0, 'B', 'grunt')]:
             url = await ev(f"""() => {{ const s = window.__strike; for (const b of s.bots) {{ b.alive = false; b.g.visible = false; }}
               const cand = s.bots.filter((x) => x.team === '{team}' && !x.rageOnly); const b = cand[(window.__fi = (window.__fi || 0) + 1) % cand.length]; s.setHumanLook(b, '{look}');
               s.player.body.pos.set(-30, 0.05, 20);
