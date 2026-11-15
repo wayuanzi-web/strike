@@ -92,7 +92,7 @@ KK = len(VT) + 1; pair, inv = np.unique(TRI.ravel() * KK + TRIvt.ravel(), return
 SV, SVT = pair // KK, pair % KK; TRI_S = inv.reshape(-1, 3)
 print('拆開 UV 接縫後頂點', len(SV))
 eye_v_base = np.zeros(len(used), bool); eye_v_base[np.unique(TRI[is_eye_tri].ravel())] = True
-AW, AH, HH = 640, 1344, 1088          # 貼圖集：寬、高、頭佔的高度
+AW, AH, HH = 768, 1600, 1344          # 貼圖集：寬、高、頭佔的高度
 print('頭部頂點', len(used), '三角形', len(TRI), '（眼球', len(TE), '）')
 
 def normals(P, T):
@@ -146,7 +146,7 @@ for var in VARIANTS:
     N[lash_v] = np.array([0, 0.5, -0.87])
     Ps = P[:n_base]                                   # 睫毛縮短：每個睫毛頂點往最近的皮膚頂點靠（根部不動、尖端縮回來）
     for i in np.where(lash_v)[0]:
-        qn = Ps[np.argmin(((Ps - P[i]) ** 2).sum(1))]; P[i] = qn + (P[i] - qn) * 0.14
+        qn = Ps[np.argmin(((Ps - P[i]) ** 2).sum(1))]; P[i] = qn + (P[i] - qn) * 0.42
     eye_v = np.zeros(len(P), bool); eye_v[np.unique(T[is_eye_tri].ravel())] = True
     # 顏色：皮膚用白底（遊戲裡乘上每張臉的膚色）× 遮蔽；嘴唇偏紅、鼻頭臉頰微紅、頭皮（剃短的頭髮）偏暗
     C = np.ones((len(P), 3)) * (0.5 + 0.5 * ao ** 1.2)[:, None]; C0 = C.copy()
@@ -183,10 +183,10 @@ for var in VARIANTS:
         col = np.where((ang < 0.2)[:, None], np.array([0.02, 0.02, 0.02]), np.where((ang < 0.3)[:, None], iris * 1.05, np.where((ang < 0.44)[:, None], iris * 0.78, np.where((ang < 0.54)[:, None], iris * 0.35, np.array([0.8, 0.77, 0.74])))))
         col = np.where(((ang >= 0.54) & (ang < 1.3))[:, None], col * (1 - 0.1 * np.clip((ang - 0.9) / 0.4, 0, 1))[:, None] * np.array([1.0, 0.94, 0.92]), col)   # 眼白往眼角偏粉
         col = col * np.clip(0.55 + 0.45 * ao, 0, 1)[:, None]
-        C[sel] = np.clip(0.78 + 0.22 * ao, 0, 1)[sel, None]; kind[sel] = 5      # 5＝眼球（用眼睛貼圖）
+        C[sel] = (np.clip(0.8 + 0.2 * ao, 0, 1) * (1 - 0.42 * np.clip(d[:, 1] / er * 1.6 - 0.15, 0, 1)) * (1 - 0.12 * np.clip(np.abs(d[:, 0]) / er - 0.55, 0, 1)))[sel, None]; kind[sel] = 5      # 5＝眼球（用眼睛貼圖）
         rr = ang * 54.5; hx = np.hypot(d[:, 0], d[:, 1]) + 1e-9          # 眼睛貼圖是「從正面攤平」的：離瞳孔的角度 → 離圖上瞳孔的距離
         EUV[sel, 0] = ((180.5 + d[:, 0] / hx * rr) / AW)[sel]; EUV[sel, 1] = ((HH + 75.9 - d[:, 1] / hx * rr) / AH)[sel]
-    C[lash_v] = hexc(var['brow']) * 0.5; kind[lash_v] = 0
+    C[lash_v] = hexc(var['brow']) * 0.45; kind[lash_v] = 6      # 6＝睫毛（著色器裡梳成一根一根）
     # 脖子的權重：下巴以下越低越跟脖子骨頭
     wn = np.clip((1.585 - P[:, 1]) / 0.05, 0, 1) * (P[:, 2] > -0.07)
     wn = np.maximum(wn, np.clip((1.56 - P[:, 1]) / 0.03, 0, 1))
@@ -214,16 +214,19 @@ for var in VARIANTS:
     neckc = tuple(int(x) for x in np.asarray(head)[20:80, 20:130].reshape(-1, 3).mean(0))
     atlas = Image.new('RGB', (AW, AH), neckc); atlas.paste(head, (0, 0)); atlas.paste(Image.fromarray((eye * 255).astype(np.uint8)), (0, HH))
     # 毛孔、鬍渣、皺紋的凹凸：從照片的明暗細節推出法線貼圖（暗的地方當成凹下去）
-    g = np.asarray(head.convert('L').resize((512, 896), Image.LANCZOS)).astype(float) / 255
+    g = np.asarray(head.convert('L').resize((640, 1120), Image.LANCZOS)).astype(float) / 255
     from PIL import ImageFilter
-    blur = np.asarray(Image.fromarray((g * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.2))).astype(float) / 255
+    blur = np.asarray(Image.fromarray((g * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.6))).astype(float) / 255
     hgt = g - blur; gx = np.zeros_like(hgt); gy = np.zeros_like(hgt); gx[:, 1:-1] = hgt[:, 2:] - hgt[:, :-2]; gy[1:-1] = hgt[2:] - hgt[:-2]
-    nx, ny = np.clip(-gx * 3.2, -0.5, 0.5), np.clip(-gy * 3.2, -0.5, 0.5); nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0.05, 1))
+    nx, ny = np.clip(-gx * 3.8, -0.5, 0.5), np.clip(-gy * 3.8, -0.5, 0.5); nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0.05, 1))
     nim = Image.fromarray((np.stack([nx, ny, nz], 2) * 127.5 + 127.5).astype(np.uint8)); nb = io.BytesIO(); nim.save(nb, 'JPEG', quality=86); ntex = 'data:image/jpeg;base64,' + base64.b64encode(nb.getvalue()).decode()
-    buf = io.BytesIO(); atlas.save(buf, 'JPEG', quality=84); tex = 'data:image/jpeg;base64,' + base64.b64encode(buf.getvalue()).decode(); atlas.save(f'/tmp/mh_atlas_{var["name"]}.jpg')
     UV = np.zeros((len(SV), 2)); raw = VT[SVT]
     UV[:, 0] = np.where(eye_v[SV], EUV[SV, 0], (raw[:, 0] - u0) / (u1 - u0)); UV[:, 1] = np.where(eye_v[SV], EUV[SV, 1], (v1 - raw[:, 1]) / (v1 - v0) * HH / AH); UV[lash_v[SV]] = 0
-    nk = ~hv & ~eye_v[SV] & ~lash_v[SV]; UV[nk] = np.array([0.75, (HH + 128) / AH])   # 脖子下緣：用一塊平的膚色
+    nk = ~hv & ~eye_v[SV] & ~lash_v[SV]; rn = raw[nk]; a0, a1, b0, b1 = rn[:, 0].min() - 0.003, rn[:, 0].max() + 0.003, rn[:, 1].min() - 0.003, rn[:, 1].max() + 0.003
+    neck = sk.crop((int(a0 * Wd), int((1 - b1) * Hd), int(a1 * Wd), int((1 - b0) * Hd))).resize((AW - 256, 256), Image.LANCZOS)
+    neck = Image.fromarray(np.clip(np.asarray(ImageEnhance.Color(neck).enhance(var.get('sat', 1.0))).astype(float) * np.array(var['tint']), 0, 255).astype(np.uint8)); atlas.paste(neck, (256, HH))
+    UV[nk, 0] = (256 + (rn[:, 0] - a0) / (a1 - a0) * (AW - 256)) / AW; UV[nk, 1] = (HH + (b1 - rn[:, 1]) / (b1 - b0) * 256) / AH   # 脖子：身體 UV 區的那一塊也放進貼圖集
+    buf = io.BytesIO(); atlas.save(buf, 'JPEG', quality=84); tex = 'data:image/jpeg;base64,' + base64.b64encode(buf.getvalue()).decode(); atlas.save(f'/tmp/mh_atlas_{var["name"]}.jpg')
     UVQ = base64.b64encode(np.clip(np.round(UV * 65535), 0, 65535).astype(np.uint16).tobytes()).decode()
     P, N, C, kind, wn, BL = P[SV], N[SV], C[SV], kind[SV], wn[SV], BL[SV]
     print('   眨眼最大位移', np.abs(BL).max().round(4), '會動的頂點', (np.abs(BL).max(1) > 1e-4).sum())

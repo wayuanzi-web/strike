@@ -121,7 +121,7 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       .replace('#include <color_fragment>', `#include <color_fragment>
   {
     vec3 base0 = diffuseColor.rgb;
-    vec3 headTx = texture2D(uHeadT, vUvH + step(4.5, vCamo) * uGaze / vec2(${MH_AT[0]}.0, ${MH_AT[1]}.0)).rgb; vec2 bq = vec2(vRest.x / 0.14 + 0.5, (1.72 - vRest.y) / 0.035);   // 貼圖在條件式外面取樣（不然手機上會取到錯的解析度層）
+    vec3 headTx = texture2D(uHeadT, vUvH + step(4.5, vCamo) * step(vCamo, 5.5) * uGaze / vec2(${MH_AT[0]}.0, ${MH_AT[1]}.0)).rgb; vec2 bq = vec2(vRest.x / 0.14 + 0.5, (1.72 - vRest.y) / 0.035);   // 貼圖在條件式外面取樣（不然手機上會取到錯的解析度層）
     float browTx = texture2D(uBrowT, vec2(clamp(bq.x, 0.0, 1.0), (uBrow.a + clamp(bq.y, 0.0, 1.0)) * 0.25)).r;
     vec3 w = abs(vRN); w /= (w.x + w.y + w.z + 1e-4);
     vec4 t = texture2D(uCamoT, vRest.zy * 2.9) * w.x + texture2D(uCamoT, vRest.xz * 2.9) * w.y + texture2D(uCamoT, vRest.xy * 2.9) * w.z;
@@ -133,11 +133,12 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * cam * 1.25, cw);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uSkin * (0.94 + 0.12 * t.a), sw);   // 皮膚：每人膚色不同，帶一點斑駁
     // 臉：正面投影細節圖（只在頭部、朝前的皮膚）
-    if (vCamo > 2.5) {   // 寫實的頭：皮膚、眼球用貼圖（頂點顏色只剩遮蔽）；眉毛從正面投影
+    if (vCamo > 5.5) { if (fract(vRest.x * 620.0 + vRest.y * 150.0) < 0.52) discard; diffuseColor.rgb = base0; }   // 睫毛：梳成一根一根
+    else if (vCamo > 2.5) {   // 寫實的頭：皮膚、眼球用貼圖（頂點顏色只剩遮蔽）；眉毛從正面投影
       diffuseColor.rgb = base0 * headTx;
       if (vCamo < 4.5 && vRN.z < -0.05 && bq.x > 0.0 && bq.x < 1.0 && bq.y > 0.0 && bq.y < 1.0) {
-        float ba = smoothstep(0.04, 0.42, browTx) * smoothstep(-0.05, -0.3, vRN.z);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uBrow.rgb * (0.75 + 0.5 * t2.a), ba * 0.9);
+        float ba = smoothstep(0.1, 0.75, browTx) * smoothstep(-0.05, -0.3, vRN.z);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uBrow.rgb * (0.75 + 0.5 * t2.a), ba * 0.82);
       }
     }
     if (sw > 0.5 && vCamo < 2.5 && vRest.y > 1.55 && vRest.y < 1.75 && vRN.z < -0.05) {
@@ -172,13 +173,18 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       normal = bumpN(normal, -vViewPosition, ph, vCamo > 2.5 ? 0.00005 : 0.00016); }   // 皮膚毛孔
     else if (vRM.x > 0.7 && vRM.y < 0.5) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0009); }   // 尼龍裝備的織紋`)
       .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26 * smoothstep(1.5, 5.0, -vViewPosition.z);   // 邊緣光：貼近看時淡掉（近看才不會每個邊都一圈白）
-if (vCamo > 4.5) { vec3 eR = reflect(-normalize(vViewPosition), normalize(normal));   // 眼球：角膜上的反光點（一大一小），眼睛才有神
+if (vCamo > 4.5 && vCamo < 5.5) { vec3 eR = reflect(-normalize(vViewPosition), normalize(normal));   // 眼球：角膜上的反光點（一大一小），眼睛才有神
   outgoingLight += vec3(1.0, 0.97, 0.92) * (min(pow(max(dot(eR, normalize(vec3(0.22, 0.1, 0.97))), 0.0), 150.0) * 3.0, 1.1) + pow(max(dot(eR, normalize(vec3(-0.4, 0.15, 0.9))), 0.0), 60.0) * 0.3); }
+#if NUM_DIR_LIGHTS > 0
+if (vCamo > 2.5 && vCamo < 4.5) { float ndl = dot(normalize(normal), directionalLights[0].direction);
+  float thin = smoothstep(0.07, 0.1, abs(vRest.x)) * 0.8 + 0.6;
+  outgoingLight += diffuseColor.rgb * directionalLights[0].color * vec3(0.55, 0.16, 0.08) * (exp(-pow((ndl + 0.05) / 0.32, 2.0)) * 0.22 * thin + max(-ndl, 0.0) * 0.05); }
+#endif
 if (vCamo > 1.5 && vCamo < 4.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.35, 0.25) * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 2.0) * 0.22;   // 皮膚邊緣透一點紅（透光感）
 outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human15'; return m;
+  m.customProgramCacheKey = () => 'human17'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();
@@ -276,7 +282,7 @@ function mergeSkinned(parts) {
     if (raw) {   // 寫實的頭：顏色、種類、權重都是每個頂點自己的
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(raw.col[i], raw.col[i + 1], raw.col[i + 2]);
-        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); BLK.push(raw.bl[i], raw.bl[i + 1], raw.bl[i + 2]); RM.push(raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
+        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); BLK.push(raw.bl[i], raw.bl[i + 1], raw.bl[i + 2]); RM.push(raw.kind[v] > 5.5 ? 0.7 : raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
       }
       continue;
     }
