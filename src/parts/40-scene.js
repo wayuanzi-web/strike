@@ -36,12 +36,69 @@ function applyVmTheme() {
   const t = MAP.theme, nk = t.night ? 0.3 : 1; VM_HEMI.intensity = 0.8 * nk; VM_FILL.intensity = 0.5 * nk;
   for (const k in VM_MATS) VM_MATS[k].envMapIntensity = VM_ENVI[k] * (t.night ? 0.25 : 1);
 }
+// ---------- 地面細節：裂縫、油漬、濕痕、落葉、人孔蓋、胎痕、排水格柵 ----------
+// 一張程式畫的圖集（白底＝不變），用相乘混色貼在地上：只會讓地面變暗、上色，白天夜裡光照都對。
+// 全部一個 InstancedMesh、一次繪製；位置用雜湊決定，換地圖重排。
+const GD_TILES = 8, GD_MAX = 60;
+const gdTex = (function () {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512; const c = cv.getContext('2d');
+  c.fillStyle = '#fff'; c.fillRect(0, 0, 1024, 512);
+  let seed = 7; const rr = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const tile = (i, fn) => { c.save(); c.translate((i % 4) * 256, Math.floor(i / 4) * 256); c.beginPath(); c.rect(4, 4, 248, 248); c.clip(); fn(); c.restore(); };
+  const crack = (x, y, a, len, w, depth) => {
+    c.strokeStyle = `rgba(60,58,55,${0.55 + w * 0.12})`; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x, y);
+    for (let k = 0; k < len; k++) { a += (rr() - 0.5) * 0.9; x += Math.cos(a) * 7; y += Math.sin(a) * 7; c.lineTo(x, y);
+      if (depth < 2 && rr() < 0.12) { c.stroke(); crack(x, y, a + (rr() < 0.5 ? 1 : -1) * (0.6 + rr()), len * 0.45 | 0, w * 0.6, depth + 1); c.strokeStyle = `rgba(60,58,55,${0.55 + w * 0.12})`; c.lineWidth = w; c.beginPath(); c.moveTo(x, y); } }
+    c.stroke(); };
+  tile(0, () => { crack(20, 130, 0.1, 32, 2.6, 0); crack(130, 128, -1.2, 14, 1.6, 1); });
+  tile(1, () => { crack(128, 128, 0, 16, 2.2, 0); crack(128, 128, 2.1, 15, 2, 0); crack(128, 128, 4.2, 14, 1.8, 0); });
+  tile(2, () => { for (let k = 0; k < 9; k++) { const x = 128 + (rr() - 0.5) * 90, y = 128 + (rr() - 0.5) * 90, r = 25 + rr() * 50, g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(70,64,58,0.55)'); g.addColorStop(0.7, 'rgba(90,84,76,0.35)'); g.addColorStop(1, 'rgba(120,112,100,0)'); c.fillStyle = g; c.fillRect(0, 0, 256, 256); } });
+  tile(3, () => { for (let k = 0; k < 14; k++) { const x = 128 + (rr() - 0.5) * 140, y = 128 + (rr() - 0.5) * 110, r = 20 + rr() * 45, g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(120,128,136,0.5)'); g.addColorStop(0.75, 'rgba(130,136,142,0.4)'); g.addColorStop(1, 'rgba(160,165,170,0)'); c.fillStyle = g; c.fillRect(0, 0, 256, 256); } });
+  tile(4, () => { const cols = ['#c2843a', '#a8642c', '#d6a24a', '#8a5a2a', '#b47838'];
+    for (let k = 0; k < 34; k++) { const x = 128 + (rr() - 0.5) * 190, y = 128 + (rr() - 0.5) * 190; if (Math.hypot(x - 128, y - 128) > 100) continue;
+      c.save(); c.translate(x, y); c.rotate(rr() * 6.28); c.fillStyle = cols[k % 5]; c.beginPath(); c.ellipse(0, 0, 9 + rr() * 6, 4 + rr() * 3, 0, 0, 6.28); c.fill();
+      c.strokeStyle = 'rgba(90,60,30,0.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-12, 0); c.lineTo(12, 0); c.stroke(); c.restore(); } });
+  tile(5, () => { c.fillStyle = '#5a5856'; c.beginPath(); c.arc(128, 128, 108, 0, 6.28); c.fill(); c.fillStyle = '#8a8884'; c.beginPath(); c.arc(128, 128, 98, 0, 6.28); c.fill();
+    c.strokeStyle = '#5e5c58'; c.lineWidth = 5; for (let k = -80; k <= 80; k += 20) { c.beginPath(); c.moveTo(128 + k, 40); c.lineTo(128 + k, 216); c.stroke(); c.beginPath(); c.moveTo(40, 128 + k); c.lineTo(216, 128 + k); c.stroke(); }
+    c.fillStyle = '#4a4846'; c.fillRect(118, 60, 20, 8); c.fillRect(118, 188, 20, 8); });
+  tile(6, () => { c.strokeStyle = 'rgba(55,52,50,0.45)'; for (const o of [-26, 26]) { c.lineWidth = 16; c.beginPath(); c.moveTo(10, 128 + o); c.bezierCurveTo(90, 100 + o, 170, 150 + o, 246, 118 + o); c.stroke(); } });
+  tile(7, () => { c.fillStyle = '#6a6866'; c.fillRect(40, 92, 176, 72); c.fillStyle = '#2e2c2a'; for (let k = 0; k < 10; k++) c.fillRect(50 + k * 16.5, 100, 9, 56); });
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; return t;
+})();
+const gdGeo = new THREE.PlaneGeometry(1, 1); gdGeo.rotateX(-Math.PI / 2);
+const gdTileA = new THREE.InstancedBufferAttribute(new Float32Array(GD_MAX), 1); gdGeo.setAttribute('aTile', gdTileA);
+const gdMat = new THREE.MeshBasicMaterial({ map: gdTex, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  blending: THREE.CustomBlending, blendSrc: THREE.DstColorFactor, blendDst: THREE.ZeroFactor });
+gdMat.onBeforeCompile = (sh) => {
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', 'attribute float aTile;\n#include <common>')
+    .replace('#include <uv_vertex>', '#include <uv_vertex>\n  vMapUv = vMapUv * vec2(0.25, 0.5) + vec2(mod(aTile, 4.0) * 0.25, 0.5 - floor(aTile / 4.0) * 0.5);');
+};
+const groundDetail = new THREE.InstancedMesh(gdGeo, gdMat, GD_MAX); groundDetail.count = 0; groundDetail.frustumCulled = false; groundDetail.renderOrder = -1; scene.add(groundDetail);
+// 每張地圖各種細節的比重：裂縫 A、裂縫 B、油漬、濕痕、落葉、人孔蓋、胎痕、排水格柵
+const GD_W = { dawn: [3, 2, 3, 1, 0, 2, 2, 1], night: [3, 2, 3, 2, 0, 2, 2, 1], market: [1, 1, 0, 3, 3, 1, 0, 2], rail: [0, 0, 4, 2, 2, 0, 0, 0], site: [3, 2, 2, 3, 1, 1, 2, 1] };
+function placeGroundDetail() {
+  const w = GD_W[MAP.id] || GD_W.dawn, tot = w.reduce((a, b) => a + b, 0), m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new V3(), ps = new V3(), up = new V3(0, 1, 0);
+  let n = 0;
+  for (let k = 0; k < 400 && n < (S.quality === 'eco' ? 30 : GD_MAX); k++) {
+    const h = (j) => hash1(k * 97 + j * 31 + MAP.id.length * 7);
+    let r = h(1) * tot, tl = 0; while (r >= w[tl]) { r -= w[tl]; tl++; }
+    const size = tl === 5 ? 0.9 : tl === 7 ? 0.8 : tl === 6 ? 3.2 : tl === 3 ? 1.6 + h(4) * 1.6 : 1.1 + h(4) * 1.3;
+    const x = (h(2) - 0.5) * 68, z = (h(3) - 0.5) * 48, rad = size * 0.55;
+    if (BOXES.some((b) => b !== BOXES[0] && b.min[1] < 0.2 && b.max[1] > 0.02 && x + rad > b.min[0] && x - rad < b.max[0] && z + rad > b.min[2] && z - rad < b.max[2])) continue;
+    q.setFromAxisAngle(up, tl === 5 ? 0 : h(5) * 6.28); sc.set(size, 1, size); ps.set(x, 0.004 + n * 0.0002, z);
+    m.compose(ps, q, sc); groundDetail.setMatrixAt(n, m); gdTileA.setX(n, tl); n++;
+  }
+  groundDetail.count = n; groundDetail.instanceMatrix.needsUpdate = true; gdTileA.needsUpdate = true;
+}
 // 重建地圖網格（換地圖時）：舊的丟掉、新的加進場景
 function rebuildMapMeshes() {
   for (const m of mapMeshes) { scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
   mapMeshes.length = 0;
   rebuildDecor();
   for (const m of buildMapMeshes(MAX_ANISO)) { mapMeshes.push(m); scene.add(m); }
+  placeGroundDetail();
 }
 rebuildMapMeshes(); applyTheme();
 
