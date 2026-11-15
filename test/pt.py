@@ -28,11 +28,16 @@ async def main():
         ok('3 匯入要確認：中途換代碼要重新看一次摘要', r[0] != 99 and r[1], r)
         # 4 死鬥：瞄準一個機器人開槍，打得到
         r = await ev("""() => { const s = window.__strike; s.startGame('dm'); s.S.autoFire = false; s.game.freezeBots = true;
-          for (let i = 0; i < 120; i++) s.step(1/60); const b = s.bots.find((x) => x.active && x.alive); s.player.body.pos.set(b.phys.pos.x + 5, b.phys.pos.y, b.phys.pos.z); const e = s.player.body.pos; b.blindT = 99; s.player.spawnT = 0;
+          for (let i = 0; i < 120; i++) s.step(1/60); const b = s.bots.find((x) => x.active && x.alive); const V = b.phys.pos.constructor, e = s.player.body.pos; b.blindT = 99; s.player.spawnT = 0;
+          // 站在機器人旁邊 5 公尺、中間沒有牆的地方（原本固定站在 +x 方向，偶爾隔著牆打不到）
+          for (const [ox, oz] of [[5, 0], [-5, 0], [0, 5], [0, -5], [3.5, 3.5], [-3.5, -3.5], [3.5, -3.5], [-3.5, 3.5]]) {
+            e.set(b.phys.pos.x + ox, b.phys.pos.y, b.phys.pos.z + oz);
+            if (s.lineClear(new V(e.x, e.y + 1.6, e.z), new V(b.phys.pos.x, b.phys.pos.y + 1.2, b.phys.pos.z))) break; }
+          s.game.freezeBots = true;
           for (let i = 0; i < 5; i++) s.step(1/60);
-          const h = b.phys.pos, dx = h.x - e.x, dz = h.z - e.z, dy = (h.y + 1.2) - (e.y + s.player.eye);
-          s.player.yaw = Math.atan2(-dx, -dz); s.player.pitch = Math.atan2(dy, Math.hypot(dx, dz)); const hp0 = b.hp;
-          s.INPUT.fire = true; for (let i = 0; i < 90; i++) s.step(1/60); s.INPUT.fire = false;
+          const aim = () => { const h = b.phys.pos, dx = h.x - e.x, dz = h.z - e.z, dy = (h.y + 1.2) - (e.y + s.player.eye); s.player.yaw = Math.atan2(-dx, -dz); s.player.pitch = Math.atan2(dy, Math.hypot(dx, dz)); };
+          aim(); const hp0 = b.hp;
+          s.INPUT.fire = true; for (let i = 0; i < 90; i++) { aim(); s.step(1/60); } s.INPUT.fire = false; s.game.freezeBots = false;
           return [+(b.leanA||0).toFixed(2), b.state, hp0, Math.round(b.hp), b.alive, s.W.shots, s.W.hits, s.player.team, b.team, s.lineClear ? 1 : 0]; }""")
         ok('4 死鬥：對準機器人開槍會扣血', r[3] < r[2] or r[4] is False, r)
         # 5 暫停：對戰中有「回選單」、按兩次才回去
