@@ -621,7 +621,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261116-0623';   // 建置時換成日期時間
+const BUILD = '20261116-0638';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -2608,46 +2608,58 @@ function updateSparks(dt) {
   sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true;
 }
 
-// ---------- 碎屑：布料碎片、牆面碎石（不發光、會掉到地上），一個 Points 一次繪製 ----------
-const DEBRIS = 140;
-const debGeo = new THREE.BufferGeometry();
-const debPos = new Float32Array(DEBRIS * 3), debCol = new Float32Array(DEBRIS * 3);
-debGeo.setAttribute('position', new THREE.BufferAttribute(debPos, 3)); debGeo.setAttribute('color', new THREE.BufferAttribute(debCol, 3));
-const debPts = new THREE.Points(debGeo, new THREE.PointsMaterial({ size: 0.028, vertexColors: true }));
-debPts.frustumCulled = false; scene.add(debPts);
-const debV = new Float32Array(DEBRIS * 3), debL = new Float32Array(DEBRIS), debFloor = new Float32Array(DEBRIS);
-for (let i = 0; i < DEBRIS; i++) debPos[i * 3 + 1] = -100;
-let debI = 0;
+// ---------- 碎屑：布料碎片、牆面碎石（不發光、會掉到地上），一組一個 Points、一次繪製 ----------
+// 兩組：小碎屑（子彈打出來的，2.8 公分）、大塊（爆炸炸飛的，7 公分）
+function mkDebris(N, size) {
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, vertexColors: true })); pts.frustumCulled = false; scene.add(pts);
+  for (let i = 0; i < N; i++) pos[i * 3 + 1] = -100;
+  return { N, geo, pos, col, V: new Float32Array(N * 3), L: new Float32Array(N), F: new Float32Array(N), i: 0, live: false };
+}
+const DEB_S = mkDebris(140, 0.028), DEB_B = mkDebris(60, 0.07);
+const DEBRIS = DEB_S.N, debL = DEB_S.L, debPos = DEB_S.pos;   // 測試用（debrisStat）
 const _debC = new THREE.Color();
-// p 命中點、n 噴出的方向、color 顏色、count 數量、spd 速度、floor 落地高度
-function spawnDebris(p, n, color, count, spd = 2.2, floor = 0) {
+// p 命中點、n 噴出的方向、color 顏色、count 數量、spd 速度、floor 落地高度、big 用大塊
+function spawnDebris(p, n, color, count, spd = 2.2, floor = 0, big = false) {
   if (S.quality === 'eco') count = Math.ceil(count * 0.5);
-  _debC.set(color); debLive = true;
+  const D = big ? DEB_B : DEB_S; _debC.set(color); D.live = true;
   for (let k = 0; k < count; k++) {
-    const i = debI++ % DEBRIS, s = rand(0.4, 1) * spd, sh = rand(0.6, 1.15);
-    debPos[i * 3] = p.x; debPos[i * 3 + 1] = p.y; debPos[i * 3 + 2] = p.z;
-    debV[i * 3] = (n.x + rand(-0.7, 0.7)) * s; debV[i * 3 + 1] = (n.y * 0.6 + rand(0, 0.9)) * s; debV[i * 3 + 2] = (n.z + rand(-0.7, 0.7)) * s;
-    debL[i] = rand(0.9, 1.6); debFloor[i] = floor + 0.012;
-    debCol[i * 3] = _debC.r * sh; debCol[i * 3 + 1] = _debC.g * sh; debCol[i * 3 + 2] = _debC.b * sh;
+    const i = D.i++ % D.N, s = rand(0.4, 1) * spd, sh = rand(0.6, 1.15);
+    D.pos[i * 3] = p.x; D.pos[i * 3 + 1] = p.y; D.pos[i * 3 + 2] = p.z;
+    D.V[i * 3] = (n.x + rand(-0.7, 0.7)) * s; D.V[i * 3 + 1] = (n.y * 0.6 + rand(0, 0.9)) * s; D.V[i * 3 + 2] = (n.z + rand(-0.7, 0.7)) * s;
+    D.L[i] = rand(0.9, 1.6) * (big ? 1.8 : 1); D.F[i] = floor + (big ? 0.03 : 0.012);
+    D.col[i * 3] = _debC.r * sh; D.col[i * 3 + 1] = _debC.g * sh; D.col[i * 3 + 2] = _debC.b * sh;
   }
 }
-let debLive = false;
-function updateDebris(dt) {
-  if (!debLive) return;
+function updateDebrisSet(D, dt) {
+  if (!D.live) return;
   let any = false;
-  for (let i = 0; i < DEBRIS; i++) {
-    if (debL[i] <= 0) continue;
-    any = true;
-    debL[i] -= dt;
-    if (debL[i] <= 0) { debPos[i * 3 + 1] = -100; continue; }
-    if (debPos[i * 3 + 1] <= debFloor[i]) continue;              // 落地就停住，等時間到消失
-    debV[i * 3 + 1] -= 9.8 * dt; const drag = Math.exp(-2.2 * dt); debV[i * 3] *= drag; debV[i * 3 + 2] *= drag;
-    debPos[i * 3] += debV[i * 3] * dt; debPos[i * 3 + 1] = Math.max(debFloor[i], debPos[i * 3 + 1] + debV[i * 3 + 1] * dt); debPos[i * 3 + 2] += debV[i * 3 + 2] * dt;
+  const { pos, V, L, F } = D;
+  for (let i = 0; i < D.N; i++) {
+    if (L[i] <= 0) continue;
+    any = true; L[i] -= dt;
+    if (L[i] <= 0) { pos[i * 3 + 1] = -100; continue; }
+    if (pos[i * 3 + 1] <= F[i]) continue;                    // 落地就停住，等時間到消失
+    V[i * 3 + 1] -= 9.8 * dt; const drag = Math.exp(-2.2 * dt); V[i * 3] *= drag; V[i * 3 + 2] *= drag;
+    pos[i * 3] += V[i * 3] * dt; pos[i * 3 + 1] = Math.max(F[i], pos[i * 3 + 1] + V[i * 3 + 1] * dt); pos[i * 3 + 2] += V[i * 3 + 2] * dt;
   }
-  debGeo.attributes.position.needsUpdate = true;
-  debGeo.attributes.color.needsUpdate = true;
-  debLive = any;
+  D.geo.attributes.position.needsUpdate = true; D.geo.attributes.color.needsUpdate = true;
+  D.live = any;
 }
+function updateDebris(dt) { updateDebrisSet(DEB_S, dt); updateDebrisSet(DEB_B, dt); }
+// 某一點底下最高的地板（方塊頂）高度：碎屑、焦痕落在這裡
+function floorBelow(x, y, z) { let fy = 0; for (const b of BOXES) if (x > b.min[0] && x < b.max[0] && z > b.min[2] && z < b.max[2] && b.max[1] <= y + 0.05) fy = Math.max(fy, b.max[1]); return fy; }
+// 爆炸碎屑：地面顏色的碎石往上往外炸飛
+function blastDebris(p, count, spd) {
+  const fy = floorBelow(p.x, p.y + 0.2, p.z), top = BOXES.find((b) => p.x > b.min[0] && p.x < b.max[0] && p.z > b.min[2] && p.z < b.max[2] && Math.abs(b.max[1] - fy) < 0.01);
+  _debC3.set(TINT[top ? top.c : 'floor'] || '#8a857a').multiplyScalar(0.7);
+  const o = _v3.set(p.x, fy + 0.15, p.z);
+  for (let k = 0; k < 4; k++) spawnDebris(o, _v2.set(rand(-0.6, 0.6), 1, rand(-0.6, 0.6)), k === 0 ? '#2a2724' : _debC3, Math.ceil(count / 4), spd, fy);
+  for (let k = 0; k < 2; k++) spawnDebris(o, _v2.set(rand(-0.5, 0.5), 1, rand(-0.5, 0.5)), k ? _debC3 : '#3a3530', Math.ceil(count / 6), spd * 0.8, fy, true);   // 大塊
+  return fy;
+}
+const _debC3 = new THREE.Color();
 
 // ---------- 機器人腳下的影子：沿太陽反方向拉長的柔邊橢圓，一次繪製 ----------
 const shadowTex = (function () {
@@ -3914,7 +3926,8 @@ function explodeHE(n) {
   boomFx(p, 5.5, '#ffb45a'); smokeBlast(p, 4.5);   // 手榴彈把附近的煙吹開
   for (let k = 0; k < 7; k++) spawnPuff(_v2.set(p.x + rand(-1.2, 1.2), p.y + rand(0.2, 1.6), p.z + rand(-1.2, 1.2)), '#3d3a36', rand(1.2, 2.2), rand(0.7, 1.2), 0.8);
   spawnSparks(p, _v2.set(0, 1, 0), '#ffd27a', 18);
-  addDecal(_v2.set(p.x, 0.005, p.z), [0, 1, 0], 9, _scorch);
+  const fy = blastDebris(p, 28, 5.5);
+  addDecal(_v2.set(p.x, fy + 0.005, p.z), [0, 1, 0], 9, _scorch);
   sfx('boom', 1, { pos: p });
   if (n.owner && n.owner.remote) return;   // 好友對戰：對手丟的手榴彈傷害由他那台算
   const units = [player].concat(bots.filter((b) => b.active));
@@ -6318,7 +6331,8 @@ function explodeBomb() {
   boomFx(p, 18, '#ffb050', 0.5);
   for (let k = 0; k < 16; k++) spawnPuff(_v2.set(p.x + rand(-4, 4), p.y + rand(0.5, 5), p.z + rand(-4, 4)), k % 2 ? '#3d3a36' : '#8a5a30', rand(3, 6), rand(1.2, 2.2), 1.5);
   spawnSparks(p, _v2.set(0, 1, 0), '#ffd27a', 40);
-  addDecal(_v2.set(p.x, 0.005, p.z), [0, 1, 0], 20, _scorch);
+  const fy = blastDebris(p, 60, 9);
+  addDecal(_v2.set(p.x, fy + 0.005, p.z), [0, 1, 0], 20, _scorch);
   sfx('bombboom', 1.2, { pos: p });
   endRound(ROUND.atk, '炸彈爆炸', 'bomb');      // 先判勝負，炸死的人不會再觸發「全滅」
   // 傷害：10 公尺內幾乎必死，20 公尺外沒事

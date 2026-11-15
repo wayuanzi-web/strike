@@ -66,7 +66,8 @@ function explodeBomb() {
   boomFx(p, 18, '#ffb050', 0.5);
   for (let k = 0; k < 16; k++) spawnPuff(_v2.set(p.x + rand(-4, 4), p.y + rand(0.5, 5), p.z + rand(-4, 4)), k % 2 ? '#3d3a36' : '#8a5a30', rand(3, 6), rand(1.2, 2.2), 1.5);
   spawnSparks(p, _v2.set(0, 1, 0), '#ffd27a', 40);
-  addDecal(_v2.set(p.x, 0.005, p.z), [0, 1, 0], 20, _scorch);
+  const fy = blastDebris(p, 60, 9);
+  addDecal(_v2.set(p.x, fy + 0.005, p.z), [0, 1, 0], 20, _scorch);
   sfx('bombboom', 1.2, { pos: p });
   endRound(ROUND.atk, '炸彈爆炸', 'bomb');      // 先判勝負，炸死的人不會再觸發「全滅」
   // 傷害：10 公尺內幾乎必死，20 公尺外沒事
