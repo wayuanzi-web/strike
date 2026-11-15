@@ -179,7 +179,10 @@ function reloadOrInspect() { if (!W.isNade && W.ammo >= WP.mag && W.reloadT <= 0
   const show = () => { el.classList.toggle('on', INPUT.lean !== 0); el.dataset.d = INPUT.lean < 0 ? 'L' : INPUT.lean > 0 ? 'R' : ''; };
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation(); audioInit(); pid = e.pointerId; sx = e.clientX; t0 = performance.now(); was = INPUT.lean;
-    INPUT.lean = was ? was : (S.lefty ? -1 : 1); show(); try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ }
+    // 按左半邊往左探、右半邊往右探；同一邊再按一次收回，按另一邊直接換邊
+    const r = el.getBoundingClientRect(), side = e.clientX < r.left + r.width / 2 ? -1 : 1;
+    if (was === side) INPUT.lean = side; else { INPUT.lean = side; was = 0; }
+    show(); try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ }
   });
   el.addEventListener('pointermove', (e) => { if (e.pointerId !== pid) return; const dx = e.clientX - sx; if (Math.abs(dx) > 18) { INPUT.lean = dx < 0 ? -1 : 1; was = 0; show(); } });
   const up = (e) => {

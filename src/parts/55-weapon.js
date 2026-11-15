@@ -376,9 +376,12 @@ function updateViewmodel(dt, lookDX, lookDY) {
   gunRig.position.y += (-dip * dip * 0.016 + 0.004) * bobA + VM.swayY * (1 - k) * 0.4 - (og ? 0 : 0.02)
     - 0.012 * moving * (1 - k) + VM.landY * (1 - k * 0.7) + Math.sin(VM.breath) * 0.0018 * ik - sk * 0.05;
   gunRig.position.z += W.kick * lerp(0.04, 0.02, k) + VM.fwdV * 0.012 * (1 - k) + sk * 0.02;
+  // 側身：手上的槍跟著往那邊歪、往那邊移一點（看得出在探頭）
+  const lnA = player.alive ? player.leanA || 0 : 0;
+  gunRig.position.x += lnA * 0.035 * (1 - k * 0.6); gunRig.position.y -= Math.abs(lnA) * 0.012;
   gunRig.rotation.set(W.kick * lerp(0.06, 0.02, k) + VM.swayY + Math.sin(VM.breath * 0.5) * 0.004 * ik - sk * 0.24 - dip * 0.012 * bobA,
     VM.swayX * 1.5 + bs * 0.01 * bobA + sk * 0.36,
-    W.roll + VM.latV * 0.06 * (1 - k * 0.8) + bs * 0.018 * bobA + sk * 0.3);
+    W.roll + VM.latV * 0.06 * (1 - k * 0.8) + bs * 0.018 * bobA + sk * 0.3 - lnA * 0.32 * (1 - k * 0.5));
   // 出槍：從畫面下方抬起來
   if (W.deployT > 0) { const d = Math.min(1, W.deployT / 0.6); gunRig.position.y -= d * d * 0.25; gunRig.rotation.x -= d * d * 0.6; }
   // 換彈：槍往下歪、彈匣拔出再插回去

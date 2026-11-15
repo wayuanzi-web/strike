@@ -85,15 +85,16 @@ async def main():
           return [hy, hipsSide, chestSide, hyBack, stepped, lag, air, knee, land]; }""")
         ok('7 側走腰轉（>0.5）胸口仍朝前（<0.35）、倒退腰不轉、原地轉身會踏步跟上、跳時縮腳、落地一沉',
            r[0] > 0.5 and abs(r[1]) > 0.4 and abs(r[2]) < 0.35 and abs(r[3]) < 0.15 and r[4] and r[5] < 0.2 and r[6] > 0.8 and r[7] < -0.6 and r[8] > 0.01, r)
-        # 8 手機探頭鍵：點一下開（往右）、再點收回；按住往左滑＝往左探、放開收回；可在自訂按鍵裡拖
-        r = await ev("""async () => { const s = window.__strike, el = document.getElementById('bLean'), rc = el.getBoundingClientRect(), cx = rc.x + rc.width / 2, cy = rc.y + rc.height / 2;
+        # 8 手機探頭鍵：右半邊點一下往右、再點收回；左半邊往左；開著時點另一邊直接換邊；按住超過 0.3 秒放開收回；槍跟著歪
+        r = await ev("""async () => { const s = window.__strike, el = document.getElementById('bLean'), rc = el.getBoundingClientRect(), L = rc.x + rc.width * 0.2, R = rc.x + rc.width * 0.8, cy = rc.y + rc.height / 2;
           const pe = (t, x, id = 7) => el.dispatchEvent(new PointerEvent(t, { pointerId: id, clientX: x, clientY: cy, bubbles: true, pointerType: 'touch' }));
-          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-          pe('pointerdown', cx); pe('pointerup', cx); const a = s.INPUT.lean, on = el.classList.contains('on');
-          pe('pointerdown', cx); pe('pointerup', cx); const b = s.INPUT.lean;
-          pe('pointerdown', cx); pe('pointermove', cx - 40); const c = s.INPUT.lean, d = el.dataset.d; await wait(350); pe('pointerup', cx - 40); const e = s.INPUT.lean;
-          return [a, on, b, c, d, e, !!document.querySelector('#bLean .tbl')]; }""")
-        ok('8 探頭鍵：點一下往右、再點收回、按住往左滑往左、放開收回', r == [1, True, 0, -1, 'L', 0, True], r)
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms)), tap = (x) => { pe('pointerdown', x); pe('pointerup', x); return s.INPUT.lean; };
+          const a = tap(R), on = el.classList.contains('on'), b = tap(R), c = tap(L), d = el.dataset.d, e = tap(R), f = tap(R);
+          pe('pointerdown', L); await wait(350); pe('pointerup', L); const g = s.INPUT.lean;
+          const z0 = s.gunRig.rotation.z; s.INPUT.leanKey = 1; for (let i = 0; i < 40; i++) s.step(1/60); const z1 = s.gunRig.rotation.z;
+          s.INPUT.leanKey = -1; for (let i = 0; i < 40; i++) s.step(1/60); const z2 = s.gunRig.rotation.z; s.INPUT.leanKey = 0; for (let i = 0; i < 40; i++) s.step(1/60);
+          return [a, on, b, c, d, e, f, g, !!document.querySelector('#bLean .tbl'), z1 < z0 - 0.05 && z2 > z0 + 0.05, +z0.toFixed(2), +z1.toFixed(2), +z2.toFixed(2)]; }""")
+        ok('8 探頭鍵：右半邊往右、再點收回、左半邊往左、點另一邊換邊、按住放開收回；槍跟著往那邊歪', r[:10] == [1, True, 0, -1, 'L', 1, 0, 0, True, True], r)
         # 9 探頭時走比較慢
         r = await ev("""() => { const s = window.__strike, pl = s.player; pl.body.pos.set(0, 1, 0);
           const sp = () => { s.INPUT.mz = 1; for (let i = 0; i < 50; i++) s.step(1/60); const v = Math.hypot(pl.body.vel.x, pl.body.vel.z); s.INPUT.mz = 0; for (let i = 0; i < 30; i++) s.step(1/60); return v; };

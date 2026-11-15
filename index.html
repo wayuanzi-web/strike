@@ -107,8 +107,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dawn); outl
 #bFire.down { background: rgba(255,74,61,.35); border-color: var(--hurt); color: #fff; }
 #bAds { width: calc(var(--u) * 14); height: calc(var(--u) * 14); right: calc(var(--sr) + var(--u) * 25); bottom: calc(var(--sb) + var(--u) * 46); }
 #bCrouch { width: calc(var(--u) * 14); height: calc(var(--u) * 14); right: calc(var(--sr) + var(--u) * 4); bottom: calc(var(--sb) + var(--u) * 26); }
-#bLean { width: max(44px, calc(var(--u) * 12)); height: max(44px, calc(var(--u) * 12)); right: calc(var(--sr) + var(--u) * 41); bottom: calc(var(--sb) + var(--u) * 51); }
+#bLean { width: max(64px, calc(var(--u) * 18)); height: max(44px, calc(var(--u) * 12)); right: calc(var(--sr) + var(--u) * 41); bottom: calc(var(--sb) + var(--u) * 51); }
 #bLean.on { background: rgba(255,190,80,.35); border-color: #ffbe50; }
+#bLean { display: flex; align-items: center; justify-content: space-between; padding: 0 calc(var(--u) * 1.2); }
+#bLean .tbl { left: 0; right: 0; text-align: center; }
+#bLean b { font-size: max(14px, calc(var(--u) * 4)); opacity: .55; line-height: 1; }
+#bLean[data-d="L"] b.l, #bLean[data-d="R"] b.r { opacity: 1; color: #ffbe50; }
 #bLean[data-d="L"] svg { transform: scaleX(-1); }
 #bJump { width: calc(var(--u) * 15); height: calc(var(--u) * 15); right: calc(var(--sr) + var(--u) * 4); bottom: calc(var(--sb) + var(--u) * 6); }
 #bReload { width: max(44px, calc(var(--u) * 13)); height: max(44px, calc(var(--u) * 13)); right: calc(var(--sr) + var(--u) * 46); bottom: calc(var(--sb) + var(--u) * 5); }
@@ -412,7 +416,7 @@ body.lefty #feed { right: auto; left: calc(var(--sl) + var(--u) * 3); top: calc(
     <div id="joy"><div id="joyK"></div></div>
     <button class="tb" id="bAds" aria-label="開鏡"><svg viewBox="0 0 24 24"><path d="M2 10.5h11v3H2zM13 9l3-2h3v10h-3l-3-2z"/><circle cx="20.5" cy="12" r="1"/></svg><i class="tbl">開鏡</i></button>
     <button class="tb" id="bFire" aria-label="開火"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/></svg></button>
-    <button class="tb" id="bLean" aria-label="側身探頭"><svg viewBox="0 0 24 24"><path d="M10 21l1-7M11 14l3-6M16 5.5a2 2 0 1 0-4 0 2 2 0 1 0 4 0M14 8l4 3M5 4v16"/></svg><i class="tbl">探頭</i></button>
+    <button class="tb" id="bLean" aria-label="側身探頭：按左半邊往左、右半邊往右"><b class="l">◀</b><svg viewBox="0 0 24 24"><path d="M10 21l1-7M11 14l3-6M16 5.5a2 2 0 1 0-4 0 2 2 0 1 0 4 0M14 8l4 3M5 4v16"/></svg><b class="r">▶</b><i class="tbl">探頭</i></button>
     <button class="tb" id="bCrouch" aria-label="蹲下"><svg viewBox="0 0 24 24"><path d="M5 20h14M8 20l2-6h4l2 6M12 14v-3M9 8.5a3 3 0 1 0 6 0 3 3 0 1 0-6 0"/></svg><i class="tbl">蹲</i></button>
     <button class="tb" id="bJump" aria-label="跳"><svg viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></svg></button>
     <button class="tb" id="bReload" aria-label="換彈"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
@@ -617,7 +621,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261116-0550';   // 建置時換成日期時間
+const BUILD = '20261116-0623';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -3472,9 +3476,12 @@ function updateViewmodel(dt, lookDX, lookDY) {
   gunRig.position.y += (-dip * dip * 0.016 + 0.004) * bobA + VM.swayY * (1 - k) * 0.4 - (og ? 0 : 0.02)
     - 0.012 * moving * (1 - k) + VM.landY * (1 - k * 0.7) + Math.sin(VM.breath) * 0.0018 * ik - sk * 0.05;
   gunRig.position.z += W.kick * lerp(0.04, 0.02, k) + VM.fwdV * 0.012 * (1 - k) + sk * 0.02;
+  // 側身：手上的槍跟著往那邊歪、往那邊移一點（看得出在探頭）
+  const lnA = player.alive ? player.leanA || 0 : 0;
+  gunRig.position.x += lnA * 0.035 * (1 - k * 0.6); gunRig.position.y -= Math.abs(lnA) * 0.012;
   gunRig.rotation.set(W.kick * lerp(0.06, 0.02, k) + VM.swayY + Math.sin(VM.breath * 0.5) * 0.004 * ik - sk * 0.24 - dip * 0.012 * bobA,
     VM.swayX * 1.5 + bs * 0.01 * bobA + sk * 0.36,
-    W.roll + VM.latV * 0.06 * (1 - k * 0.8) + bs * 0.018 * bobA + sk * 0.3);
+    W.roll + VM.latV * 0.06 * (1 - k * 0.8) + bs * 0.018 * bobA + sk * 0.3 - lnA * 0.32 * (1 - k * 0.5));
   // 出槍：從畫面下方抬起來
   if (W.deployT > 0) { const d = Math.min(1, W.deployT / 0.6); gunRig.position.y -= d * d * 0.25; gunRig.rotation.x -= d * d * 0.6; }
   // 換彈：槍往下歪、彈匣拔出再插回去
@@ -6804,7 +6811,10 @@ function reloadOrInspect() { if (!W.isNade && W.ammo >= WP.mag && W.reloadT <= 0
   const show = () => { el.classList.toggle('on', INPUT.lean !== 0); el.dataset.d = INPUT.lean < 0 ? 'L' : INPUT.lean > 0 ? 'R' : ''; };
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation(); audioInit(); pid = e.pointerId; sx = e.clientX; t0 = performance.now(); was = INPUT.lean;
-    INPUT.lean = was ? was : (S.lefty ? -1 : 1); show(); try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ }
+    // 按左半邊往左探、右半邊往右探；同一邊再按一次收回，按另一邊直接換邊
+    const r = el.getBoundingClientRect(), side = e.clientX < r.left + r.width / 2 ? -1 : 1;
+    if (was === side) INPUT.lean = side; else { INPUT.lean = side; was = 0; }
+    show(); try { el.setPointerCapture(pid); } catch (err) { /* 略過 */ }
   });
   el.addEventListener('pointermove', (e) => { if (e.pointerId !== pid) return; const dx = e.clientX - sx; if (Math.abs(dx) > 18) { INPUT.lean = dx < 0 ? -1 : 1; was = 0; show(); } });
   const up = (e) => {
