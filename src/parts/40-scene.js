@@ -54,13 +54,25 @@ function boxMesh(w, h, d, color, x, y, z, parent, mat) {
   m.position.set(x, y, z); parent.add(m); return m;
 }
 // 把很多小零件合成一個幾何（每個零件可以帶自己的顏色），減少繪製次數
+let VM_BEV = false;   // 建手上的槍時：大零件用有倒角的方塊（邊緣接得到光，像加工過的金屬）
+function bevelBox(w, h, d, r) {
+  const g = new THREE.BoxGeometry(w, h, d, 2, 2, 2), p = g.attributes.position, v = new V3(), c = new V3(), hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    c.set(Math.max(-hx, Math.min(hx, v.x)), Math.max(-hy, Math.min(hy, v.y)), Math.max(-hz, Math.min(hz, v.z)));
+    const dd = v.clone().sub(c); if (dd.lengthSq() > 1e-12) { dd.normalize(); v.copy(c).addScaledVector(dd, r); }
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals(); return g;
+}
 function partBox(w, h, d, x, y, z, color, rx = 0, ry = 0, rz = 0) {
-  const g = new THREE.BoxGeometry(w, h, d);
+  const mn = Math.min(w, h, d), mx = Math.max(w, h, d);
+  const g = VM_BEV && mn >= 0.012 && mx >= 0.03 ? bevelBox(w, h, d, Math.min(0.004, mn * 0.25)) : new THREE.BoxGeometry(w, h, d);
   g.applyMatrix4(new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new V3(1, 1, 1)));
   g.userData.color = color; return g;
 }
 function partCyl(r, len, x, y, z, color, seg = 8) {
-  const g = new THREE.CylinderGeometry(r, r, len, seg); g.rotateX(Math.PI / 2); g.translate(x, y, z); g.userData.color = color; return g;
+  const g = new THREE.CylinderGeometry(r, r, len, VM_BEV ? Math.max(seg, r > 0.012 ? 20 : 12) : seg); g.rotateX(Math.PI / 2); g.translate(x, y, z); g.userData.color = color; return g;
 }
 // 側面輪廓擠出：pts 是 [槍身 z（往後為正）, y]，w 是厚度
 function partProfile(pts, w, x, color) {
@@ -102,7 +114,7 @@ const VM_ENV = (function () {
     const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromEquirectangular(t); pm.dispose(); t.dispose(); return rt.texture;
   } catch (e) { return null; }
 })();
-const VM_BASE = { metal: new THREE.Color('#3d4248'), poly: new THREE.Color('#34332f'), cloth: new THREE.Color('#9da392') };
+const VM_BASE = { metal: new THREE.Color('#40454b'), poly: new THREE.Color('#2a2a28'), cloth: new THREE.Color('#9da392') };   // 機匣是陽極處理的深灰、護木握把是更深的霧面塑膠
 const VM_MATS = {
   metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.4, envMap: VM_ENV, envMapIntensity: 0.9 }),
   poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.62, envMap: VM_ENV, envMapIntensity: 0.6 }),
@@ -158,6 +170,7 @@ function vmAssemble(metal, poly, cloth, left, magParts, magPos, muzzle) {
 }
 const VMODELS = {};
 (function buildViewmodels() {
+  VM_BEV = true;
   const M = '#ffffff', D = '#9aa0a8', P = '#ffffff', P2 = '#c9bfae', K = '#4a4e55';
   // 步槍「曙七」
   {
@@ -281,6 +294,7 @@ const VMODELS = {};
     [partCyl(0.032, 0.1, 0, 0, 0, body, 10), partCyl(0.0335, 0.018, 0, 0, -0.02, band, 10)], vmRightArm(0.012, -0.075, 0.06), vmLeftArm(-0.04, -0.06, -0.1),
     [partBox(0.001, 0.001, 0.001, 0, 0, 0, M)], new V3(0, 0, 0), new V3(0, 0, -0.05));
   for (const g of [VMODELS.he = nade('#5d6440', '#2b2d22'), VMODELS.flash = nade('#c9cdd2', '#3b6fb0'), VMODELS.smoke = nade('#77808a', '#d8d8d8'), VMODELS.molotov = nade('#6b4a26', '#e9dfc8')]) g.children[1].rotation.x = Math.PI / 2;
+  VM_BEV = false;
 })();
 let gun = VMODELS.rifle; gun.visible = true;
 // 走進陰影時手上的槍也跟著變暗（matcap 不受場景燈光影響，用這個近似）
