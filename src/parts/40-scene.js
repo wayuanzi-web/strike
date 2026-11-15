@@ -483,6 +483,7 @@ function audioInit() {
     noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.5, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     prerenderSounds();
+    setTimeout(() => { if (typeof ensureReverb === 'function') ensureReverb(); }, 400);   // 混響器先建好（設定回音要做 FFT，放到開打第一幀會卡 40 毫秒以上）
   } catch (e) { AC = null; }
 }
 function offline(len, build) {

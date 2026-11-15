@@ -546,6 +546,7 @@ function makeHuman(team, look = 'grunt') {
   });
   const face = HUMAN_SEQ++ % MH_HEADS.length; mat.userData.skinU.value.set(MH_HEADS[face].tone);
   mat.userData.headTU.value = mhHeadTex(face); mat.userData.headNU.value = mhHeadTex(face, 1); { const bc = new THREE.Color(MH_HEADS[face].brow); mat.userData.browU.value.set(bc.r, bc.g, bc.b, face % MH_HEADS.length); }
+  humanGeo(team, look, 1, face);   // 遠處的簡化版也先建好（不然第一次有人走遠時那一幀要臨時建，卡 10–50 毫秒）
   const mesh = new THREE.SkinnedMesh(humanGeo(team, look, 0, face), mat);
   mesh.add(bones[0]); mesh.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(bones));

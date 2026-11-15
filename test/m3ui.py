@@ -13,6 +13,12 @@ async def main():
         r = await page.evaluate("() => { const s = window.__strike; return [s.game.state, s.ROUND.num, s.game.fps.toFixed(1), s.game.autoPR, s.renderer.getPixelRatio()]; }")
         res.append(('對戰在新地圖開打', r[0] == 'play' and r[1] == 1, r))
         res.append(('畫質自動：太卡會降解析度', r[3] < pr0[0] or float(r[2]) >= 45, [pr0, r[2:]]))
+        r = await page.evaluate("""() => { const s = window.__strike, g = s.game, keep = [g.fps, g.autoPR, g.autoDown, g.fastN]; g.autoDown = false; g.fastN = 0; g.autoPR = 1.25; g.fps = 60;
+          const dpr = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio'); Object.defineProperty(window, 'devicePixelRatio', { value: 3, configurable: true });
+          for (let i = 0; i < 31; i++) s.autoQuality(); const up = g.autoPR; for (let i = 0; i < 61; i++) s.autoQuality(); const up2 = g.autoPR;
+          g.fps = 30; for (let i = 0; i < 6; i++) s.autoQuality(); const down = g.autoPR; g.fps = 60; for (let i = 0; i < 62; i++) s.autoQuality(); const after = g.autoPR;
+          if (dpr) Object.defineProperty(window, 'devicePixelRatio', dpr); else delete window.devicePixelRatio; g.fps = keep[0]; g.autoPR = keep[1]; g.autoDown = keep[2]; g.fastN = keep[3]; return [up, up2, down, after]; }""")
+        res.append(('畫質自動：穩定 15 秒就往上調（最高 1.5）、降過一次就不再往上', r == [1.375, 1.5, 1.3, 1.3], r))
         await page.screenshot(path=str(OUT / 'm3ui.png'))
         for n, ok, info in res: print('PASS' if ok else 'FAIL', n, info)
         print('ERRORS', [e for e in errors if '404' not in e]); await b.close()
