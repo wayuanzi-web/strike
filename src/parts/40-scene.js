@@ -94,16 +94,26 @@ function placeGroundDetail() {
 }
 // ---------- 會動的布：舊城巷子裡的晾衣繩、其他地圖的旗桿 ----------
 // 全部合成一個網格、一次繪製；擺動在頂點著色器裡算（aW：0＝固定的邊、1＝自由端，aPh：相位）
-const CLOTH_U = { value: 0 };
+const CLOTH_U = { value: 0 }, CLOTH_B = { value: new THREE.Vector4(0, -99, 0, -99) };   // 最近一次爆炸：位置＋時間
 const clothMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
 clothMat.onBeforeCompile = (sh) => {
-  sh.uniforms.uT = CLOTH_U;
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', 'uniform float uT; attribute float aW; attribute float aPh; attribute vec3 aN;\n#include <common>')
+  sh.uniforms.uT = CLOTH_U; sh.uniforms.uB = CLOTH_B;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', 'uniform float uT; uniform vec4 uB; attribute float aW; attribute float aPh; attribute vec3 aN;\n#include <common>')
     .replace('#include <begin_vertex>', `#include <begin_vertex>
       float wv = sin(uT * 3.1 + aPh + position.x * 1.7 + position.z * 1.3 + position.y * 2.0) * 0.6 + sin(uT * 5.3 + aPh * 1.7 + position.y * 3.0) * 0.4;
-      transformed += aN * wv * aW * 0.16 + vec3(0.0, -abs(wv) * aW * aW * 0.03, 0.0);`);
+      transformed += aN * wv * aW * 0.16 + vec3(0.0, -abs(wv) * aW * aW * 0.03, 0.0);
+      // 爆炸的震波：附近的布被往外吹、抖幾下，一秒多後平息
+      float ba = uT - uB.w, bd = distance(position, uB.xyz), bk = step(0.0, ba) * exp(-ba * 2.6) * (1.0 - smoothstep(4.0, 16.0, bd));
+      vec3 away = normalize(position - uB.xyz + vec3(0.0, 0.01, 0.0));
+      transformed += (away * 0.45 * exp(-ba * 5.0) + aN * sin(ba * 21.0 + aPh) * 0.3) * bk * aW;`);
 };
 let clothMesh = null;
+function clothBlast(p) { CLOTH_B.value.set(p.x, p.y + 0.5, p.z, performance.now() / 1000); }
+// 爆炸震到附近沒受傷的人：往爆炸的反方向晃一下、縮一下（不留血跡）
+function blastFlinch(p, r) {
+  for (const b of bots) { if (!b.active || !b.alive) continue; const P = b.phys.pos, d = Math.hypot(P.x - p.x, P.z - p.z); if (d > r || d < 0.3) continue;
+    humanHit(b, 'body', _v1.set((P.x - p.x) / d, 0, (P.z - p.z) / d), 26 * (1 - d / r) + 8, true); b.flinchT = 0.35 + 0.35 * (1 - d / r); }
+}
 function buildCloth() {
   if (clothMesh) { scene.remove(clothMesh); clothMesh.geometry.dispose(); clothMesh = null; }
   const P = [], C = [], W = [], PH = [], NN = [], I = [], col = new THREE.Color();

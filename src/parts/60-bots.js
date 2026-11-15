@@ -547,7 +547,9 @@ function botModel(b, dt) {
   const p = b.phys.pos;
   const sp = Math.hypot(b.phys.vel.x, b.phys.vel.z);
   b.walk += dt * sp * 2.3;
-  b.ck = lerp(b.ck, b.phys.crouched ? 1 : 0, 1 - Math.exp(-15 * dt));
+  // 附近爆炸：縮身半蹲一下（約半秒）
+  if (b.flinchT > 0) b.flinchT -= dt;
+  b.ck = lerp(b.ck, b.phys.crouched ? 1 : b.flinchT > 0 ? 0.6 : 0, 1 - Math.exp(-(b.flinchT > 0 ? 18 : 15) * dt));
   botLean(b, dt, sp);
   if (b.g.visible && MAP.lamps && (b.lampT = (b.lampT || 0) - dt) <= 0) { b.lampT = 0.2; lampColorAt(b.phys.pos.x, b.phys.pos.z, b.hm.mat.userData.lampU.value); }   // 夜裡：站在路燈下才被照亮
   else if (!MAP.lamps && b.hm.mat.userData.lampU.value.r) b.hm.mat.userData.lampU.value.setRGB(0, 0, 0);

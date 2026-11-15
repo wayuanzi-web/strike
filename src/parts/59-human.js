@@ -620,7 +620,7 @@ function humanInit(b) {
   b.hYaw = 0; b.tLag = 0; b.tStep = 0; b.tSide = 1; b.airT = 0; b.airK = 0; b.prevSp = 0; b.lastYaw = b.yaw;
 }
 // 中彈：dir 是子彈飛的方向（世界座標）；照部位和方向推一下
-function humanHit(b, part, dir, dmg) {
+function humanHit(b, part, dir, dmg, noMark = false) {
   if (!b.hs) humanInit(b);
   const f = Math.cos(b.yaw), s = Math.sin(b.yaw);
   // 子彈方向換到這個人的座標：back>0 往他背後推（正面中彈）、right>0 往他右邊推
@@ -630,7 +630,7 @@ function humanHit(b, part, dir, dmg) {
   else if (part === 'legs') { const side = right > 0 ? 'kL' : 'kR'; H[Math.random() < 0.5 ? 'kL' : 'kR'].v += 9 * k; H[side].v += 4 * k; H.sp.v -= 2.5 * k; }
   else { H.sp.v += 7 * back * k; H.sy.v += 9 * (right >= 0 ? 1 : -1) * k * (0.6 + Math.random() * 0.4); H.sr.v += 5 * right * k; H.hd.v += 4 * back * k; }
   // 衣服上留彈孔與血跡（綁定姿勢座標，正面 -z）：身體打在胸腹前後、腳打在大腿；頭有頭盔不畫
-  if (b.mat && b.mat.userData.hitsU && part !== 'head') {
+  if (!noMark && b.mat && b.mat.userData.hitsU && part !== 'head') {
     const front = back >= 0, sd = right > 0 ? -1 : 1, rr = 0.042 + Math.min(0.035, dmg * 0.0009);
     const pt = part === 'legs' ? [sd * rand(0.07, 0.14), rand(0.5, 0.86), front ? -0.085 : 0.075] : [rand(-0.14, 0.14), rand(1.0, 1.4), front ? -0.165 : 0.14];
     const ud = b.mat.userData; ud.hitsU.value[ud.hitN++ % 6].set(pt[0], pt[1], pt[2], rr);

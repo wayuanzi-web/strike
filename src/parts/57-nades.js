@@ -71,7 +71,7 @@ function explodeHE(n) {
   boomFx(p, 5.5, '#ffb45a'); smokeBlast(p, 4.5);   // 手榴彈把附近的煙吹開
   for (let k = 0; k < 7; k++) spawnPuff(_v2.set(p.x + rand(-1.2, 1.2), p.y + rand(0.2, 1.6), p.z + rand(-1.2, 1.2)), '#3d3a36', rand(1.2, 2.2), rand(0.7, 1.2), 0.8);
   spawnSparks(p, _v2.set(0, 1, 0), '#ffd27a', 18);
-  const fy = blastDebris(p, 28, 5.5);
+  const fy = blastDebris(p, 28, 5.5); clothBlast(p); blastFlinch(p, 12);
   addDecal(_v2.set(p.x, fy + 0.005, p.z), [0, 1, 0], 9, _scorch);
   sfx('boom', 1, { pos: p });
   if (n.owner && n.owner.remote) return;   // 好友對戰：對手丟的手榴彈傷害由他那台算
