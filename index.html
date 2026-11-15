@@ -617,7 +617,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261115-0934';   // 建置時換成日期時間
+const BUILD = '20261115-0949';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -3869,7 +3869,7 @@ const ARM_A = 0.31, ARM_B = 0.27;   // 上臂、前臂長
 // 迷彩配色：底色＋兩種斑塊＋深色（每隊／每種外觀不同）
 const CAMO = {
   B: ['#4d573c', '#39422e', '#636c4a', '#242a1f'],      // 敵方：深綠林地迷彩
-  A: ['#8f8b6e', '#6a6c4e', '#a39a7c', '#54463a'],      // 我方：美軍 OCP（棕綠底、橄欖與淺沙色斑塊、深棕點）
+  A: ['#a39a7b', '#7b7f5f', '#c0b598', '#5c4e3b'],      // 我方：美軍 OCP（棕綠底、橄欖與淺沙色斑塊、深棕點）
   elite: ['#2c2e31', '#1d1e20', '#3c3e42', '#141516'],
   boss: ['#26303f', '#26303f', '#2c3748', '#1b2230'],      // 軍官制服：深藍、幾乎素色
 };
@@ -4143,11 +4143,19 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
     add(hBox(0.1, 0.1, 0.09, 0, 1.53, -0.03, W, HB.neck, 1, 0.1));   // 立領
   } else {
     // 防彈背心：前後板、側邊、彈匣袋、無線電、肩帶、背包
-    add(hBox(0.33, 0.33, 0.05, 0, 1.31, -0.125, vest, HB.chest), hBox(0.31, 0.31, 0.012, 0, 1.31, -0.153, vestD, HB.chest),
-      hBox(0.33, 0.35, 0.05, 0, 1.31, 0.12, vest, HB.chest), hBox(0.06, 0.22, 0.2, -0.19, 1.25, 0, vestD, HB.chest), hBox(0.06, 0.22, 0.2, 0.19, 1.25, 0, vestD, HB.chest),
-      hBox(0.07, 0.03, 0.26, -0.13, 1.47, 0, vest, HB.chest), hBox(0.07, 0.03, 0.26, 0.13, 1.47, 0, vest, HB.chest));
-    for (let k = 0; k < 3; k++) add(hBox(0.085, 0.12, 0.05, -0.095 + k * 0.095, 1.2, -0.17, pouch, HB.chest), hBox(0.087, 0.03, 0.052, -0.095 + k * 0.095, 1.25, -0.172, vestD, HB.chest));
-    for (let k = 0; k < 3; k++) add(hBox(0.3, 0.008, 0.008, 0, 1.38 - k * 0.04, -0.156, strap, HB.chest));   // 織帶
+    const vk = us ? 1 : 0, vC = us ? W : vest, vD = us ? W : vestD, pC = us ? W : pouch;   // 美軍：背心、彈匣袋都是迷彩布
+    add(hBox(0.33, 0.33, 0.05, 0, 1.31, -0.125, vC, HB.chest, vk), hBox(0.31, 0.31, 0.012, 0, 1.31, -0.153, vD, HB.chest, vk),
+      hBox(0.33, 0.35, 0.05, 0, 1.31, 0.12, vC, HB.chest, vk), hBox(0.06, 0.22, 0.2, -0.19, 1.25, 0, vD, HB.chest, vk), hBox(0.06, 0.22, 0.2, 0.19, 1.25, 0, vD, HB.chest, vk),
+      hBox(0.07, 0.03, 0.26, -0.13, 1.47, 0, vC, HB.chest, vk), hBox(0.07, 0.03, 0.26, 0.13, 1.47, 0, vC, HB.chest, vk));
+    for (let k = 0; k < 3; k++) add(hBox(0.085, 0.12, 0.05, -0.095 + k * 0.095, 1.2, -0.17, pC, HB.chest, vk), hBox(0.087, 0.03, 0.052, -0.095 + k * 0.095, 1.25, -0.172, vD, HB.chest, vk));
+    if (us) {
+      for (let k = 0; k < 3; k++) add(hBox(0.06, 0.035, 0.022, -0.095 + k * 0.095, 1.272, -0.168, '#3d4a35', HB.chest));                       // 露出來的彈匣
+      for (let k = 0; k < 5; k++) add(hBox(0.3, 0.012, 0.005, 0, 1.44 - k * 0.032, -0.16, '#8d8468', HB.chest));                              // 一排排織帶（MOLLE）
+      for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) add(hBox(0.004, 0.2, 0.012, 0.195 * sx + 0.03 * sx, 1.25, -0.06 + k * 0.06, '#8d8468', HB.chest));   // 腰封織帶
+      add(hBox(0.09, 0.07, 0.006, 0, 1.4, -0.162, '#a89a78', HB.chest), hBox(0.022, 0.022, 0.004, 0, 1.4, -0.166, '#2a2a26', HB.chest));       // 胸口魔鬼氈與階級章
+      for (const sx of [-1, 1]) add(hBox(0.05, 0.02, 0.03, 0.13 * sx, 1.482, -0.09, '#7a6a4c', HB.chest), hBox(0.075, 0.11, 0.06, 0.2 * sx, 1.2, -0.1, W, HB.chest, 1));   // 肩帶扣具、側邊小包
+      add(hTorso(0.082, 0.09, 0.07, 0, 1.515, 0.0, W, HB.neck, 1, 1, 10));                                                                      // 戰鬥衫的立領
+    } else for (let k = 0; k < 3; k++) add(hBox(0.3, 0.008, 0.008, 0, 1.38 - k * 0.04, -0.156, strap, HB.chest));   // 織帶
     add(hBox(0.06, 0.1, 0.045, -0.12, 1.4, -0.165, '#2a2d30', HB.chest), hCyl(0.005, 0.24, -0.15, 1.52, 0.17, '#1a1b1c', HB.chest));    // 無線電＋天線
     add(hBox(0.27, 0.3, 0.13, 0, 1.28, 0.205, elite ? '#1c1d1f' : PAL.pack, HB.chest), hBox(0.25, 0.08, 0.02, 0, 1.36, 0.275, strap, HB.chest));
     add(hBox(0.08, 0.05, 0.012, 0.0, 1.4, -0.158, band, HB.chest));   // 胸前隊伍色章
@@ -4192,7 +4200,10 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
       hBox(0.012, 0.09, 0.012, -0.093, 1.655, -0.03, strap, HB.head, 0, 0.35), hBox(0.012, 0.09, 0.012, 0.093, 1.655, -0.03, strap, HB.head, 0, 0.35), hBox(0.05, 0.016, 0.02, 0, 1.578, -0.088, strap, HB.head));   // 下巴帶
     else add(hEll(0.132, 0.12, 0.142, 0, 1.705, 0.008, hc, HB.head, elite ? 0 : 1, 14, 6, 0, Math.PI * 0.55), hTorso(0.134, 0.136, 0.02, 0, 1.7, 0.008, '#1b1c1d', HB.head, 0, 1.06, 14));
     const cx = mh ? 0.098 : 0.115, cc = us ? '#5f5238' : '#1c1e20';
-    add(hCyl(0.036, 0.03, -cx, 1.662, 0.012, cc, HB.head, 0, Math.PI / 2, 10), hCyl(0.036, 0.03, cx, 1.662, 0.012, cc, HB.head, 0, Math.PI / 2, 10));
+    if (us && mh) for (const sx of [-1, 1]) add(hBox(0.014, 0.034, 0.11, 0.11 * sx, 1.722, 0.0, '#9a8763', HB.head), hBox(0.014, 0.03, 0.035, 0.106 * sx, 1.7, 0.045, '#9a8763', HB.head),
+      hBox(0.017, 0.012, 0.075, 0.113 * sx, 1.73, 0.0, '#6f6044', HB.head));   // 導軌座：橫桿＋前後兩支斜撐＋上面的槽
+    else add(hCyl(0.036, 0.03, -cx, 1.662, 0.012, cc, HB.head, 0, Math.PI / 2, 10), hCyl(0.036, 0.03, cx, 1.662, 0.012, cc, HB.head, 0, Math.PI / 2, 10));
+    if (us && mh) add(hBox(0.06, 0.05, 0.025, 0, 1.765, -0.118, '#17181a', HB.head, 0, -0.25), hBox(0.035, 0.03, 0.03, 0, 1.76, -0.135, '#0f1011', HB.head, 0, -0.25));   // 正面的夜視鏡座
     add(hBox(0.05, 0.035, 0.03, 0, mh ? 1.785 : 1.765, mh ? -0.112 : -0.135, '#16171a', HB.head), hBox(0.06, 0.03, 0.012, 0, 1.74, 0.145, band, HB.head));   // 隊伍色魔鬼氈章在盔後
     if (elite) add(hBox(0.09, 0.04, 0.06, 0, 1.765, -0.17, '#0e0f10', HB.head), hCyl(0.018, 0.05, -0.025, 1.745, -0.2, '#0e0f10', HB.head, Math.PI / 2), hCyl(0.018, 0.05, 0.025, 1.745, -0.2, '#0e0f10', HB.head, Math.PI / 2));
   }
