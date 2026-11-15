@@ -509,9 +509,11 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
     // 頭盔（上半球＋盔緣）、耳機、夜視鏡座、盔布
     const hc = elite ? '#1a1b1d' : PAL.helmet, h0 = parts.length;
     if (mh) add(hEll(0.112, 0.112, 0.128, 0, 1.712, 0.002, hc, HB.head, 1, 20, 8, 0, Math.PI * 0.52), hTorso(0.1125, 0.1125, 0.012, 0, 1.705, 0.002, us ? '#6f6648' : '#22261e', HB.head, 0, 1.143, 20),   // 貼合頭型的頭盔＋盔緣
-      hBox(0.042, 0.012, 0.014, 0, 1.577, -0.09, strap, HB.head));   // 下巴托
+      ...(mh ? [] : [hBox(0.042, 0.012, 0.014, 0, 1.577, -0.09, strap, HB.head)]));   // 下巴托（寫實的頭照下巴尖另外放）
+    const CH = mh && MH_HEADS[face0 % MH_HEADS.length].chin || [1.586, -0.095];
+    if (mh) add(hLimb(0.0042, [-0.018, CH[0] - 0.024, CH[1] + 0.03], [0.018, CH[0] - 0.024, CH[1] + 0.03], strap, HB.head, 0, 5));   // 四點式固定帶：從下巴底下繞過（照每張臉的下巴位置；IHPS 沒有下巴杯）
     if (mh && !lod) for (const sx of [-1, 1]) add(hLimb(0.0042, [0.1 * sx, 1.722, -0.04], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5), hLimb(0.0042, [0.102 * sx, 1.722, 0.05], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5),
-      hLimb(0.0042, [0.09 * sx, 1.632, -0.03], [0.03 * sx, 1.58, -0.085], strap, HB.head, 0, 5), hBox(0.008, 0.014, 0.014, 0.091 * sx, 1.632, -0.03, '#1d1d1b', HB.head));   // Y 形下巴帶＋調整扣
+      hLimb(0.0042, [0.09 * sx, 1.632, -0.03], [0.018 * sx, CH[0] - 0.024, CH[1] + 0.03], strap, HB.head, 0, 5), hBox(0.008, 0.014, 0.014, 0.091 * sx, 1.632, -0.03, '#1d1d1b', HB.head));   // Y 形下巴帶＋調整扣
     if (mh && !lod) {
       const vel = us ? '#a89a78' : '#2c3226';
       add(hBox(0.07, 0.004, 0.06, 0, 1.823, 0.005, vel, HB.head));   // 盔頂的魔鬼氈

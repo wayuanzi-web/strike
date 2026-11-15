@@ -270,8 +270,14 @@ for var in VARIANTS:
     Nl /= np.linalg.norm(Nl, axis=1, keepdims=True) + 1e-12
     print('   遠處簡化頭：頂點', nl, '三角形', len(Tl))
     low = dict(p=q(Pl - np.array([0, 1.65, 0]), -0.2, 0.2, np.uint16), nrm=q(Nl, -1, 1, np.uint8), c=q(np.clip(Cl, 0, 1), 0, 1, np.uint8), wn=q(Wl, 0, 1, np.uint8), tri=base64.b64encode(Tl.astype(np.uint16).tobytes()).decode())
+    # 下巴尖：臉中線上、嘴巴下方 2–7 公分裡最前面的點（給頭盔的下巴托和帶子對位）
+    cm = (np.abs(P[:, 0]) < 0.012) & (P[:, 1] < L['mouth'][1] - 0.02) & (P[:, 1] > L['mouth'][1] - 0.07) & (kind > 2.5) & (kind < 4.5)
+    ci = np.where(cm)[0][np.argmin(P[cm, 2])]; chin_pt = [round(float(P[ci, 1]), 4), round(float(P[ci, 2]), 4)]
+    under = cm & (P[:, 1] < chin_pt[0] - 0.008); chin_pt.append(round(float(P[under, 1].min()), 4) if under.any() else round(chin_pt[0] - 0.02, 4))
+    print('   下巴尖 y, z, 下緣 y', chin_pt)
     out.append(dict(name=var['name'], tone=var['tone'], brow=var['brow'], n=len(P), tex=tex, ntex=ntex, kb=len(tex) // 1024, nkb=len(ntex) // 1024, bl=q(BL, -0.02, 0.02, np.uint8),
         eye=[round(float(abs(L['eyeL'][0])), 4), round(float(L['eyeL'][1]), 4)], mouth=[round(float(L['mouth'][1]), 4), round(float(L['mouth'][2]), 4)],
+        chin=chin_pt,
         p=q(P, -0.16, 0.16, np.uint16) if False else q(P - np.array([0, 1.65, 0]), -0.2, 0.2, np.uint16), nrm=q(N, -1, 1, np.uint8), c=q(C, 0, 1, np.uint8), k=q(kind * 10, 0, 255, np.uint8), wn=q(wn, 0, 1, np.uint8),
         tri=base64.b64encode(Tk.astype(np.uint16).tobytes()).decode(), low=low))
 

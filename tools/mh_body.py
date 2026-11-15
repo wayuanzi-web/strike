@@ -56,6 +56,7 @@ for b in order:
     elif base in ('lowerarm02', 'wrist') and TWIST: R = rot_axis(d, TWIST * 0.5 * side)
     elif base.startswith('finger'):
         f, seg = int(base[6]), int(base[8]) - 1; ang = (THUMB if f == 1 else CURL)[seg]
+        if f == 2 and b.endswith('.R'): ang = (6, 10, 6)[seg]          # 右手食指：伸直貼著扳機護弓（持槍的基本動作），其他手指握著握把
         if ang:
             # 彎曲軸：手掌的橫向（食指根 → 小指根），在擺好的姿勢下量
             sfx = b[-2:]; lat = (head['finger5-1' + sfx] - head['finger2-1' + sfx]) @ GA['wrist' + sfx].T
