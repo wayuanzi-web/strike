@@ -92,15 +92,16 @@ function patchHumanMat(m, rim, camo) {
   const U = m.userData.rimU = { value: new THREE.Color().setRGB(...rim.split(',').map(Number)) };
   const C = m.userData.camoU = camo.map((c) => ({ value: new THREE.Color(c) }));
   m.userData.skinU = { value: new THREE.Color(pick(SKIN_TONES)) };
-  m.userData.lampU = { value: new THREE.Color(0, 0, 0) };   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
+  m.userData.lampU = { value: new THREE.Color(0, 0, 0) };
+  m.userData.headTU = { value: mhHeadTex(0) }; m.userData.browU = { value: new THREE.Vector4(0.1, 0.07, 0.05, 0) };   // 寫實的頭：皮膚＋眼睛貼圖、眉毛顏色與第幾列   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; });
     sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU; sh.uniforms.uLampH = m.userData.lampU; sh.uniforms.uFl = LIGHT_U.uFl;
-    sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH };
-    sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM;')
+    sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH }; sh.uniforms.uHeadT = m.userData.headTU; sh.uniforms.uBrow = m.userData.browU; sh.uniforms.uBrowT = { value: mhBrowTex() };
+    sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nattribute vec2 aUvH;\nvarying vec2 vUvH;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM; vUvH = aUvH;')
       .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvHw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM;
-varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw; varying vec2 vRM;
+    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uBrowT; uniform vec4 uBrow;
+varying vec2 vUvH; varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw; varying vec2 vRM;
 ${FL_GLSL}
 // 布料凹凸：織紋（細）＋皺褶（沿著四肢的橫向褶子、關節處多）
 float clothH(vec3 p, vec3 n) {
@@ -118,6 +119,9 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
 ` + sh.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
   {
+    vec3 base0 = diffuseColor.rgb;
+    vec3 headTx = texture2D(uHeadT, vUvH).rgb; vec2 bq = vec2(vRest.x / 0.14 + 0.5, (1.72 - vRest.y) / 0.035);   // 貼圖在條件式外面取樣（不然手機上會取到錯的解析度層）
+    float browTx = texture2D(uBrowT, vec2(clamp(bq.x, 0.0, 1.0), (uBrow.a + clamp(bq.y, 0.0, 1.0)) * 0.25)).r;
     vec3 w = abs(vRN); w /= (w.x + w.y + w.z + 1e-4);
     vec4 t = texture2D(uCamoT, vRest.zy * 2.9) * w.x + texture2D(uCamoT, vRest.xz * 2.9) * w.y + texture2D(uCamoT, vRest.xy * 2.9) * w.z;
     vec3 q2 = vRest * 8.3 + 0.37; vec4 t2 = texture2D(uCamoT, q2.zy) * w.x + texture2D(uCamoT, q2.xz) * w.y + texture2D(uCamoT, q2.xy) * w.z;   // 第二層：把斑塊邊緣打碎、加小碎點
@@ -128,13 +132,20 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * cam * 1.25, cw);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uSkin * (0.94 + 0.12 * t.a), sw);   // 皮膚：每人膚色不同，帶一點斑駁
     // 臉：正面投影細節圖（只在頭部、朝前的皮膚）
-    if (sw > 0.5 && vRest.y > 1.55 && vRest.y < 1.75 && vRN.z < -0.05) {
+    if (vCamo > 2.5) {   // 寫實的頭：皮膚、眼球用貼圖（頂點顏色只剩遮蔽）；眉毛從正面投影
+      diffuseColor.rgb = base0 * headTx;
+      if (vCamo < 4.5 && vRN.z < -0.05 && bq.x > 0.0 && bq.x < 1.0 && bq.y > 0.0 && bq.y < 1.0) {
+        float ba = smoothstep(0.04, 0.42, browTx) * smoothstep(-0.05, -0.3, vRN.z);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uBrow.rgb * (0.75 + 0.5 * t2.a), ba * 0.9);
+      }
+    }
+    if (sw > 0.5 && vCamo < 2.5 && vRest.y > 1.55 && vRest.y < 1.75 && vRN.z < -0.05) {
       vec2 fuv = vec2(vRest.x / 0.2 + 0.5, (vRest.y - 1.55) / 0.2);
       vec4 fc = vCamo > 2.5 ? texture2D(uFaceM, fuv) : texture2D(uFaceT, fuv);
       diffuseColor.rgb = mix(diffuseColor.rgb, pow(fc.rgb, vec3(2.2)), fc.a * smoothstep(-0.05, -0.4, vRN.z));
     }
     if (vCamo > 2.5) { float hm = clamp(1.0 - abs(vCamo - 3.5) * 2.5, 0.0, 1.0); float sp = texture2D(uCamoT, vRest.xy * 47.0 + vRest.zz * 31.0).a;
-      diffuseColor.rgb *= 1.0 - hm * 0.45 * smoothstep(0.42, 0.6, sp); }   // 剃短的頭髮：一點一點的髮根
+      diffuseColor.rgb *= 1.0 - hm * 0.28 * smoothstep(0.42, 0.6, sp); }   // 剃短的頭髮：一點一點的髮根
     diffuseColor.rgb *= 0.9 + 0.1 * t.a;   // 布料、皮膚細紋
     if (sw < 0.5 && vRM.y < 0.5) diffuseColor.rgb *= 0.86 + 0.26 * t2.b;   // 裝備用久了顏色不均（灰塵、磨損）
     // 布料：腳下越靠近地面越髒（泥土色）、膝蓋磨白
@@ -142,22 +153,24 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.27, 0.21) * (0.8 + 0.4 * t.b), dirt * 0.55);
     diffuseColor.rgb *= 1.0 + cw * 0.12 * exp(-pow((vRest.y - 0.48) * 14.0, 2.0)) * step(abs(vRest.z), 0.12) * step(vRest.z, -0.02);
   }`)
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x; if (vCamo > 1.5) roughnessFactor *= 0.92 + 0.2 * texture2D(uCamoT, vRest.xy * 21.0 + vRest.z * 13.0).a;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x; if (vCamo > 1.5 && vCamo < 4.5) roughnessFactor *= 0.92 + 0.2 * texture2D(uCamoT, vRest.xy * 21.0 + vRest.z * 13.0).a;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRM.y;')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   { float cwN = clamp(vCamo, 0.0, 1.0) * (1.0 - step(1.5, vCamo)); if (cwN > 0.5 || vRM.x > 0.85) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0016);
-    else if (vCamo > 1.5) { vec3 aw = abs(vRN); aw /= (aw.x + aw.y + aw.z + 1e-4); vec3 sp = vRest * 34.0;
+    else if (vCamo > 1.5 && vCamo < 4.5) { vec3 aw = abs(vRN); aw /= (aw.x + aw.y + aw.z + 1e-4); vec3 sp = vRest * 34.0;
       float ph = texture2D(uCamoT, sp.zy).a * aw.x + texture2D(uCamoT, sp.xz).a * aw.y + texture2D(uCamoT, sp.xy).a * aw.z;
       float hmN = clamp(1.0 - abs(vCamo - 3.5) * 2.5, 0.0, 1.0), lipN = smoothstep(3.6, 4.0, vCamo);
       ph += hmN * texture2D(uCamoT, vRest.xy * 47.0 + vRest.zz * 31.0).a * 4.0;   // 髮根的顆粒
       normal = bumpN(normal, -vViewPosition, ph, 0.00016); }   // 皮膚毛孔
     else if (vRM.x > 0.7 && vRM.y < 0.5) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0009); }   // 尼龍裝備的織紋`)
       .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26 * smoothstep(1.5, 5.0, -vViewPosition.z);   // 邊緣光：貼近看時淡掉（近看才不會每個邊都一圈白）
-if (vCamo > 1.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.35, 0.25) * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 2.0) * 0.22;   // 皮膚邊緣透一點紅（透光感）
+if (vCamo > 4.5) { vec3 eR = reflect(-normalize(vViewPosition), normalize(normal));   // 眼球：角膜上的反光點（一大一小），眼睛才有神
+  outgoingLight += vec3(1.0, 0.97, 0.92) * (min(pow(max(dot(eR, normalize(vec3(0.22, 0.1, 0.97))), 0.0), 150.0) * 3.0, 1.1) + pow(max(dot(eR, normalize(vec3(-0.4, 0.15, 0.9))), 0.0), 60.0) * 0.3); }
+if (vCamo > 1.5 && vCamo < 4.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.35, 0.25) * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 2.0) * 0.22;   // 皮膚邊緣透一點紅（透光感）
 outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human8'; return m;
+  m.customProgramCacheKey = () => 'human13'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();
@@ -216,19 +229,29 @@ function hCyl(r, h, x, y, z, color, bone, rx = 0, rz = 0, seg = 10) {
   const g = new THREE.CylinderGeometry(r, r, h, seg); g.rotateX(rx); g.rotateZ(rz); g.translate(x, y, z); return hp(g, color, bone);
 }
 // 寫實的頭（58-heads，MakeHuman 資料）：解開成一個零件，帶自己的頂點顏色、種類、頭／脖子兩根骨頭的權重
-const MH_CACHE = {};
+const MH_CACHE = {}, MH_TEX = {};
+function mhHeadTex(fi) {
+  if (typeof MH_HEADS === 'undefined') return null; const H = MH_HEADS[fi % MH_HEADS.length];
+  if (!MH_TEX[H.name]) { const t = new THREE.TextureLoader().load(H.tex); t.colorSpace = THREE.SRGBColorSpace; t.flipY = false; t.anisotropy = 4; MH_TEX[H.name] = t; }
+  return MH_TEX[H.name];
+}
+function mhBrowTex() {
+  if (!MH_TEX.brow) { const t = new THREE.TextureLoader().load(MH_BROW_TEX); t.colorSpace = THREE.NoColorSpace; t.flipY = false; t.anisotropy = 4; MH_TEX.brow = t; }
+  return MH_TEX.brow;
+}
 function mhHeadPart(fi) {
   const H = MH_HEADS[fi % MH_HEADS.length];
   if (!MH_CACHE[H.name]) {
     const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
     const p = b64(H.p, Uint16Array), n = b64(H.nrm, Uint8Array), c = b64(H.c, Uint8Array), k = b64(H.k, Uint8Array), wn = b64(H.wn, Uint8Array), tri = b64(H.tri || MH_HEADS[0].tri, Uint16Array);
+    const uvq = b64(MH_HEAD_UV, Uint16Array), uv = new Float32Array(tri.length * 2);
     const N = tri.length, pos = new Float32Array(N * 3), nrm = new Float32Array(N * 3), col = new Float32Array(N * 3), kind = new Float32Array(N), w = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       const v = tri[i];
       for (let a = 0; a < 3; a++) { pos[i * 3 + a] = p[v * 3 + a] / 65535 * 0.4 - 0.2 + (a === 1 ? 1.65 : 0); nrm[i * 3 + a] = n[v * 3 + a] / 255 * 2 - 1; col[i * 3 + a] = c[v * 3 + a] / 255; }
-      kind[i] = k[v] / 10; w[i] = wn[v] / 255;
+      kind[i] = k[v] / 10; w[i] = wn[v] / 255; uv[i * 2] = uvq[v * 2] / 65535; uv[i * 2 + 1] = uvq[v * 2 + 1] / 65535;
     }
-    MH_CACHE[H.name] = { pos, nrm, col, kind, w };
+    MH_CACHE[H.name] = { pos, nrm, col, kind, w, uv };
   }
   const D = MH_CACHE[H.name], g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(D.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(D.nrm, 3));
@@ -236,7 +259,7 @@ function mhHeadPart(fi) {
   return g;
 }
 function mergeSkinned(parts) {
-  const P = [], N = [], C = [], SI = [], SW = [], CA = [], RM = [], c = new THREE.Color();
+  const P = [], N = [], C = [], SI = [], SW = [], CA = [], RM = [], UVH = [], c = new THREE.Color();
   for (const p0 of parts) {
     const pr = p0.parameters; if (HLOD && pr && pr.depth !== undefined && Math.max(pr.width, pr.height, pr.depth) < 0.05) continue;   // 遠處看不到的小零件
     const g = p0.index ? p0.toNonIndexed() : p0; c.set(p0.userData.color || '#ffffff');
@@ -245,7 +268,7 @@ function mergeSkinned(parts) {
     if (raw) {   // 寫實的頭：顏色、種類、權重都是每個頂點自己的
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(raw.col[i], raw.col[i + 1], raw.col[i + 2]);
-        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); RM.push(raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
+        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); RM.push(raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
       }
       continue;
     }
@@ -254,12 +277,12 @@ function mergeSkinned(parts) {
     for (let i = 0; i < pa.length; i += 3) {
       const ao = 1 - Math.max(0, -na[i + 1]) * 0.28 - (pa[i + 1] < 0.3 ? 0.06 : 0);   // 朝下的面、腳邊比較暗（接觸陰影）
       P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(c.r * ao, c.g * ao, c.b * ao);
-      SI.push(bn, 0, 0, 0); SW.push(1, 0, 0, 0); CA.push(cm); RM.push(rm[0], rm[1]);
+      SI.push(bn, 0, 0, 0); SW.push(1, 0, 0, 0); CA.push(cm); RM.push(rm[0], rm[1]); UVH.push(0, 0);
     }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('aCamo', new THREE.Float32BufferAttribute(CA, 1)); g.setAttribute('aRM', new THREE.Float32BufferAttribute(RM, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('aCamo', new THREE.Float32BufferAttribute(CA, 1)); g.setAttribute('aRM', new THREE.Float32BufferAttribute(RM, 2)); g.setAttribute('aUvH', new THREE.Float32BufferAttribute(UVH, 2));
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(SI, 4)); g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(SW, 4));
   g.computeBoundingSphere(); g.boundingSphere.radius = 1.6; g.boundingSphere.center.set(0, 0.9, 0);   // 倒地、彎腰時也不會被誤裁掉
   return g;
@@ -440,6 +463,7 @@ function makeHuman(team, look = 'grunt') {
     if (HB_PARENT[i] >= 0) bones[HB_PARENT[i]].add(bn);
   });
   const face = HUMAN_SEQ++ % MH_HEADS.length; mat.userData.skinU.value.set(MH_HEADS[face].tone);
+  mat.userData.headTU.value = mhHeadTex(face); { const bc = new THREE.Color(MH_HEADS[face].brow); mat.userData.browU.value.set(bc.r, bc.g, bc.b, face % MH_HEADS.length); }
   const mesh = new THREE.SkinnedMesh(humanGeo(team, look, 0, face), mat);
   mesh.add(bones[0]); mesh.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(bones));

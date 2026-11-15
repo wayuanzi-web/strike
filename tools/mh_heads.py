@@ -7,17 +7,19 @@ import sys, json, base64, os, math
 import numpy as np
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else '/home/claude/mh/makehuman/makehuman/data'
+SKINS = sys.argv[2] if len(sys.argv) > 2 else '/home/claude/mhskin'   # MakeHuman 的皮膚貼圖（public domain；download.tuxfamily.org/makehuman/assets/1.2/base/skins/textures）
 OUT = os.path.join(os.path.dirname(__file__), '..', 'src', 'parts', '58-heads.js')
 
 def load_obj(p):
-    V, F, G, g = [], [], [], ''
+    V, F, G, VT, FT, g = [], [], [], [], [], ''
     for ln in open(p):
         if ln.startswith('v '): V.append([float(x) for x in ln.split()[1:4]])
+        elif ln.startswith('vt '): VT.append([float(x) for x in ln.split()[1:3]])
         elif ln.startswith('g '): g = ln.split()[1]
         elif ln.startswith('f '):
             idx = [int(t.split('/')[0]) - 1 for t in ln.split()[1:]]
-            F.append(idx); G.append(g)
-    return np.array(V), F, G
+            F.append(idx); G.append(g); FT.append([int(t.split('/')[1]) - 1 for t in ln.split()[1:]])
+    return np.array(V), F, G, np.array(VT), FT
 
 def load_target(name):
     p = os.path.join(DATA, 'targets', name + '.target'); idx, d = [], []
@@ -26,7 +28,7 @@ def load_target(name):
         a = ln.split(); idx.append(int(a[0])); d.append([float(a[1]), float(a[2]), float(a[3])])
     return np.array(idx, dtype=int), np.array(d, dtype=float).reshape(-1, 3)
 
-V0, F, G = load_obj(os.path.join(DATA, '3dobjs', 'base.obj'))
+V0, F, G, VT, FT = load_obj(os.path.join(DATA, '3dobjs', 'base.obj'))
 W = json.load(open(os.path.join(DATA, 'rigs', 'default_weights.mhw')))['weights']
 BODY_BONES = ('root', 'spine', 'pelvis', 'clavicle', 'shoulder', 'upperarm', 'lowerarm', 'wrist', 'finger', 'metacarpal', 'upperleg', 'lowerleg', 'foot', 'toe', 'breast')
 headw = np.zeros(len(V0)); neckw = np.zeros(len(V0))
@@ -38,10 +40,10 @@ for bone, lst in W.items():
 
 # 四張臉：人種比例（非洲、亞洲、高加索）＋臉部細節目標（名稱 → 強度）；都是 25 歲上下的男性、肌肉偏多
 VARIANTS = [
-    dict(name='a', eth=(0.0, 0.0, 1.0), tone='#c9a184', iris='#5a7a8c', brow='#4a3626', det={'nose/nose-scale-horiz-decr': 0.3, 'chin/chin-width-incr': 0.4, 'cheek/l-cheek-bones-incr': 0.3, 'cheek/r-cheek-bones-incr': 0.3}),
-    dict(name='b', eth=(1.0, 0.0, 0.0), tone='#7a5540', iris='#3a2414', brow='#17110d', det={'chin/chin-height-incr': 0.3, 'head/head-square': 0.3}),
-    dict(name='c', eth=(0.0, 0.85, 0.15), tone='#c79b78', iris='#3c2616', brow='#1c1410', det={'head/head-round': 0.25, 'nose/nose-hump-decr': 0.3}),
-    dict(name='d', eth=(0.3, 0.1, 0.6), tone='#a87a5c', iris='#4a3018', brow='#241a12', det={'chin/chin-prominent-incr': 0.4, 'nose/nose-scale-vert-incr': 0.3, 'head/head-rectangular': 0.3}),
+    dict(name='a', skin='young_lightskinned_male_diffuse', tint=(1, 1, 1), eth=(0.0, 0.0, 1.0), tone='#c9a184', iris='#6c8ea4', brow='#4a3626', det={'nose/nose-scale-horiz-decr': 0.3, 'chin/chin-width-incr': 0.4, 'cheek/l-cheek-bones-incr': 0.3, 'cheek/r-cheek-bones-incr': 0.3}),
+    dict(name='b', skin='young_darkskinned_male_diffuse', tint=(1, 1, 1), eth=(1.0, 0.0, 0.0), tone='#7a5540', iris='#4a2d17', brow='#17110d', det={'chin/chin-height-incr': 0.3, 'head/head-square': 0.3}),
+    dict(name='c', skin='young_lightskinned_male_diffuse3', tint=(1.0, 0.95, 0.85), eth=(0.0, 0.85, 0.15), tone='#c79b78', iris='#553419', brow='#1c1410', det={'head/head-round': 0.25, 'nose/nose-hump-decr': 0.3}),
+    dict(name='d', skin='young_lightskinned_male_diffuse2', tint=(0.84, 0.76, 0.7), eth=(0.3, 0.1, 0.6), tone='#a87a5c', iris='#7b5a30', brow='#241a12', det={'chin/chin-prominent-incr': 0.4, 'nose/nose-scale-vert-incr': 0.3, 'head/head-rectangular': 0.3}),
 ]
 
 def shape(var):
@@ -55,6 +57,8 @@ def shape(var):
     add('macrodetails/universal-male-young-maxmuscle-averageweight', 0.6)
     add('macrodetails/universal-male-young-averagemuscle-averageweight', 0.4)
     for name, k in var['det'].items(): add(name, k)
+    for sd in 'lr':   # 眼睛：真人放鬆時上眼瞼會蓋到一點虹膜、有雙眼皮褶與一點眼袋
+        add(f'eyes/{sd}-eye-height2-decr', var.get('lid', 0.08)); add(f'eyes/{sd}-eye-eyefold-down', var.get('fold', 0.25)); add(f'eyes/{sd}-eye-bag-incr', 0.3)
     return V
 
 def tri_faces(faces):
@@ -64,6 +68,7 @@ def tri_faces(faces):
         else: T.append([f[0], f[1], f[2]]); T.append([f[0], f[2], f[3]])
     return np.array(T)
 
+FTof = {id(f): ft for f, ft in zip(F, FT)}
 body_faces = [f for f, g in zip(F, G) if g == 'body']
 eyeL = sorted({i for f, g in zip(F, G) if g == 'helper-l-eye' for i in f}); eyeR = sorted({i for f, g in zip(F, G) if g == 'helper-r-eye' for i in f})
 eye_faces = [f for f, g in zip(F, G) if g in ('helper-l-eye', 'helper-r-eye')]
@@ -72,11 +77,20 @@ head_faces = [f for f in body_faces if min(headw[i] for i in f) > 0.35]
 TH = tri_faces(head_faces); TE = tri_faces(eye_faces)
 used = np.unique(np.concatenate([TH.ravel(), TE.ravel()])); remap = -np.ones(len(V0), int); remap[used] = np.arange(len(used))
 # 睫毛：MakeHuman 的睫毛片（兩面都畫），頂點接在最後面（遮蔽的快取照舊可用）
-lash_faces = [f for f, g in zip(F, G) if 'eyelashes' in g]
+lash_all = [(f, g) for f, g in zip(F, G) if 'eyelashes' in g]
+_eyc = {sd: V0[sorted({i for f, g in zip(F, G) if g == f'helper-{sd}-eye' for i in f})].mean(0) for sd in 'lr'}
+for gname in sorted({g for f, g in lash_all}): print('  睫毛組', gname, '平均高度 − 眼球中心', round(float(np.mean([V0[i][1] for f, g in lash_all if g == gname for i in f]) - _eyc[gname[7]][1]), 3))
+lash_faces = [f for f, g in lash_all if np.mean([V0[i][1] for i in f]) > _eyc[g[7]][1]]   # 只留上睫毛（下睫毛做成實心片太重）
 TL = tri_faces(lash_faces); lash_used = np.unique(TL.ravel()); n_base = len(used)
 remap[lash_used] = n_base + np.arange(len(lash_used)); used = np.concatenate([used, lash_used])
 TRI = np.concatenate([remap[TH], remap[TE], remap[TL], remap[TL][:, ::-1]]); is_eye_tri = np.concatenate([np.zeros(len(TH), bool), np.ones(len(TE), bool), np.zeros(len(TL) * 2, bool)])
 lash_v = np.zeros(len(used), bool); lash_v[n_base:] = True
+# 貼圖座標：同一個頂點在 UV 接縫兩邊有不同座標 → 依（頂點、vt）拆開；輸出時用拆開後的頂點
+THt = tri_faces([FTof[id(f)] for f in head_faces]); TEt = tri_faces([FTof[id(f)] for f in eye_faces])
+TRIvt = np.concatenate([THt, TEt, np.zeros((len(TL) * 2, 3), int)])
+KK = len(VT) + 1; pair, inv = np.unique(TRI.ravel() * KK + TRIvt.ravel(), return_inverse=True)
+SV, SVT = pair // KK, pair % KK; TRI_S = inv.reshape(-1, 3)
+print('拆開 UV 接縫後頂點', len(SV))
 print('頭部頂點', len(used), '三角形', len(TRI), '（眼球', len(TE), '）')
 
 def normals(P, T):
@@ -115,7 +129,8 @@ for var in VARIANTS:
     P = xf(P); L = dict(eyeL=xf(cl[None])[0], eyeR=xf(cr[None])[0], mouth=xf(mouth[None])[0])
     T = TRI[:, [0, 2, 1]]                      # 鏡射 x、z 等於轉 180 度，繞向不變；這裡統一成逆時針朝外（下面檢查）
     N = normals(P, T)
-    if (N[:, :] * (P - P.mean(0))).sum() < 0: T = TRI; N = normals(P, T)
+    TS = TRI_S[:, [0, 2, 1]]
+    if (N[:, :] * (P - P.mean(0))).sum() < 0: T = TRI; TS = TRI_S; N = normals(P, T)
     cache = f'/tmp/mh_ao_{var["name"]}.npy'
     if os.path.exists(cache) and len(np.load(cache)) == n_base: ao = np.load(cache)
     else: ao = bake_ao(P[:n_base], N[:n_base], T[(T < n_base).all(1)]); np.save(cache, ao)
@@ -123,14 +138,13 @@ for var in VARIANTS:
     N[lash_v] = np.array([0, 0.5, -0.87])
     Ps = P[:n_base]                                   # 睫毛縮短：每個睫毛頂點往最近的皮膚頂點靠（根部不動、尖端縮回來）
     for i in np.where(lash_v)[0]:
-        qn = Ps[np.argmin(((Ps - P[i]) ** 2).sum(1))]; P[i] = qn + (P[i] - qn) * 0.4
+        qn = Ps[np.argmin(((Ps - P[i]) ** 2).sum(1))]; P[i] = qn + (P[i] - qn) * 0.14
     eye_v = np.zeros(len(P), bool); eye_v[np.unique(T[is_eye_tri].ravel())] = True
     # 顏色：皮膚用白底（遊戲裡乘上每張臉的膚色）× 遮蔽；嘴唇偏紅、鼻頭臉頰微紅、頭皮（剃短的頭髮）偏暗
-    C = np.ones((len(P), 3)) * (0.42 + 0.58 * ao ** 1.4)[:, None]
+    C = np.ones((len(P), 3)) * (0.5 + 0.5 * ao ** 1.2)[:, None]; C0 = C.copy()
     front = N[:, 2] < -0.2
     m = L['mouth']; dx, dy = (P[:, 0] - m[0]) / 0.027, (P[:, 1] - (m[1] + 0.001)) / 0.0085
     lip = np.clip(1.15 - (dx * dx + dy * dy), 0, 1) * front * (P[:, 2] < m[2] - 0.012)
-    C = C * (1 - lip[:, None] * 0.6) + lip[:, None] * 0.6 * np.array([0.86, 0.56, 0.54]) * C
     # 真人皮膚的顏色不均勻：臉頰、鼻頭、耳朵偏紅，眼睛下方略暗，下巴和上唇有鬍渣的青灰色，法令紋一道淡淡的陰影
     def blob(cx, cy, rx, ry): return np.clip(1 - ((np.abs(P[:, 0]) - cx) / rx) ** 2 - ((P[:, 1] - cy) / ry) ** 2, 0, 1) * front
     eyeY0 = L['eyeL'][1]
@@ -140,20 +154,20 @@ for var in VARIANTS:
     fold = np.clip(1 - np.abs((np.abs(P[:, 0]) - 0.02) - (eyeY0 - 0.045 - P[:, 1]) * 0.45) / 0.0045, 0, 1) * np.clip((eyeY0 - 0.04 - P[:, 1]) / 0.008, 0, 1) * np.clip((P[:, 1] - (m[1] - 0.004)) / 0.008, 0, 1) * front
     C = C * (1 - fold[:, None] * 0.12)
     beard = np.clip((m[1] + 0.02 - P[:, 1]) / 0.012, 0, 1) * np.clip((P[:, 1] - 1.545) / 0.01, 0, 1) * np.clip((-P[:, 2] - 0.0) / 0.03, 0, 1) * (1 - lip) * (1 - np.clip((np.abs(P[:, 0]) - 0.03) / 0.01, 0, 1) * np.clip((P[:, 1] - m[1] - 0.004) / 0.006, 0, 1))
-    C = C * (1 - beard[:, None] * 0.2 * np.array([1.0, 0.92, 0.85]))
+    C = C0.copy()   # 貼圖裡已經有紅暈、眼下、法令紋、鬍渣
     eyeY = L['eyeL'][1]
     scalp = np.clip((P[:, 1] - (eyeY + 0.062)) / 0.02, 0, 1) * np.clip((P[:, 2] + 0.07) / 0.03 + (P[:, 1] - eyeY - 0.075) / 0.02, 0, 1)
     side = np.clip((np.abs(P[:, 0]) - 0.058) / 0.01, 0, 1) * np.clip((P[:, 1] - eyeY - 0.012) / 0.01, 0, 1) * np.clip((P[:, 2] + 0.035) / 0.02, 0, 1)
-    hair = np.clip(scalp + side, 0, 1) * 0.62
+    hair = np.clip(scalp + side, 0, 1) * (0.0 if 'dark' in var['skin'] else 0.4)
     C = C * (1 - hair[:, None]) + hair[:, None] * hexc(var['brow']) / np.maximum(hexc(var['tone']), 0.05) * 0.9
     # 眼球：眼白、虹膜（朝前 -z 的那一小圈）、瞳孔；整顆稍微暗一點（眼窩的陰影）
+    EUV = np.zeros((len(P), 2))
     kind = np.full(len(P), 3.0)                # 3＝皮膚；3.5＝頭髮（剃短）；4＝嘴唇；0＝一般（眼球、睫毛）
-    kind[hair > 0.3] = 3.5; kind[lip > 0.45] = 4.0
-    upper = np.clip((P[:, 1] - (m[1] + 0.001)) / 0.003, 0, 1) * lip; C = C * (1 - upper[:, None] * 0.14)      # 上唇比下唇暗
-    seam = np.clip(1 - np.abs(P[:, 1] - (m[1] + 0.001)) / 0.0022, 0, 1) * np.clip(1 - np.abs(P[:, 0]) / 0.03, 0, 1) * front; C = C * (1 - seam[:, None] * 0.3)   # 唇縫
+    kind[np.clip(scalp + side, 0, 1) > 0.5] = 3.5; kind[lip > 0.45] = 4.0
+    seam = np.clip(1 - np.abs(P[:, 1] - (m[1] + 0.001)) / 0.0022, 0, 1) * np.clip(1 - np.abs(P[:, 0]) / 0.03, 0, 1) * front; C = C * (1 - seam[:, None] * 0.2)   # 唇縫
     for c in (L['eyeL'], L['eyeR']):           # 眼瞼邊緣：上眼瞼一道深色（睫毛根部的陰影），下眼瞼淡一點
         dd = np.linalg.norm(P - c, axis=1); rimm = np.clip(1 - (dd - er * 1.0) / (er * 0.22), 0, 1) * (dd > er * 0.9) * front * ~eye_v * ~lash_v
-        C = C * (1 - rimm[:, None] * np.where(P[:, 1] > c[1], 0.3, 0.1)[:, None])
+        C = C * (1 - rimm[:, None] * np.where(P[:, 1] > c[1], 0.16, 0.0)[:, None])
     for c in (L['eyeL'], L['eyeR']):
         d = P - c; r = np.linalg.norm(d, axis=1); sel = eye_v & (r < er * 1.6)
         ang = np.arccos(np.clip(-d[:, 2] / (r + 1e-9), -1, 1))
@@ -161,7 +175,9 @@ for var in VARIANTS:
         col = np.where((ang < 0.2)[:, None], np.array([0.02, 0.02, 0.02]), np.where((ang < 0.3)[:, None], iris * 1.05, np.where((ang < 0.44)[:, None], iris * 0.78, np.where((ang < 0.54)[:, None], iris * 0.35, np.array([0.8, 0.77, 0.74])))))
         col = np.where(((ang >= 0.54) & (ang < 1.3))[:, None], col * (1 - 0.1 * np.clip((ang - 0.9) / 0.4, 0, 1))[:, None] * np.array([1.0, 0.94, 0.92]), col)   # 眼白往眼角偏粉
         col = col * np.clip(0.55 + 0.45 * ao, 0, 1)[:, None]
-        C[sel] = col[sel]; kind[sel] = 0
+        C[sel] = np.clip(0.78 + 0.22 * ao, 0, 1)[sel, None]; kind[sel] = 5      # 5＝眼球（用眼睛貼圖）
+        rr = ang * 54.5; hx = np.hypot(d[:, 0], d[:, 1]) + 1e-9          # 眼睛貼圖是「從正面攤平」的：離瞳孔的角度 → 離圖上瞳孔的距離
+        EUV[sel, 0] = ((180.5 + d[:, 0] / hx * rr) / 512)[sel]; EUV[sel, 1] = ((768 + 75.9 - d[:, 1] / hx * rr) / 1024)[sel]
     C[lash_v] = hexc(var['brow']) * 0.5; kind[lash_v] = 0
     # 脖子的權重：下巴以下越低越跟脖子骨頭
     wn = np.clip((1.585 - P[:, 1]) / 0.05, 0, 1) * (P[:, 2] > -0.07)
@@ -171,15 +187,53 @@ for var in VARIANTS:
     eyeT = np.isin(T, np.where(eye_v)[0]).all(1)
     hidden = ((ao[T] < 0.1).all(1) & ~eyeT) | (P[T][:, :, 1] > 1.752).all(1)
     eye_back = eyeT & (P[T][:, :, 2] > L['eyeL'][2] + 0.002).all(1)        # 眼球的後半顆
-    Tk = T[~(hidden | eye_back)]
+    Tk = TS[~(hidden | eye_back)]
     print('   三角形', len(T), '→', len(Tk))
     q = lambda A, lo, hi, t: base64.b64encode(np.clip(np.round((A - lo) / (hi - lo) * (65535 if t == np.uint16 else 255)), 0, 65535 if t == np.uint16 else 255).astype(t).tobytes()).decode()
-    out.append(dict(name=var['name'], tone=var['tone'], brow=var['brow'], n=len(P),
+        # 貼圖集：上面 512×768 是頭（從 2048 的皮膚貼圖裁出頭的 UV 範圍），左下 256×256 是眼睛
+    from PIL import Image, ImageEnhance
+    import io
+    hv = ~eye_v[SV] & ~lash_v[SV] & (VT[SVT][:, 0] > 0.62) & (VT[SVT][:, 1] > 0.12) & (VT[SVT][:, 1] < 0.85); uvh = VT[SVT[hv]]; print('   頭的 UV 島頂點', hv.sum(), '脖子（在身體的 UV 島）', (~hv & ~eye_v[SV] & ~lash_v[SV]).sum()); u0, u1 = uvh[:, 0].min() - 0.004, uvh[:, 0].max() + 0.004; v0, v1 = uvh[:, 1].min() - 0.004, uvh[:, 1].max() + 0.004
+    sk = Image.open(os.path.join(SKINS, var['skin'] + '.png')).convert('RGB'); Wd, Hd = sk.size
+    head = sk.crop((int(u0 * Wd), int((1 - v1) * Hd), int(u1 * Wd), int((1 - v0) * Hd))).resize((512, 768), Image.LANCZOS)
+    head = Image.fromarray(np.clip(np.asarray(head).astype(float) * np.array(var['tint']), 0, 255).astype(np.uint8))
+    eye = np.asarray(Image.open(os.path.join(DATA, 'eyes', 'materials', 'brown_eye.png')).convert('RGB').resize((256, 256), Image.LANCZOS)).astype(float) / 255
+    yy, xx = np.mgrid[0:256, 0:256]; ic = hexc(var['iris']); eye = np.clip(eye * 1.14, 0, 1)
+    for (ex, ey) in ((180.5, 75.9), (74.0, 181.4)):      # 虹膜換成這張臉的顏色：保留原圖的紋理明暗，只換色
+        rr_ = np.hypot(xx - ex, yy - ey); msk = np.clip((27.5 - rr_) / 2.0, 0, 1)[:, :, None]; lum = eye.mean(2, keepdims=True); ml = lum[rr_ < 24].mean()
+        eye = eye * (1 - msk) + msk * np.clip((lum / ml) ** 1.3 * ic * 0.72 * (1 - 0.45 * np.clip((rr_ - 21) / 6, 0, 1))[:, :, None], 0, 1)
+    neckc = tuple(int(x) for x in np.asarray(head)[15:60, 15:110].reshape(-1, 3).mean(0))
+    atlas = Image.new('RGB', (512, 1024), neckc); atlas.paste(head, (0, 0)); atlas.paste(Image.fromarray((eye * 255).astype(np.uint8)), (0, 768))
+    buf = io.BytesIO(); atlas.save(buf, 'JPEG', quality=82); tex = 'data:image/jpeg;base64,' + base64.b64encode(buf.getvalue()).decode(); atlas.save(f'/tmp/mh_atlas_{var["name"]}.jpg')
+    UV = np.zeros((len(SV), 2)); raw = VT[SVT]
+    UV[:, 0] = np.where(eye_v[SV], EUV[SV, 0], (raw[:, 0] - u0) / (u1 - u0)); UV[:, 1] = np.where(eye_v[SV], EUV[SV, 1], (v1 - raw[:, 1]) / (v1 - v0) * 0.75); UV[lash_v[SV]] = 0
+    nk = ~hv & ~eye_v[SV] & ~lash_v[SV]; UV[nk] = np.array([0.75, 0.875])   # 脖子下緣：用一塊平的膚色
+    UVQ = base64.b64encode(np.clip(np.round(UV * 65535), 0, 65535).astype(np.uint16).tobytes()).decode()
+    P, N, C, kind, wn = P[SV], N[SV], C[SV], kind[SV], wn[SV]
+    out.append(dict(name=var['name'], tone=var['tone'], brow=var['brow'], n=len(P), tex=tex, kb=len(tex) // 1024,
         eye=[round(float(abs(L['eyeL'][0])), 4), round(float(L['eyeL'][1]), 4)], mouth=[round(float(L['mouth'][1]), 4), round(float(L['mouth'][2]), 4)],
         p=q(P, -0.16, 0.16, np.uint16) if False else q(P - np.array([0, 1.65, 0]), -0.2, 0.2, np.uint16), nrm=q(N, -1, 1, np.uint8), c=q(C, 0, 1, np.uint8), k=q(kind * 10, 0, 255, np.uint8), wn=q(wn, 0, 1, np.uint8),
         tri=base64.b64encode(Tk.astype(np.uint16).tobytes()).decode()))
 
+# 眉毛：MakeHuman 的眉毛貼圖（一根一根的毛、帶透明度），四張臉各一種，排成 512×512（每列 512×128，涵蓋 x ±0.07 公尺、y 1.685–1.72）
+from PIL import Image
+import io
+BROWS = {'a': '010', 'b': '012', 'c': '012', 'd': '010'}; sheet = np.zeros((512, 512))
+PXM = 512 / 0.14
+for r, var in enumerate(VARIANTS):
+    al = np.asarray(Image.open(os.path.join(SKINS, 'brow', f'eyebrow{BROWS[var["name"]]}.png')).convert('RGBA'))[:, :, 3].astype(float) / 255
+    rows = np.where(al.sum(1) > 1.0)[0]; brk = np.where(np.diff(rows) > 3)[0]; r1 = rows[brk[0]] if len(brk) else rows[-1]     # 第一條眉毛所在的那幾列
+    half = al[rows[0]:r1 + 1]; xs = np.where(half.sum(0) > 0.5)[0]; one = half[:, xs.min():xs.max() + 1]
+    if one[:, :one.shape[1] // 2].sum() < one[:, one.shape[1] // 2:].sum(): one = one[:, ::-1]          # 粗的那頭（眉頭）放左邊
+    wpx = int(0.05 * PXM); hpx = max(8, int(one.shape[0] * wpx / one.shape[1] * (1.05 if var['name'] == 'c' else 1.3)))
+    im = np.asarray(Image.fromarray((one * 255).astype(np.uint8)).resize((wpx, hpx), Image.LANCZOS)).astype(float) / 255
+    cy = int((1.72 - 1.6965) * PXM); y0 = r * 128 + cy - hpx // 2; x0 = 256 + int(0.011 * PXM)
+    y0 = max(r * 128, min(y0, r * 128 + 128 - hpx))
+    sheet[y0:y0 + hpx, x0:x0 + wpx] = np.maximum(sheet[y0:y0 + hpx, x0:x0 + wpx], im)
+    sheet[y0:y0 + hpx, 512 - x0 - wpx:512 - x0] = np.maximum(sheet[y0:y0 + hpx, 512 - x0 - wpx:512 - x0], im[:, ::-1])
+bim = Image.fromarray((np.clip(sheet * 1.25, 0, 1) * 255).astype(np.uint8)); buf = io.BytesIO(); bim.save(buf, 'PNG', optimize=True); bim.save('/tmp/mh_brows.png')
+BROW_URL = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
 js = ('/* ===== 58-heads：寫實的頭（tools/mh_heads.py 用 MakeHuman 的 CC0 人體資料產生，不要手改）\n'
       '   每張臉：位置（uint16，相對 (0,1.65,0)、±0.2 公尺）、法線、頂點顏色（含烘好的遮蔽、嘴唇、短髮、眼球）、種類、脖子權重、三角形索引 */\n'
-      'const MH_HEADS = ' + json.dumps(out, separators=(',', ':')) + ';\n')
+      'const MH_HEAD_UV = "' + UVQ + '";\nconst MH_BROW_TEX = "' + BROW_URL + '";\nconst MH_HEADS = ' + json.dumps(out, separators=(',', ':')) + ';\n')
 open(OUT, 'w').write(js); print('寫出', OUT, round(len(js) / 1024), 'KB')
