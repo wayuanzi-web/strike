@@ -254,10 +254,26 @@ for var in VARIANTS:
     UVQ = base64.b64encode(np.clip(np.round(UV * 65535), 0, 65535).astype(np.uint16).tobytes()).decode()
     P, N, C, kind, wn, BL = P[SV], N[SV], C[SV], kind[SV], wn[SV], BL[SV]
     print('   眨眼最大位移', np.abs(BL).max().round(4), '會動的頂點', (np.abs(BL).max(1) > 1e-4).sum())
+    # 遠處用的簡化頭：皮膚、眼睛的顏色直接從貼圖集取樣烘進頂點（線性色彩），頂點併到 1.6 公分的格子（眼球和臉分開併），不要睫毛
+    at = np.asarray(atlas).astype(float) / 255; tx = at[np.clip((UV[:, 1] * AH).astype(int), 0, AH - 1), np.clip((UV[:, 0] * AW).astype(int), 0, AW - 1)] ** 2.2
+    isl = lash_v[SV]; isk = kind > 2.5
+    bake = np.where(isk[:, None] | (kind[:, None] == 5) | eye_v[SV][:, None], C * tx, C)
+    keep = ~isl[Tk].any(1); Tl = Tk[keep]; used_l = np.unique(Tl.ravel())
+    cell = 0.016; keyv = np.concatenate([np.floor(P[used_l] / cell).astype(int), eye_v[SV][used_l, None].astype(int)], 1)
+    _, first, inv = np.unique(keyv, axis=0, return_index=True, return_inverse=True); inv = inv.ravel(); nl = len(first)
+    rmap = -np.ones(len(P), int); rmap[used_l] = inv
+    Pl = np.zeros((nl, 3)); Cl = np.zeros((nl, 3)); Wl = np.zeros(nl); cnt = np.zeros(nl)
+    np.add.at(Pl, inv, P[used_l]); np.add.at(Cl, inv, bake[used_l]); np.add.at(Wl, inv, wn[used_l]); np.add.at(cnt, inv, 1); Pl /= cnt[:, None]; Cl /= cnt[:, None]; Wl /= cnt
+    Tl = rmap[Tl]; Tl = Tl[(Tl[:, 0] != Tl[:, 1]) & (Tl[:, 1] != Tl[:, 2]) & (Tl[:, 0] != Tl[:, 2])]; _, ui = np.unique(np.sort(Tl, 1), axis=0, return_index=True); Tl = Tl[np.sort(ui)]
+    Nl = np.zeros_like(Pl); fn = np.cross(Pl[Tl[:, 1]] - Pl[Tl[:, 0]], Pl[Tl[:, 2]] - Pl[Tl[:, 0]])
+    for kk in range(3): np.add.at(Nl, Tl[:, kk], fn)
+    Nl /= np.linalg.norm(Nl, axis=1, keepdims=True) + 1e-12
+    print('   遠處簡化頭：頂點', nl, '三角形', len(Tl))
+    low = dict(p=q(Pl - np.array([0, 1.65, 0]), -0.2, 0.2, np.uint16), nrm=q(Nl, -1, 1, np.uint8), c=q(np.clip(Cl, 0, 1), 0, 1, np.uint8), wn=q(Wl, 0, 1, np.uint8), tri=base64.b64encode(Tl.astype(np.uint16).tobytes()).decode())
     out.append(dict(name=var['name'], tone=var['tone'], brow=var['brow'], n=len(P), tex=tex, ntex=ntex, kb=len(tex) // 1024, nkb=len(ntex) // 1024, bl=q(BL, -0.02, 0.02, np.uint8),
         eye=[round(float(abs(L['eyeL'][0])), 4), round(float(L['eyeL'][1]), 4)], mouth=[round(float(L['mouth'][1]), 4), round(float(L['mouth'][2]), 4)],
         p=q(P, -0.16, 0.16, np.uint16) if False else q(P - np.array([0, 1.65, 0]), -0.2, 0.2, np.uint16), nrm=q(N, -1, 1, np.uint8), c=q(C, 0, 1, np.uint8), k=q(kind * 10, 0, 255, np.uint8), wn=q(wn, 0, 1, np.uint8),
-        tri=base64.b64encode(Tk.astype(np.uint16).tobytes()).decode()))
+        tri=base64.b64encode(Tk.astype(np.uint16).tobytes()).decode(), low=low))
 
 # 眉毛：MakeHuman 的眉毛貼圖（一根一根的毛、帶透明度），四張臉各一種，排成 512×512（每列 512×128，涵蓋 x ±0.07 公尺、y 1.685–1.72）
 from PIL import Image

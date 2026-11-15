@@ -12,7 +12,7 @@ const ARM_A = 0.31, ARM_B = 0.27;   // 上臂、前臂長
 // 迷彩配色：底色＋兩種斑塊＋深色（每隊／每種外觀不同）
 const CAMO = {
   B: ['#4d573c', '#39422e', '#636c4a', '#242a1f'],      // 敵方：深綠林地迷彩
-  A: ['#a39a7b', '#7b7f5f', '#c0b598', '#5c4e3b'],      // 我方：美軍 OCP（棕綠底、橄欖與淺沙色斑塊、深棕點）
+  A: ['#8c8366', '#66694c', '#a0977a', '#4d4132'],   // OCP：照片裡在太陽下的顏色（原本的淺沙色在遊戲光照下幾乎變白）      // 我方：美軍 OCP（棕綠底、橄欖與淺沙色斑塊、深棕點）
   elite: ['#2c2e31', '#1d1e20', '#3c3e42', '#141516'],
   boss: ['#26303f', '#26303f', '#2c3748', '#1b2230'],      // 軍官制服：深藍、幾乎素色
 };
@@ -305,6 +305,24 @@ function mhHeadPart(fi) {
   g.userData = { color: '#ffffff', bone: HB.head, camo: 3, raw: D };
   return g;
 }
+// 遠處的簡化頭：同一張臉、頂點較少，皮膚和眼睛的顏色烘在頂點（不取樣貼圖、不眨眼）
+function mhHeadPartLow(fi) {
+  const H = MH_HEADS[fi % MH_HEADS.length], L = H.low, key = H.name + 'L';
+  if (!L) return mhHeadPart(fi);
+  if (!MH_CACHE[key]) {
+    const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
+    const p = b64(L.p, Uint16Array), n = b64(L.nrm, Uint8Array), c = b64(L.c, Uint8Array), wn = b64(L.wn, Uint8Array), tri = b64(L.tri, Uint16Array);
+    const N = tri.length, pos = new Float32Array(N * 3), nrm = new Float32Array(N * 3), col = new Float32Array(N * 3), kind = new Float32Array(N), w = new Float32Array(N), uv = new Float32Array(N * 2), bl = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { const v = tri[i];
+      for (let a = 0; a < 3; a++) { pos[i * 3 + a] = p[v * 3 + a] / 65535 * 0.4 - 0.2 + (a === 1 ? 1.65 : 0); nrm[i * 3 + a] = n[v * 3 + a] / 255 * 2 - 1; col[i * 3 + a] = c[v * 3 + a] / 255; }
+      w[i] = wn[v] / 255; }
+    MH_CACHE[key] = { pos, nrm, col, kind, w, uv, bl, low: true };
+  }
+  const D = MH_CACHE[key], g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(D.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(D.nrm, 3));
+  g.userData = { color: '#ffffff', bone: HB.head, camo: 0, raw: D };
+  return g;
+}
 // 身體和手（57-body，MakeHuman 資料）：衣服直接用身體的形狀（已經外推一點），手是手套
 const MH_BODY_C = {};
 function mhBodyPart(glove, vest, lod) {
@@ -343,7 +361,7 @@ function mergeSkinned(parts) {
     if (raw) {   // 寫實的頭：顏色、種類、權重都是每個頂點自己的
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(raw.col[i], raw.col[i + 1], raw.col[i + 2]);
-        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); BLK.push(raw.bl[i], raw.bl[i + 1], raw.bl[i + 2]); RM.push(raw.kind[v] > 5.5 ? 0.7 : raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
+        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); UVH.push(raw.uv[v * 2], raw.uv[v * 2 + 1]); BLK.push(raw.bl[i], raw.bl[i + 1], raw.bl[i + 2]); RM.push(raw.low ? 0.55 : raw.kind[v] > 5.5 ? 0.7 : raw.kind[v] > 4.5 ? 0.05 : raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
       }
       continue;
     }
@@ -365,7 +383,7 @@ function mergeSkinned(parts) {
 // ---------- 外觀：team 'A'／'B'，look 'grunt'／'elite'／'boss' ----------
 const HUMAN_GEO = {};
 function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
-  const mh = lod === 0 && look !== 'elite' && typeof MH_HEADS !== 'undefined';   // 近看：寫實的頭（精英戴面罩、遠處簡化版用原本的）
+  const mh = look !== 'elite' && typeof MH_HEADS !== 'undefined';   // 寫實的頭（精英戴面罩用原本的）；遠處用同一張臉的簡化版（顏色烘在頂點）
   const key = team + look + lod + (mh ? 'f' + faceI % MH_HEADS.length : ''); if (HUMAN_GEO[key]) return HUMAN_GEO[key];
   HLOD = lod;
   const PAL = PALETTE[team], W = '#ffffff';   // 迷彩部位用白色底，實際顏色在著色器
@@ -464,7 +482,7 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
   // 脖子、頭
   const face = elite ? '#1d1e20' : skin;        // 精英戴面罩
   const fk = elite ? 0 : SK;
-  if (mh) add(mhHeadPart(face0));
+  if (mh) add(lod ? mhHeadPartLow(face0) : mhHeadPart(face0));
   else {
   add(hTorso(0.054, 0.058, 0.12, 0, 1.54, 0.005, elite ? '#1b1c1e' : skin, HB.neck, elite ? 0 : SK, 1, 10));
   add(hEll(0.096, 0.118, 0.108, 0, 1.665, 0, face, HB.head, fk, 18, 14), hEll(0.072, 0.05, 0.072, 0, 1.585, -0.028, face, HB.head, fk, 12, 8));   // 頭、下巴
@@ -492,7 +510,7 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
     const hc = elite ? '#1a1b1d' : PAL.helmet, h0 = parts.length;
     if (mh) add(hEll(0.112, 0.112, 0.128, 0, 1.712, 0.002, hc, HB.head, 1, 20, 8, 0, Math.PI * 0.52), hTorso(0.1125, 0.1125, 0.012, 0, 1.705, 0.002, us ? '#6f6648' : '#22261e', HB.head, 0, 1.143, 20),   // 貼合頭型的頭盔＋盔緣
       hBox(0.042, 0.012, 0.014, 0, 1.577, -0.09, strap, HB.head));   // 下巴托
-    if (mh) for (const sx of [-1, 1]) add(hLimb(0.0042, [0.1 * sx, 1.722, -0.04], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5), hLimb(0.0042, [0.102 * sx, 1.722, 0.05], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5),
+    if (mh && !lod) for (const sx of [-1, 1]) add(hLimb(0.0042, [0.1 * sx, 1.722, -0.04], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5), hLimb(0.0042, [0.102 * sx, 1.722, 0.05], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5),
       hLimb(0.0042, [0.09 * sx, 1.632, -0.03], [0.03 * sx, 1.58, -0.085], strap, HB.head, 0, 5), hBox(0.008, 0.014, 0.014, 0.091 * sx, 1.632, -0.03, '#1d1d1b', HB.head));   // Y 形下巴帶＋調整扣
     if (mh && !lod) {
       const vel = us ? '#a89a78' : '#2c3226';

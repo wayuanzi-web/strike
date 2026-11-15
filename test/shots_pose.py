@@ -9,7 +9,7 @@ async def main():
           for (const id of ['hud', 'touch']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; } }""")
         await page.wait_for_timeout(2500)
         # 名稱、相機（相對機器人）、看的高度、隊伍、狀態
-        for nm, cx, cy, cz, ly, team, mode in [('back', -0.7, 1.45, 2.0, 1.15, 'A', ''), ('side', 2.1, 1.3, 0.2, 1.1, 'A', ''), ('backB', 0.7, 1.45, 2.0, 1.15, 'B', ''), ('run2', -1.8, 1.2, 0.3, 1.0, 'A', 'run'), ('crouch2', -1.5, 0.9, -1.0, 0.7, 'B', 'crouch'), ('crouch', 1.1, 1.0, -1.7, 0.8, 'A', 'crouch'),
+        for nm, cx, cy, cz, ly, team, mode in [('crouchS', 2.2, 0.8, 0.0, 0.5, 'A', 'crouch'), ('crouchS2', -2.2, 0.8, 0.0, 0.5, 'A', 'crouch'), ('back', -0.7, 1.45, 2.0, 1.15, 'A', ''), ('side', 2.1, 1.3, 0.2, 1.1, 'A', ''), ('backB', 0.7, 1.45, 2.0, 1.15, 'B', ''), ('run2', -1.8, 1.2, 0.3, 1.0, 'A', 'run'), ('crouch2', -1.5, 0.9, -1.0, 0.7, 'B', 'crouch'), ('crouch', 1.1, 1.0, -1.7, 0.8, 'A', 'crouch'),
                                                ('run', 1.6, 1.2, -1.6, 1.0, 'B', 'run'), ('dead', 1.2, 1.3, -1.6, 0.2, 'A', 'dead'), ('up', 0.5, 1.5, -1.0, 1.35, 'A', ''), ('upB', -0.5, 1.5, -1.0, 1.35, 'B', '')]:
             url = await ev(f"""() => {{ const s = window.__strike, V = s.player.body.pos.constructor; for (const b of s.bots) {{ b.alive = false; b.g.visible = false; }}
               const cand = s.bots.filter((x) => x.team === '{team}' && !x.rageOnly); const b = cand[(window.__fi = (window.__fi || 0) + 1) % cand.length]; s.setHumanLook(b, 'grunt');
