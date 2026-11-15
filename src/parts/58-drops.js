@@ -2,7 +2,7 @@
    對戰：每回合開始清掉；其他模式 20 秒後消失。地上最多 14 把（多了先清最舊的）。
    撿：走到槍旁邊，那一格是空的就自動撿；已經有了按「撿起」換（手上那把丟在原地）。 */
 const DROPS = [];
-const DROP_MAT = new THREE.MeshLambertMaterial({ color: '#d8d2c6' });
+const DROP_MAT = new THREE.MeshLambertMaterial({ color: '#d8d2c6', vertexColors: true });   // 槍的幾何帶自己的顏色（深色）；材質顏色調到大於 1，掉在地上才看得到
 const _dropGeo = {};
 function dropGeo(def) {
   if (_dropGeo[def.id]) return _dropGeo[def.id];
@@ -17,7 +17,7 @@ function spawnDrop(def, ammo, reserve, x, y, z) {
   while (DROPS.length >= 14) removeDrop(DROPS[0]);
   // 掉在高處就放到最近的地面路點（機器人才拿得到）；不要卡進牆
   const n = nearestNode(x, z, y); if (n && Math.hypot(n.x - x, n.z - z) > 2.5) { x = n.x; z = n.z; y = n.y; }
-  const mesh = new THREE.Mesh(dropGeo(def), DROP_MAT); mesh.material = mesh.material.clone(); mesh.material.color.set('#9a958c');
+  const mesh = new THREE.Mesh(dropGeo(def), DROP_MAT); mesh.material = mesh.material.clone(); mesh.material.color.setRGB(2.6, 2.5, 2.4);
   mesh.position.set(x, (y || 0) + 0.06, z); mesh.rotation.set(0, Math.random() * Math.PI * 2, Math.PI / 2);
   scene.add(mesh);
   const d = { def, ammo, reserve, pos: new V3(x, y || 0, z), mesh, t: 0 };

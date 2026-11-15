@@ -434,7 +434,11 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
       add(hTorso(0.082, 0.09, 0.07, 0, 1.515, 0.0, W, HB.neck, 1, 1, 10));                                                                      // 戰鬥衫的立領
     } else for (let k = 0; k < 3; k++) add(hBox(0.3, 0.008, 0.008, 0, 1.38 - k * 0.04, -0.156, strap, HB.chest));   // 織帶
     add(hBox(0.06, 0.1, 0.045, -0.12, 1.4, -0.165, '#2a2d30', HB.chest), hCyl(0.005, 0.24, -0.15, 1.52, 0.17, '#1a1b1c', HB.chest));    // 無線電＋天線
-    add(hBox(0.27, 0.3, 0.13, 0, 1.28, 0.205, elite ? '#1c1d1f' : PAL.pack, HB.chest), hBox(0.25, 0.08, 0.02, 0, 1.36, 0.275, strap, HB.chest));
+    if (lod) add(hBox(0.27, 0.3, 0.13, 0, 1.28, 0.205, elite ? '#1c1d1f' : PAL.pack, HB.chest), hBox(0.25, 0.08, 0.02, 0, 1.36, 0.275, strap, HB.chest));
+    else { const pk = elite ? '#1c1d1f' : PAL.pack, rb = (w, h, d, r, x, y, z, c) => { const g = roundBox(w, h, d, r); g.translate(x, y, z); return hp(g, c, HB.chest, 0); };
+      add(rb(0.27, 0.3, 0.13, 0.045, 0, 1.28, 0.2, pk), rb(0.25, 0.1, 0.06, 0.028, 0, 1.405, 0.215, pk), rb(0.2, 0.13, 0.05, 0.022, 0, 1.22, 0.275, pk),          // 背包主體（大圓角）、上蓋、前袋
+        hBox(0.25, 0.012, 0.004, 0, 1.36, 0.268, strap, HB.chest), hBox(0.012, 0.3, 0.004, -0.06, 1.28, 0.267, strap, HB.chest), hBox(0.012, 0.3, 0.004, 0.06, 1.28, 0.267, strap, HB.chest),   // 橫、直的織帶
+        hBox(0.03, 0.018, 0.01, -0.06, 1.345, 0.272, '#17181a', HB.chest), hBox(0.03, 0.018, 0.01, 0.06, 1.345, 0.272, '#17181a', HB.chest), hBox(0.06, 0.02, 0.02, 0, 1.465, 0.2, strap, HB.chest)); }   // 插扣、提把
     add(hBox(0.08, 0.05, 0.012, 0.0, 1.4, -0.158, band, HB.chest));   // 胸前隊伍色章
     add(hBox(0.1, 0.022, 0.008, 0.095, 1.44, -0.157, '#2d2b26', HB.chest), hBox(0.08, 0.012, 0.004, 0.095, 1.44, -0.162, '#8a8470', HB.chest));   // 名條
     add(hCyl(0.028, 0.07, 0.16, 1.2, -0.12, '#4d5332', HB.chest), hCyl(0.006, 0.022, 0.16, 1.245, -0.12, '#8c8c80', HB.chest), hCyl(0.028, 0.07, -0.165, 1.2, -0.12, '#4d5332', HB.chest));   // 手榴彈
@@ -605,11 +609,15 @@ function humanDie(b, part, dir) {
 }
 const DEATH_GRAV = 9.0;
 // 每格：擺骨頭
+const HUM_LOD = { last: 1e9, n: 0 };
 function humanPose(b, dt) {
   const B = b.hm.bones, H = b.hs || (humanInit(b), b.hs), p = b.phys.pos;
   const d2 = camera ? p.distanceToSquared(camera.position) : 0, near = d2 < 45 * 45;
   // 遠近換模型：22 公尺外用簡化版（三角形少一半多）
-  const lod = d2 > 22 * 22 ? 1 : 0;
+  // 細緻版很重（近處每人約 4 萬個三角形）：省電或自動畫質已經降到底時，縮短距離；同時最多幾個人用細緻版（6 公尺內一定用）
+  if (b.i <= HUM_LOD.last) HUM_LOD.n = 0; HUM_LOD.last = b.i;
+  const eco = S.quality === 'eco', slow = S.quality === 'auto' && game.autoPR < 1.05, LD = eco ? 10 : slow ? 14 : 22, cap = eco ? 2 : slow ? 3 : 6;
+  let lod = d2 > LD * LD ? 1 : 0; if (!lod) { if (HUM_LOD.n >= cap && d2 > 36) lod = 1; else HUM_LOD.n++; }
   if (b.hm.lod !== lod) { b.hm.lod = lod; b.hm.mesh.geometry = humanGeo(b.baseTeam, b.hm.look, lod, b.hm.face); }
   if (!lod) {   // 眨眼（每 2.5–6 秒一次、約 0.17 秒）、眼球小幅掃視；倒地後半閉
     const E = b.hm.eye || (b.hm.eye = { t: 1 + Math.random() * 4, b: -1, g: 0.5, gx: 0, gy: 0 }), U = b.hm.mat.userData;
