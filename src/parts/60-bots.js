@@ -96,7 +96,7 @@ function botSpawn(b, sx, sz, faceX = 0, faceZ = 0) {
   b.yaw = Math.atan2(-(faceX - sx), -(faceZ - sz)) + rand(-0.3, 0.3);
   if (game.mode !== 'match' && !b.dummy) { b.vest = b.helmet = true; b.armor = 100; }   // 對戰以外每次重生都是滿護甲
   b.g.visible = true; b.g.rotation.set(0, b.yaw, 0); b.g.position.copy(p);
-  b.ck = 0; b.dd = null; if (b.hs) humanInit(b); b.gunP.position.set(...HUMAN_GUN_P); b.gunP.rotation.set(0, 0, 0);
+  b.ck = 0; b.dd = null; if (b.hs) humanInit(b); b.gunP.position.set(...HUMAN_GUN_P); b.gunP.rotation.set(0, 0, 0); b.gunP.baseX = 0;
   b.lastP.copy(p); b.stuckT = 0;
   hitBoxes(p, b.phys.h, b.boxes);
 }

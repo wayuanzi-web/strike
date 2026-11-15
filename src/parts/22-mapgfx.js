@@ -8,13 +8,13 @@ const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'co
   house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'glass', lampw: 'lamp', lampc: 'lamp', roof: 'brick', door: 'wood',
   awn1: 'plaster', awn2: 'plaster', water: 'floor', clock: 'plaster', sill: 'concrete',
   // 鐵道：碎石地、車廂、鐵軌、枕木
-  cone: 'floor', sign: 'floor', gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
+  cone: 'floor', sign: 'floor', leaf: 'plaster', pot: 'brick', gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
   wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
   house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#2c3846', lampw: '#ffe2b0', lampc: '#e4f0ff', roof: '#b0573a', door: '#6b4a32',
   awn1: '#c8423a', awn2: '#f0e8d8', water: '#4f8fa8', clock: '#f2ede2', sill: '#d8d0c0',
-  cone: '#e2582a', sign: '#e8c23a', gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
+  cone: '#e2582a', sign: '#e8c23a', leaf: '#4f7a34', pot: '#b0603e', gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
 };
 
 // 每張地圖都有的：依方塊顏色自動加的裝飾（貨櫃凸條、牆頂壓條、外牆壁柱、房子窗戶與屋簷、車廂細節）
@@ -128,6 +128,8 @@ function decorHouse(b) {
         const ground = fy < 2 && hash1(Math.round(c * 7 + pl * 3)) < 0.25;
         const w = ground ? 1.1 : 0.9, h0 = ground ? 0 : fy, h1 = ground ? 2.3 : fy + 1.3, col = ground ? 'door' : 'win';
         const o0 = sg > 0 ? pl : pl - e, o1 = sg > 0 ? pl + e : pl;
+        if (ground) { streetProp(ax, pl, sg, c - step / 2 + 0.3, c - w / 2 - 0.15, hash1(Math.round(c * 9 + pl * 5 + 1))); streetProp(ax, pl, sg, c + w / 2 + 0.15, c + step / 2 - 0.3, hash1(Math.round(c * 4 - pl * 7 + 2))); }
+        else if (fy < 2 && hash1(Math.round(c * 3 + pl * 2 + 7)) < 0.55) streetProp(ax, pl, sg, c - step / 2 + 0.3, c + step / 2 - 0.3, hash1(Math.round(c * 11 + pl * 3)));
         if (ax === 2) { D(c - w / 2, o0, c + w / 2, o1, h0, h1, col); if (!ground) D(c - w / 2 - 0.1, sg > 0 ? pl : pl - 0.12, c + w / 2 + 0.1, sg > 0 ? pl + 0.12 : pl, h0 - 0.1, h0, 'sill'); }
         else { D(o0, c - w / 2, o1, c + w / 2, h0, h1, col); if (!ground) D(sg > 0 ? pl : pl - 0.12, c - w / 2 - 0.1, sg > 0 ? pl + 0.12 : pl, c + w / 2 + 0.1, h0 - 0.1, h0, 'sill'); }
       }
@@ -137,6 +139,29 @@ function decorHouse(b) {
   D(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, 0, 0.45, 'stone');
   D(x0 - 0.18, z0 - 0.18, x1 + 0.18, z1 + 0.18, y1, y1 + 0.22, 'roof');
   D(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, y1 - 0.5, y1 - 0.38, 'sill');
+}
+// 房子門口的街道雜物（舊城）：花盆、長椅、疊起來的蔬果木箱；只放在腳邊沒有方塊的地方
+function streetProp(ax, pl, sg, c0, c1, r) {
+  if (MAP.id !== 'market' || c1 - c0 < 0.7) return;
+  const P = (a0, a1, d0, d1, h0, h1, col) => { const q0 = pl + sg * d0, q1 = pl + sg * d1; if (ax === 2) D(a0, q0, a1, q1, h0, h1, col); else D(q0, a0, q1, a1, h0, h1, col); };
+  const free = (a0, a1, d0, d1, h) => { const q0 = pl + sg * d0, q1 = pl + sg * d1, lo = ax === 2 ? [a0, Math.min(q0, q1)] : [Math.min(q0, q1), a0], hi = ax === 2 ? [a1, Math.max(q0, q1)] : [Math.max(q0, q1), a1];
+    for (const o of BOXES) if (o.min[0] < hi[0] + 0.04 && o.max[0] > lo[0] - 0.04 && o.min[2] < hi[1] + 0.04 && o.max[2] > lo[1] - 0.04 && o.min[1] < h && o.max[1] > 0.02) return false; return true; };
+  const m = (c0 + c1) / 2;
+  if (r < 0.4) {                                  // 花盆一兩個：陶盆、盆緣、一叢葉子
+    for (const x of c1 - c0 > 1.4 ? [m - 0.4, m + 0.4] : [m]) { if (!free(x - 0.3, x + 0.3, 0.1, 0.65, 1)) continue;
+      P(x - 0.22, x + 0.22, 0.15, 0.59, 0, 0.42, 'pot'); P(x - 0.25, x + 0.25, 0.12, 0.62, 0.42, 0.47, 'pot');
+      P(x - 0.2, x + 0.2, 0.17, 0.57, 0.47, 0.78, 'leaf'); P(x - 0.13, x + 0.13, 0.24, 0.5, 0.78, 0.95, 'leaf'); P(x - 0.27, x - 0.1, 0.22, 0.4, 0.55, 0.72, 'leaf'); P(x + 0.1, x + 0.27, 0.36, 0.54, 0.55, 0.7, 'leaf'); }
+  } else if (r < 0.65 && c1 - c0 > 1.7) {        // 長椅：座板三片、椅背兩片、鐵腳
+    if (!free(m - 0.85, m + 0.85, 0.05, 0.6, 1)) return;
+    for (const d of [0.25, 0.38, 0.51]) P(m - 0.8, m + 0.8, d - 0.055, d + 0.055, 0.42, 0.46, 'stall');
+    for (const h of [0.6, 0.76]) P(m - 0.8, m + 0.8, 0.12, 0.16, h, h + 0.09, 'stall');
+    for (const x of [m - 0.68, m + 0.68]) { P(x - 0.03, x + 0.03, 0.18, 0.58, 0, 0.42, 'dark'); P(x - 0.03, x + 0.03, 0.1, 0.16, 0, 0.88, 'dark'); }
+  } else if (r < 0.85) {                          // 蔬果木箱：2–3 個疊著，上面一層色塊是水果
+    const n = r < 0.75 ? 2 : 3; if (!free(m - 0.5, m + 0.5, 0.05, 0.6, 0.9)) return;
+    const fr = ['awn1', 'paint', 'leaf'];
+    for (let i = 0; i < n; i++) { const x = m - 0.25 + (i % 2) * 0.5, y = i < 2 ? 0 : 0.32;
+      P(x - 0.22, x + 0.22, 0.1, 0.5, y, y + 0.3, 'crate'); P(x - 0.19, x + 0.19, 0.13, 0.47, y + 0.26, y + 0.31, fr[(i + Math.floor(r * 10)) % 3]); }
+  }
 }
 // 車廂：底下的轉向架（輪子）、車頂、側門的框、車身下緣的暗色
 function decorCar(b) {

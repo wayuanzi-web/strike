@@ -747,14 +747,21 @@ function humanPose(b, dt) {
   if (b.reloadT > 0 && b.wpn) { act = 'reload'; const kq = Math.sin(clamp(1 - b.reloadT / b.wpn.reload, 0, 1) * Math.PI); gx = -0.55 * kq; lean = 0.08 * kq; }
   else if (b.state === 'plant' || b.state === 'defuse') { act = 'use'; gx = -1.0; lean = 0.5; }
   else if (thr < 0.55) { act = 'throw'; const t = thr / 0.55; gx = -0.6 * Math.sin(t * Math.PI); lean = 0.25 * Math.sin(t * Math.PI); }
-  const ready = act ? 0 : 1, lowReady = b.state === 'patrol' && !b.visible && sp > 0.5 ? 0.35 : 0;   // 巡邏時槍口稍微朝下
+  // 沒在交戰：巡邏走路槍口稍微朝下；跑起來（巡邏、搜索、繞路、回防）低姿持槍，槍口朝地、上身往前
+  const calm = !b.visible && !act && b.state !== 'combat' && b.state !== 'cover' && b.state !== 'hold';
+  const ready = act ? 0 : 1, lowReady = calm ? (run > 0.4 ? 0.62 : b.state === 'patrol' && sp > 0.5 ? 0.35 : 0) : 0;
+  // 步伐帶動的上身起伏：每一步胸口一沉、槍跟著點一下；站著時呼吸
+  const gp2 = 4 * Math.PI * (b.gph || 0), stepBob = Math.cos(gp2) * Math.min(1, sp / 2) * (og ? 1 : 0);
+  const brth = (1 - Math.min(1, sp)) * Math.sin(game.t * 1.6 + (b.brOff ??= Math.random() * 6)) * 0.018;
   B[HB.spine].rotation.set(-aim * 0.35 - lean * 0.6 + H.sp.x * 0.5 + run * 0.08 * ready - back * mv * 0.06 + ldx * 0.3, -pelYaw - 0.12 + H.sy.x * 0.4 - hipY * 0.6, H.sr.x * 0.3 - la * 0.32 + pelList);
-  B[HB.chest].rotation.set(-aim * 0.55 - lean * 0.4 + H.sp.x * 0.5, -0.22 + H.sy.x * 0.5 - hipY * 0.4, H.sr.x * 0.3 - la * 0.22);
+  B[HB.chest].rotation.set(-aim * 0.55 - lean * 0.4 + H.sp.x * 0.5 + stepBob * (0.025 + run * 0.03) + brth, -0.22 + H.sy.x * 0.5 - hipY * 0.4, H.sr.x * 0.3 - la * 0.22);
   B[HB.neck].rotation.set(H.hd.x * 0.4 - aim * 0.05, 0.22 + H.hy.x * 0.3, 0);
-  B[HB.head].rotation.set(H.hd.x * 0.6 + aim * 0.05, 0.1 + H.hy.x * 0.5, 0);
+  B[HB.head].rotation.set(H.hd.x * 0.6 + aim * 0.05 - stepBob * (0.02 + run * 0.025), 0.1 + H.hy.x * 0.5, 0);
   // 槍：掛在胸骨上，抵消側身讓槍口朝前
   const gp = b.gunP;
-  gp.rotation.set(lerp(gp.rotation.x, gx - lowReady, 1 - Math.exp(-14 * dt)), 0.34, 0);
+  gp.baseX = lerp(gp.baseX || 0, gx - lowReady, 1 - Math.exp(-(lowReady > gp.lowK ? 5 : 14) * dt));
+  gp.rotation.set(gp.baseX + stepBob * 0.012 * ready, 0.34 - lowReady * 0.35, lowReady * 0.25);
+  gp.lowK = lowReady;
   if (!near) return;    // 遠的人不算手（看不清楚，省時間）
   // 手：IK 握槍（換彈時左手去拿彈匣、丟東西時右手往後甩再往前、裝拆彈時手往前下）
   b.g.updateMatrixWorld(true);
