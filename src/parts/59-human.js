@@ -77,11 +77,14 @@ const FACE_MH = (function () {
   let sd = 5; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
   for (const s of [-1, 1]) for (let k = 0; k < 300; k++) {
     const t = rnd(), bx = (0.01 + t * 0.042) * s, by = 1.7015 + Math.sin(t * 2.6) * 0.0045 - t * 0.002 + (rnd() - 0.5) * 0.0045 * (1 - t * 0.5);
-    c.strokeStyle = `rgba(26,19,14,${0.8 + rnd() * 0.2 - t * 0.2})`; c.lineWidth = 1.4 * Q; c.beginPath(); c.moveTo(X(bx), Y(by) + 1.5 * Q); c.lineTo(X(bx) + 3.5 * s * Q, Y(by) - 1.5 * Q); c.stroke();
+    c.strokeStyle = `rgba(34,25,19,${0.42 + rnd() * 0.2 - t * 0.2})`; c.lineWidth = 0.75 * Q; c.beginPath(); c.moveTo(X(bx), Y(by) + 1.5 * Q); c.lineTo(X(bx) + 3.5 * s * Q, Y(by) - 1.5 * Q); c.stroke();
   }
   for (let k = 0; k < 2600; k++) { const x = (rnd() - 0.5) * 0.13, y = 1.555 + rnd() * 0.07; if (y > 1.607 && Math.abs(x) > 0.032) continue; if (y > 1.628) continue; if (Math.abs(y - 1.614) < 0.007 && Math.abs(x) < 0.026) continue; c.fillStyle = `rgba(40,30,24,${0.16 + rnd() * 0.2})`; c.fillRect(X(x), Y(y), 1.3, 1.3); }
   for (let k = 0; k < 5200; k++) { const x = (rnd() - 0.5) * 0.13, y = 1.555 + rnd() * 0.07; if (y > 1.607 && Math.abs(x) > 0.032) continue; if (y > 1.628) continue; if (Math.abs(y - 1.614) < 0.007 && Math.abs(x) < 0.026) continue; c.fillStyle = `rgba(34,26,21,${0.14 + rnd() * 0.2})`; c.fillRect(X(x), Y(y), 1, 1.6); }
   for (let k = 0; k < 900; k++) { const x = (rnd() - 0.5) * 0.15, y = 1.56 + rnd() * 0.17; c.fillStyle = `rgba(${rnd() < 0.5 ? '120,70,55' : '70,45,35'},${0.05 + rnd() * 0.07})`; c.fillRect(X(x), Y(y), 1 + rnd() * 1.6, 1 + rnd() * 1.6); }   // 毛孔、小斑點
+  c.lineCap = 'round';
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { c.strokeStyle = 'rgba(60,38,30,0.16)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(X(0.047 * s), Y(1.683 + (k - 1) * 0.003)); c.lineTo(X(0.056 * s), Y(1.684 + (k - 1) * 0.0065)); c.stroke(); }
+  for (let k = 0; k < 3; k++) { c.strokeStyle = 'rgba(60,38,30,0.11)'; c.lineWidth = 1.4; c.beginPath(); for (let i = 0; i <= 24; i++) { const x = (i / 24 - 0.5) * 0.085, y = 1.716 + k * 0.0075 + Math.sin(i * 0.6 + k * 2) * 0.0008 - x * x * 0.9; i ? c.lineTo(X(x), Y(y)) : c.moveTo(X(x), Y(y)); } c.stroke(); }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.NoColorSpace; return t;
 })();
 // 迷彩＋布料細節＋邊緣光（每個人一份材質，顏色放 uniform，程式共用）
@@ -130,6 +133,8 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       vec4 fc = vCamo > 2.5 ? texture2D(uFaceM, fuv) : texture2D(uFaceT, fuv);
       diffuseColor.rgb = mix(diffuseColor.rgb, pow(fc.rgb, vec3(2.2)), fc.a * smoothstep(-0.05, -0.4, vRN.z));
     }
+    if (vCamo > 2.5) { float hm = clamp(1.0 - abs(vCamo - 3.5) * 2.5, 0.0, 1.0); float sp = texture2D(uCamoT, vRest.xy * 47.0 + vRest.zz * 31.0).a;
+      diffuseColor.rgb *= 1.0 - hm * 0.45 * smoothstep(0.42, 0.6, sp); }   // 剃短的頭髮：一點一點的髮根
     diffuseColor.rgb *= 0.9 + 0.1 * t.a;   // 布料、皮膚細紋
     if (sw < 0.5 && vRM.y < 0.5) diffuseColor.rgb *= 0.86 + 0.26 * t2.b;   // 裝備用久了顏色不均（灰塵、磨損）
     // 布料：腳下越靠近地面越髒（泥土色）、膝蓋磨白
@@ -142,14 +147,17 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   { float cwN = clamp(vCamo, 0.0, 1.0) * (1.0 - step(1.5, vCamo)); if (cwN > 0.5 || vRM.x > 0.85) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0016);
     else if (vCamo > 1.5) { vec3 aw = abs(vRN); aw /= (aw.x + aw.y + aw.z + 1e-4); vec3 sp = vRest * 34.0;
-      float ph = texture2D(uCamoT, sp.zy).a * aw.x + texture2D(uCamoT, sp.xz).a * aw.y + texture2D(uCamoT, sp.xy).a * aw.z; normal = bumpN(normal, -vViewPosition, ph, 0.00016); }   // 皮膚毛孔
+      float ph = texture2D(uCamoT, sp.zy).a * aw.x + texture2D(uCamoT, sp.xz).a * aw.y + texture2D(uCamoT, sp.xy).a * aw.z;
+      float hmN = clamp(1.0 - abs(vCamo - 3.5) * 2.5, 0.0, 1.0), lipN = smoothstep(3.6, 4.0, vCamo);
+      ph += hmN * texture2D(uCamoT, vRest.xy * 47.0 + vRest.zz * 31.0).a * 4.0;   // 髮根的顆粒
+      normal = bumpN(normal, -vViewPosition, ph, 0.00016); }   // 皮膚毛孔
     else if (vRM.x > 0.7 && vRM.y < 0.5) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0009); }   // 尼龍裝備的織紋`)
-      .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26;
+      .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26 * smoothstep(1.5, 5.0, -vViewPosition.z);   // 邊緣光：貼近看時淡掉（近看才不會每個邊都一圈白）
 if (vCamo > 1.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.35, 0.25) * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 2.0) * 0.22;   // 皮膚邊緣透一點紅（透光感）
 outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human6'; return m;
+  m.customProgramCacheKey = () => 'human8'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();
@@ -218,7 +226,7 @@ function mhHeadPart(fi) {
     for (let i = 0; i < N; i++) {
       const v = tri[i];
       for (let a = 0; a < 3; a++) { pos[i * 3 + a] = p[v * 3 + a] / 65535 * 0.4 - 0.2 + (a === 1 ? 1.65 : 0); nrm[i * 3 + a] = n[v * 3 + a] / 255 * 2 - 1; col[i * 3 + a] = c[v * 3 + a] / 255; }
-      kind[i] = k[v]; w[i] = wn[v] / 255;
+      kind[i] = k[v] / 10; w[i] = wn[v] / 255;
     }
     MH_CACHE[H.name] = { pos, nrm, col, kind, w };
   }
@@ -237,7 +245,7 @@ function mergeSkinned(parts) {
     if (raw) {   // 寫實的頭：顏色、種類、權重都是每個頂點自己的
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(raw.col[i], raw.col[i + 1], raw.col[i + 2]);
-        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); RM.push(raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
+        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); RM.push(raw.kind[v] > 3.8 ? 0.42 : raw.kind[v] > 3.3 ? 0.62 : raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : raw.col[i] + raw.col[i + 1] < 0.25 && raw.col[i] > 0.03 ? 0.8 : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
       }
       continue;
     }
@@ -376,10 +384,10 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
       hBox(0.04, 0.04, 0.012, 0, 1.79, -0.13, gold, HB.head), hBox(0.2, 0.012, 0.012, 0, 1.75, -0.104, gold, HB.head), hBox(0.21, 0.012, 0.21, 0, 1.775, 0, '#c8202a', HB.head));
   } else {
     // 頭盔（上半球＋盔緣）、耳機、夜視鏡座、盔布
-    const hc = elite ? '#1a1b1d' : PAL.helmet;
+    const hc = elite ? '#1a1b1d' : PAL.helmet, h0 = parts.length;
     if (mh) add(hEll(0.112, 0.112, 0.128, 0, 1.712, 0.002, hc, HB.head, 1, 20, 8, 0, Math.PI * 0.52), hTorso(0.1125, 0.1125, 0.012, 0, 1.705, 0.002, us ? '#6f6648' : '#22261e', HB.head, 0, 1.143, 20),   // 貼合頭型的頭盔＋盔緣
-      hBox(0.05, 0.016, 0.02, 0, 1.578, -0.088, strap, HB.head));   // 下巴托
-    if (mh) for (const sx of [-1, 1]) add(hLimb(0.0042, [0.1 * sx, 1.705, -0.04], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5), hLimb(0.0042, [0.102 * sx, 1.705, 0.05], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5),
+      hBox(0.042, 0.012, 0.014, 0, 1.577, -0.09, strap, HB.head));   // 下巴托
+    if (mh) for (const sx of [-1, 1]) add(hLimb(0.0042, [0.1 * sx, 1.722, -0.04], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5), hLimb(0.0042, [0.102 * sx, 1.722, 0.05], [0.09 * sx, 1.632, -0.03], strap, HB.head, 0, 5),
       hLimb(0.0042, [0.09 * sx, 1.632, -0.03], [0.03 * sx, 1.58, -0.085], strap, HB.head, 0, 5), hBox(0.008, 0.014, 0.014, 0.091 * sx, 1.632, -0.03, '#1d1d1b', HB.head));   // Y 形下巴帶＋調整扣
     if (mh && !lod) {
       const vel = us ? '#a89a78' : '#2c3226';
@@ -398,6 +406,7 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
     if (us && mh) add(hBox(0.046, 0.04, 0.016, 0, 1.768, -0.116, '#1d1e20', HB.head, 0, -0.3), hBox(0.026, 0.02, 0.014, 0, 1.764, -0.128, '#0c0c0d', HB.head, 0, -0.3), hBox(0.05, 0.006, 0.02, 0, 1.79, -0.108, '#1d1e20', HB.head, 0, -0.3));   // 正面的夜視鏡座
     if (!(us && mh)) add(hBox(0.05, 0.035, 0.03, 0, mh ? 1.785 : 1.765, mh ? -0.112 : -0.135, '#16171a', HB.head));
     add(hBox(0.06, 0.03, 0.012, 0, 1.74, 0.145, band, HB.head));   // 隊伍色魔鬼氈章在盔後
+    if (mh) for (let i = h0; i < parts.length; i++) { parts[i].computeBoundingBox(); if (parts[i].boundingBox.min.y > 1.69) parts[i].translate(0, 0.014, 0); }   // 寫實的頭：頭盔戴高一點，露出眉毛和一截額頭
     if (elite) add(hBox(0.09, 0.04, 0.06, 0, 1.765, -0.17, '#0e0f10', HB.head), hCyl(0.018, 0.05, -0.025, 1.745, -0.2, '#0e0f10', HB.head, Math.PI / 2), hCyl(0.018, 0.05, 0.025, 1.745, -0.2, '#0e0f10', HB.head, Math.PI / 2));
   }
   // 手臂：上臂（肩章／隊伍色章）、前臂、護肘、手套（手掌＋四指＋拇指）
