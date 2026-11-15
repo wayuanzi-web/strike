@@ -617,7 +617,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261116-0126';   // 建置時換成日期時間
+const BUILD = '20261116-0550';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -2604,6 +2604,47 @@ function updateSparks(dt) {
   sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true;
 }
 
+// ---------- 碎屑：布料碎片、牆面碎石（不發光、會掉到地上），一個 Points 一次繪製 ----------
+const DEBRIS = 140;
+const debGeo = new THREE.BufferGeometry();
+const debPos = new Float32Array(DEBRIS * 3), debCol = new Float32Array(DEBRIS * 3);
+debGeo.setAttribute('position', new THREE.BufferAttribute(debPos, 3)); debGeo.setAttribute('color', new THREE.BufferAttribute(debCol, 3));
+const debPts = new THREE.Points(debGeo, new THREE.PointsMaterial({ size: 0.028, vertexColors: true }));
+debPts.frustumCulled = false; scene.add(debPts);
+const debV = new Float32Array(DEBRIS * 3), debL = new Float32Array(DEBRIS), debFloor = new Float32Array(DEBRIS);
+for (let i = 0; i < DEBRIS; i++) debPos[i * 3 + 1] = -100;
+let debI = 0;
+const _debC = new THREE.Color();
+// p 命中點、n 噴出的方向、color 顏色、count 數量、spd 速度、floor 落地高度
+function spawnDebris(p, n, color, count, spd = 2.2, floor = 0) {
+  if (S.quality === 'eco') count = Math.ceil(count * 0.5);
+  _debC.set(color); debLive = true;
+  for (let k = 0; k < count; k++) {
+    const i = debI++ % DEBRIS, s = rand(0.4, 1) * spd, sh = rand(0.6, 1.15);
+    debPos[i * 3] = p.x; debPos[i * 3 + 1] = p.y; debPos[i * 3 + 2] = p.z;
+    debV[i * 3] = (n.x + rand(-0.7, 0.7)) * s; debV[i * 3 + 1] = (n.y * 0.6 + rand(0, 0.9)) * s; debV[i * 3 + 2] = (n.z + rand(-0.7, 0.7)) * s;
+    debL[i] = rand(0.9, 1.6); debFloor[i] = floor + 0.012;
+    debCol[i * 3] = _debC.r * sh; debCol[i * 3 + 1] = _debC.g * sh; debCol[i * 3 + 2] = _debC.b * sh;
+  }
+}
+let debLive = false;
+function updateDebris(dt) {
+  if (!debLive) return;
+  let any = false;
+  for (let i = 0; i < DEBRIS; i++) {
+    if (debL[i] <= 0) continue;
+    any = true;
+    debL[i] -= dt;
+    if (debL[i] <= 0) { debPos[i * 3 + 1] = -100; continue; }
+    if (debPos[i * 3 + 1] <= debFloor[i]) continue;              // 落地就停住，等時間到消失
+    debV[i * 3 + 1] -= 9.8 * dt; const drag = Math.exp(-2.2 * dt); debV[i * 3] *= drag; debV[i * 3 + 2] *= drag;
+    debPos[i * 3] += debV[i * 3] * dt; debPos[i * 3 + 1] = Math.max(debFloor[i], debPos[i * 3 + 1] + debV[i * 3 + 1] * dt); debPos[i * 3 + 2] += debV[i * 3 + 2] * dt;
+  }
+  debGeo.attributes.position.needsUpdate = true;
+  debGeo.attributes.color.needsUpdate = true;
+  debLive = any;
+}
+
 // ---------- 機器人腳下的影子：沿太陽反方向拉長的柔邊橢圓，一次繪製 ----------
 const shadowTex = (function () {
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
@@ -3117,6 +3158,7 @@ function wearArmor(u, absorbed) {
 }
 function giveArmor(u, helmet) { const A = armorOf(u); A.vest = true; if (helmet) A.helmet = true; A.armor = 100; }
 // 子彈打到人：算傷害（含護甲），並扣護甲耐久
+const _debC2 = new THREE.Color();
 function hitDamage(w, part, dist, u) {
   const A = armorOf(u), vest = u === player ? INV.vest : A.vest !== false, helm = u === player ? INV.helmet : A.helmet !== false;
   const raw = weaponDamage(w, part, dist, false, false), d = weaponDamage(w, part, dist, vest, helm);
@@ -3319,11 +3361,21 @@ function shoot() {
       _pel.set(res.bot, e);
       if (k < 4) { const bw = rayWorld(_hit, _d, 2.5); if (bw) addBloodSplat(_v2.copy(_hit).addScaledVector(_d, bw.t), bw.n); }
       spawnPuff(_hit, '#9e1d16', res.part === 'head' ? 0.55 : 0.35, 0.35, 0.2);
+      // 穿出去那一側的血霧（往後噴、往下沉）＋入口飛出的布料碎片（迷彩色；頭是頭盔的碎屑）
+      if (k < 2) {
+        spawnPuff(_v2.copy(_hit).addScaledVector(_d, 0.28), '#6e1410', res.part === 'head' ? 0.7 : 0.5, 0.5, -0.15);
+        const lk = res.bot.hm && res.bot.hm.look, cm = CAMO[lk === 'elite' || lk === 'boss' ? 'elite' : res.bot.baseTeam || res.bot.team] || CAMO.B;
+        spawnDebris(_hit, _v3.copy(_d).multiplyScalar(-0.55), res.part === 'head' ? '#5a5444' : cm[res.part === 'legs' ? 1 : 0], n > 1 ? 2 : 5, 1.8, res.bot.phys.pos.y);
+      }
       if (res.part === 'head') spawnSparks(_hit, _d, '#ffd27a', 5);
     } else if (res.n && decals < 4) {
       decals++; addDecal(_hit, res.n); spawnPuff(_hit, '#cfc6b6', n > 1 ? 0.25 : 0.4, 0.5, 0.5);
       if (decals === 1) impactSfx(_hit, boxMat(res.box), n > 1 ? 0.55 : 0.8);   // 打到什麼材質就是什麼聲音
       spawnSparks(_hit, _v1.set(res.n[0], res.n[1], res.n[2]), '#ffcf86', n > 1 ? 1 : 3);
+      // 牆面碎屑：跟被打到的方塊同色（略深），落在底下的地板上
+      if (res.box) { let fy = 0; for (const b of BOXES) if (_hit.x + res.n[0] * 0.1 > b.min[0] && _hit.x + res.n[0] * 0.1 < b.max[0] && _hit.z + res.n[2] * 0.1 > b.min[2] && _hit.z + res.n[2] * 0.1 < b.max[2] && b.max[1] <= _hit.y + 0.05) fy = Math.max(fy, b.max[1]);
+        _debC2.set(TINT[res.box.c] || '#9a9488').multiplyScalar(0.75);
+        spawnDebris(_hit, _v1, _debC2, n > 1 ? 2 : 6, 2.4, fy); }
     }
     if (k < 3) spawnTracer(_mz, _hit, '#ffe0a0', n > 1 ? 0.018 : 0.028);
   }
@@ -9191,7 +9243,7 @@ function step(dt) {
     camera.position.set(Math.sin(game.menuT) * 30, 12, Math.cos(game.menuT) * 30);
     camera.lookAt(0, 1, 0);
     for (const b of bots) updateBot(b, dt);
-    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
+    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateBlobShadows(); updateMuzzleLight(dt);
     return;
   }
   if ((game.state === 'pause' && game.mode !== 'duel') || game.state === 'over') return;   // 好友對戰暫停時遊戲照跑（不然對方會以為斷線）
@@ -9225,7 +9277,7 @@ function step(dt) {
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);
   updateNades(dt); updateDrops(dt); kcRecord();
   if (game.mode !== 'match' && game.mode !== 'tutorial') updatePlayerUse(dt);   // 撿槍（對戰模式在 updateBomb 裡）
-  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
+  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateBlobShadows(); updateMuzzleLight(dt);
   // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
   const spec = !player.alive && game.mode === 'match' && player.deadT > 2 ? spectateTarget() : null;
@@ -9274,7 +9326,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, sprayPicks: () => SPRAY_PICKS, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, debrisStat: () => { let n = 0, lo = 9, hi = -9; for (let i = 0; i < DEBRIS; i++) if (debL[i] > 0) { n++; lo = Math.min(lo, debPos[i * 3 + 1]); hi = Math.max(hi, debPos[i * 3 + 1]); } return [n, +lo.toFixed(2), +hi.toFixed(2)]; }, sprayPicks: () => SPRAY_PICKS, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };

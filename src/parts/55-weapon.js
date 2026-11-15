@@ -62,6 +62,7 @@ function wearArmor(u, absorbed) {
 }
 function giveArmor(u, helmet) { const A = armorOf(u); A.vest = true; if (helmet) A.helmet = true; A.armor = 100; }
 // 子彈打到人：算傷害（含護甲），並扣護甲耐久
+const _debC2 = new THREE.Color();
 function hitDamage(w, part, dist, u) {
   const A = armorOf(u), vest = u === player ? INV.vest : A.vest !== false, helm = u === player ? INV.helmet : A.helmet !== false;
   const raw = weaponDamage(w, part, dist, false, false), d = weaponDamage(w, part, dist, vest, helm);
@@ -264,11 +265,21 @@ function shoot() {
       _pel.set(res.bot, e);
       if (k < 4) { const bw = rayWorld(_hit, _d, 2.5); if (bw) addBloodSplat(_v2.copy(_hit).addScaledVector(_d, bw.t), bw.n); }
       spawnPuff(_hit, '#9e1d16', res.part === 'head' ? 0.55 : 0.35, 0.35, 0.2);
+      // 穿出去那一側的血霧（往後噴、往下沉）＋入口飛出的布料碎片（迷彩色；頭是頭盔的碎屑）
+      if (k < 2) {
+        spawnPuff(_v2.copy(_hit).addScaledVector(_d, 0.28), '#6e1410', res.part === 'head' ? 0.7 : 0.5, 0.5, -0.15);
+        const lk = res.bot.hm && res.bot.hm.look, cm = CAMO[lk === 'elite' || lk === 'boss' ? 'elite' : res.bot.baseTeam || res.bot.team] || CAMO.B;
+        spawnDebris(_hit, _v3.copy(_d).multiplyScalar(-0.55), res.part === 'head' ? '#5a5444' : cm[res.part === 'legs' ? 1 : 0], n > 1 ? 2 : 5, 1.8, res.bot.phys.pos.y);
+      }
       if (res.part === 'head') spawnSparks(_hit, _d, '#ffd27a', 5);
     } else if (res.n && decals < 4) {
       decals++; addDecal(_hit, res.n); spawnPuff(_hit, '#cfc6b6', n > 1 ? 0.25 : 0.4, 0.5, 0.5);
       if (decals === 1) impactSfx(_hit, boxMat(res.box), n > 1 ? 0.55 : 0.8);   // 打到什麼材質就是什麼聲音
       spawnSparks(_hit, _v1.set(res.n[0], res.n[1], res.n[2]), '#ffcf86', n > 1 ? 1 : 3);
+      // 牆面碎屑：跟被打到的方塊同色（略深），落在底下的地板上
+      if (res.box) { let fy = 0; for (const b of BOXES) if (_hit.x + res.n[0] * 0.1 > b.min[0] && _hit.x + res.n[0] * 0.1 < b.max[0] && _hit.z + res.n[2] * 0.1 > b.min[2] && _hit.z + res.n[2] * 0.1 < b.max[2] && b.max[1] <= _hit.y + 0.05) fy = Math.max(fy, b.max[1]);
+        _debC2.set(TINT[res.box.c] || '#9a9488').multiplyScalar(0.75);
+        spawnDebris(_hit, _v1, _debC2, n > 1 ? 2 : 6, 2.4, fy); }
     }
     if (k < 3) spawnTracer(_mz, _hit, '#ffe0a0', n > 1 ? 0.018 : 0.028);
   }

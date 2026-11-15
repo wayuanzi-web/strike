@@ -460,6 +460,47 @@ function updateSparks(dt) {
   sparkGeo.attributes.position.needsUpdate = true; sparkGeo.attributes.color.needsUpdate = true;
 }
 
+// ---------- 碎屑：布料碎片、牆面碎石（不發光、會掉到地上），一個 Points 一次繪製 ----------
+const DEBRIS = 140;
+const debGeo = new THREE.BufferGeometry();
+const debPos = new Float32Array(DEBRIS * 3), debCol = new Float32Array(DEBRIS * 3);
+debGeo.setAttribute('position', new THREE.BufferAttribute(debPos, 3)); debGeo.setAttribute('color', new THREE.BufferAttribute(debCol, 3));
+const debPts = new THREE.Points(debGeo, new THREE.PointsMaterial({ size: 0.028, vertexColors: true }));
+debPts.frustumCulled = false; scene.add(debPts);
+const debV = new Float32Array(DEBRIS * 3), debL = new Float32Array(DEBRIS), debFloor = new Float32Array(DEBRIS);
+for (let i = 0; i < DEBRIS; i++) debPos[i * 3 + 1] = -100;
+let debI = 0;
+const _debC = new THREE.Color();
+// p 命中點、n 噴出的方向、color 顏色、count 數量、spd 速度、floor 落地高度
+function spawnDebris(p, n, color, count, spd = 2.2, floor = 0) {
+  if (S.quality === 'eco') count = Math.ceil(count * 0.5);
+  _debC.set(color); debLive = true;
+  for (let k = 0; k < count; k++) {
+    const i = debI++ % DEBRIS, s = rand(0.4, 1) * spd, sh = rand(0.6, 1.15);
+    debPos[i * 3] = p.x; debPos[i * 3 + 1] = p.y; debPos[i * 3 + 2] = p.z;
+    debV[i * 3] = (n.x + rand(-0.7, 0.7)) * s; debV[i * 3 + 1] = (n.y * 0.6 + rand(0, 0.9)) * s; debV[i * 3 + 2] = (n.z + rand(-0.7, 0.7)) * s;
+    debL[i] = rand(0.9, 1.6); debFloor[i] = floor + 0.012;
+    debCol[i * 3] = _debC.r * sh; debCol[i * 3 + 1] = _debC.g * sh; debCol[i * 3 + 2] = _debC.b * sh;
+  }
+}
+let debLive = false;
+function updateDebris(dt) {
+  if (!debLive) return;
+  let any = false;
+  for (let i = 0; i < DEBRIS; i++) {
+    if (debL[i] <= 0) continue;
+    any = true;
+    debL[i] -= dt;
+    if (debL[i] <= 0) { debPos[i * 3 + 1] = -100; continue; }
+    if (debPos[i * 3 + 1] <= debFloor[i]) continue;              // 落地就停住，等時間到消失
+    debV[i * 3 + 1] -= 9.8 * dt; const drag = Math.exp(-2.2 * dt); debV[i * 3] *= drag; debV[i * 3 + 2] *= drag;
+    debPos[i * 3] += debV[i * 3] * dt; debPos[i * 3 + 1] = Math.max(debFloor[i], debPos[i * 3 + 1] + debV[i * 3 + 1] * dt); debPos[i * 3 + 2] += debV[i * 3 + 2] * dt;
+  }
+  debGeo.attributes.position.needsUpdate = true;
+  debGeo.attributes.color.needsUpdate = true;
+  debLive = any;
+}
+
 // ---------- 機器人腳下的影子：沿太陽反方向拉長的柔邊橢圓，一次繪製 ----------
 const shadowTex = (function () {
   const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');

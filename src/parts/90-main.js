@@ -199,7 +199,7 @@ function step(dt) {
     camera.position.set(Math.sin(game.menuT) * 30, 12, Math.cos(game.menuT) * 30);
     camera.lookAt(0, 1, 0);
     for (const b of bots) updateBot(b, dt);
-    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
+    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateBlobShadows(); updateMuzzleLight(dt);
     return;
   }
   if ((game.state === 'pause' && game.mode !== 'duel') || game.state === 'over') return;   // 好友對戰暫停時遊戲照跑（不然對方會以為斷線）
@@ -233,7 +233,7 @@ function step(dt) {
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);
   updateNades(dt); updateDrops(dt); kcRecord();
   if (game.mode !== 'match' && game.mode !== 'tutorial') updatePlayerUse(dt);   // 撿槍（對戰模式在 updateBomb 裡）
-  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateBlobShadows(); updateMuzzleLight(dt);
+  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateBlobShadows(); updateMuzzleLight(dt);
   // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
   const spec = !player.alive && game.mode === 'match' && player.deadT > 2 ? spectateTarget() : null;
@@ -282,7 +282,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, sprayPicks: () => SPRAY_PICKS, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, debrisStat: () => { let n = 0, lo = 9, hi = -9; for (let i = 0; i < DEBRIS; i++) if (debL[i] > 0) { n++; lo = Math.min(lo, debPos[i * 3 + 1]); hi = Math.max(hi, debPos[i * 3 + 1]); } return [n, +lo.toFixed(2), +hi.toFixed(2)]; }, sprayPicks: () => SPRAY_PICKS, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };
