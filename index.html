@@ -617,7 +617,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261115-1808';   // 建置時換成日期時間
+const BUILD = '20261115-1845';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -1100,10 +1100,46 @@ function decorBoxes() {
       if (z1 <= -26) { for (let x = -33; x <= 33; x += 6) D(x - 0.2, -26, x + 0.2, -25.9, 0, y1, 'outer'); D(-36, -26, 36, -25.85, y1, y1 + 0.1, 'trim'); }
       if (x0 >= 36) { for (let z = -21; z <= 21; z += 6) D(35.9, z - 0.2, 36, z + 0.2, 0, y1, 'outer'); D(35.85, -26, 36, 26, y1, y1 + 0.1, 'trim'); }
       if (x1 <= -36) { for (let z = -21; z <= 21; z += 6) D(-36, z - 0.2, -35.9, z + 0.2, 0, y1, 'outer'); D(-36, -26, -35.85, 26, y1, y1 + 0.1, 'trim'); }
+      wallProps(b);
     }
   
     else if (b.c.startsWith('house') && y1 > 4) decorHouse(b);
     else if (b.c.startsWith('car')) decorCar(b);
+  }
+}
+// 外牆內側壁柱之間的雜物：落水管、電箱、冷氣室外機、通風百葉、牆腳的勒腳（每張圖都有，位置用雜湊決定，固定不變）
+function wallProps(b) {
+  const [x0, , z0] = b.min, [x1, y1, z1] = b.max;
+  let ax, pl, sg, a0, a1;
+  if (z0 >= 26) { ax = 2; pl = 25.9; sg = -1; a0 = -36; a1 = 36; } else if (z1 <= -26) { ax = 2; pl = -25.9; sg = 1; a0 = -36; a1 = 36; }
+  else if (x0 >= 36) { ax = 0; pl = 35.9; sg = -1; a0 = -26; a1 = 26; } else if (x1 <= -36) { ax = 0; pl = -35.9; sg = 1; a0 = -26; a1 = 26; } else return;
+  // 在牆面上放一個方塊：沿牆 c0..c1、離牆 d0..d1、高 h0..h1
+  const P = (c0, c1, d0, d1, h0, h1, col) => { const q0 = pl + sg * d0, q1 = pl + sg * d1;
+    if (ax === 2) D(c0, q0, c1, q1, h0, h1, col); else D(q0, c0, q1, c1, h0, h1, col); };
+  P(a0, a1, -0.06, 0.05, 0, 0.32, 'trim');                     // 勒腳
+  const first = ax === 2 ? -30 : -18;
+  for (let c = first; c < a1 - 3; c += 6) {
+    const r = hash1(Math.round(c * 13 + pl * 7)), r2 = hash1(Math.round(c * 31 - pl * 5));
+    if (r < 0.3) {                                              // 落水管：直管、管箍、底下的彎頭
+      const m = c + (r2 - 0.5) * 2;
+      P(m - 0.055, m + 0.055, 0.02, 0.13, 0.25, y1 + 0.05, 'dark');
+      for (let h = 1; h < y1; h += 1.6) P(m - 0.075, m + 0.075, 0.0, 0.15, h, h + 0.05, 'dark');
+      P(m - 0.07, m + 0.07, 0.02, 0.3, 0.08, 0.25, 'dark');
+    } else if (r < 0.55) {                                      // 電箱與往上的線槽
+      const m = c + (r2 - 0.5) * 1.6;
+      P(m - 0.3, m + 0.3, 0, 0.2, 1.1, 1.9, 'shed'); P(m - 0.32, m + 0.32, 0, 0.23, 1.9, 1.95, 'dark');
+      P(m - 0.04, m + 0.04, 0, 0.06, 1.95, y1, 'dark'); P(m + 0.18, m + 0.22, 0.2, 0.22, 1.4, 1.55, 'dark');
+    } else if (r < 0.75 && y1 > 3.5) {                          // 冷氣室外機（吊在牆上）與支架
+      const m = c + (r2 - 0.5) * 1.4, h = 2.4 + r2 * 0.6;
+      P(m - 0.45, m + 0.45, 0.04, 0.36, h, h + 0.6, 'shed');
+      for (let k = 0; k < 5; k++) P(m - 0.38 + k * 0.03, m - 0.37 + k * 0.03, 0.36, 0.37, h + 0.08, h + 0.52, 'dark');
+      P(m - 0.42, m - 0.38, 0, 0.36, h - 0.06, h, 'dark'); P(m + 0.38, m + 0.42, 0, 0.36, h - 0.06, h, 'dark');
+      P(m + 0.3, m + 0.34, 0.02, 0.06, 0.3, h, 'dark');
+    } else if (r < 0.9) {                                       // 通風百葉
+      const m = c + (r2 - 0.5) * 2, h = 2.6;
+      P(m - 0.35, m + 0.35, 0, 0.04, h, h + 0.5, 'dark');
+      for (let k = 0; k < 5; k++) P(m - 0.32, m + 0.32, 0.04, 0.07, h + 0.05 + k * 0.09, h + 0.08 + k * 0.09, 'trim');
+    }
   }
 }
 // 房子：每層窗戶（窗台、窗框）、一樓偶爾有門、屋簷（陶瓦色）
@@ -1126,6 +1162,8 @@ function decorHouse(b) {
       }
     }
   }
+  // 石材勒腳：一樓牆腳一圈
+  D(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, 0, 0.45, 'stone');
   D(x0 - 0.18, z0 - 0.18, x1 + 0.18, z1 + 0.18, y1, y1 + 0.22, 'roof');
   D(x0 - 0.05, z0 - 0.05, x1 + 0.05, z1 + 0.05, y1 - 0.5, y1 - 0.38, 'sill');
 }
@@ -2020,13 +2058,25 @@ function boxMesh(w, h, d, color, x, y, z, parent, mat) {
   m.position.set(x, y, z); parent.add(m); return m;
 }
 // 把很多小零件合成一個幾何（每個零件可以帶自己的顏色），減少繪製次數
+let VM_BEV = false;   // 建手上的槍時：大零件用有倒角的方塊（邊緣接得到光，像加工過的金屬）
+function bevelBox(w, h, d, r) {
+  const g = new THREE.BoxGeometry(w, h, d, 2, 2, 2), p = g.attributes.position, v = new V3(), c = new V3(), hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    c.set(Math.max(-hx, Math.min(hx, v.x)), Math.max(-hy, Math.min(hy, v.y)), Math.max(-hz, Math.min(hz, v.z)));
+    const dd = v.clone().sub(c); if (dd.lengthSq() > 1e-12) { dd.normalize(); v.copy(c).addScaledVector(dd, r); }
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals(); return g;
+}
 function partBox(w, h, d, x, y, z, color, rx = 0, ry = 0, rz = 0) {
-  const g = new THREE.BoxGeometry(w, h, d);
+  const mn = Math.min(w, h, d), mx = Math.max(w, h, d);
+  const g = VM_BEV && mn >= 0.012 && mx >= 0.03 ? bevelBox(w, h, d, Math.min(0.004, mn * 0.25)) : new THREE.BoxGeometry(w, h, d);
   g.applyMatrix4(new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new V3(1, 1, 1)));
   g.userData.color = color; return g;
 }
 function partCyl(r, len, x, y, z, color, seg = 8) {
-  const g = new THREE.CylinderGeometry(r, r, len, seg); g.rotateX(Math.PI / 2); g.translate(x, y, z); g.userData.color = color; return g;
+  const g = new THREE.CylinderGeometry(r, r, len, VM_BEV ? Math.max(seg, r > 0.012 ? 20 : 12) : seg); g.rotateX(Math.PI / 2); g.translate(x, y, z); g.userData.color = color; return g;
 }
 // 側面輪廓擠出：pts 是 [槍身 z（往後為正）, y]，w 是厚度
 function partProfile(pts, w, x, color) {
@@ -2068,7 +2118,7 @@ const VM_ENV = (function () {
     const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromEquirectangular(t); pm.dispose(); t.dispose(); return rt.texture;
   } catch (e) { return null; }
 })();
-const VM_BASE = { metal: new THREE.Color('#3d4248'), poly: new THREE.Color('#34332f'), cloth: new THREE.Color('#9da392') };
+const VM_BASE = { metal: new THREE.Color('#40454b'), poly: new THREE.Color('#2a2a28'), cloth: new THREE.Color('#9da392') };   // 機匣是陽極處理的深灰、護木握把是更深的霧面塑膠
 const VM_MATS = {
   metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.4, envMap: VM_ENV, envMapIntensity: 0.9 }),
   poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.62, envMap: VM_ENV, envMapIntensity: 0.6 }),
@@ -2124,6 +2174,7 @@ function vmAssemble(metal, poly, cloth, left, magParts, magPos, muzzle) {
 }
 const VMODELS = {};
 (function buildViewmodels() {
+  VM_BEV = true;
   const M = '#ffffff', D = '#9aa0a8', P = '#ffffff', P2 = '#c9bfae', K = '#4a4e55';
   // 步槍「曙七」
   {
@@ -2247,6 +2298,7 @@ const VMODELS = {};
     [partCyl(0.032, 0.1, 0, 0, 0, body, 10), partCyl(0.0335, 0.018, 0, 0, -0.02, band, 10)], vmRightArm(0.012, -0.075, 0.06), vmLeftArm(-0.04, -0.06, -0.1),
     [partBox(0.001, 0.001, 0.001, 0, 0, 0, M)], new V3(0, 0, 0), new V3(0, 0, -0.05));
   for (const g of [VMODELS.he = nade('#5d6440', '#2b2d22'), VMODELS.flash = nade('#c9cdd2', '#3b6fb0'), VMODELS.smoke = nade('#77808a', '#d8d8d8'), VMODELS.molotov = nade('#6b4a26', '#e9dfc8')]) g.children[1].rotation.x = Math.PI / 2;
+  VM_BEV = false;
 })();
 let gun = VMODELS.rifle; gun.visible = true;
 // 走進陰影時手上的槍也跟著變暗（matcap 不受場景燈光影響，用這個近似）
@@ -7855,16 +7907,32 @@ vec3 patColor(out float glow) {
   float l1 = smoothstep(0.03, 0.0, abs(fract(p.x * 14.0 + p.y * 6.0) - 0.5) - 0.02), l2 = smoothstep(0.03, 0.0, abs(fract(p.y * 22.0 - p.x * 4.0) - 0.5) - 0.015);
   glow = l1 + l2 * 0.7; return mix(uPA, mix(uPB, uPC, l2), clamp(glow, 0.0, 1.0));
 }`;
+// 手上的槍的表面細節：邊角磨損（倒角的地方法線變化快 → 露出金屬底色）、沿槍身的細刮痕、粗糙度不均；塑膠是霧面顆粒與手摸的亮面
+const VM_DETAIL_GLSL = `
+uniform float uDet;
+vec3 vmDetail(vec3 base, out float wear, out float rough) {
+  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : vGP.zy;
+  float edge = clamp(length(fwidth(normalize(vGN))) * 2.2 - 0.15, 0.0, 1.0);
+  float n1 = pn(p * 140.0), n2 = pn(vec2(vGP.z * 30.0, (an.y > 0.7 ? vGP.x : vGP.y) * 900.0)), n3 = pn(p * 26.0);
+  float scratch = smoothstep(0.78, 0.95, n2) * smoothstep(0.35, 0.7, n3);
+  wear = clamp(edge * (0.55 + 0.6 * n1) + scratch * 0.5, 0.0, 1.0) * mix(0.35, 1.0, uDet);
+  rough = mix(0.82 + 0.36 * n1, 1.0, 0.0) * (1.0 - wear * 0.45 * uDet) * mix(1.0, 0.9 + 0.2 * pn(p * 300.0), 1.0 - uDet);
+  vec3 bare = mix(base, vec3(0.55, 0.56, 0.58), uDet);   // 金屬：磨掉陽極處理露出來的鋁色；塑膠：磨亮一點
+  return mix(base * (0.92 + 0.12 * n3), mix(base * 1.35, bare, 0.75), wear * (uDet > 0.5 ? 0.65 : 0.3));
+}`;
 function patchVmPattern(mat, k) {
   mat.userData.patK = { value: k };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, PAT_U); sh.uniforms.uPK = mat.userData.patK;
     sh.vertexShader = 'varying vec3 vGP; varying vec3 vGN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGP = position; vGN = normal;');
-    sh.fragmentShader = PAT_GLSL + '\n' + sh.fragmentShader
-      .replace('#include <color_fragment>', '#include <color_fragment>\nfloat pGlow; vec3 pCol = patColor(pGlow); diffuseColor.rgb *= mix(vec3(1.0), pCol, uPK);')
+    sh.uniforms.uDet = { value: k < 0.9 ? 1 : 0 };
+    sh.fragmentShader = PAT_GLSL + VM_DETAIL_GLSL + '\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', '#include <color_fragment>\nfloat pGlow; vec3 pCol = patColor(pGlow); diffuseColor.rgb *= mix(vec3(1.0), pCol, uPK);\nfloat vmWear, vmRough; diffuseColor.rgb = vmDetail(diffuseColor.rgb, vmWear, vmRough);')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * vmRough, 0.08, 1.0);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.9, vmWear * uDet);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += pGlow * uPK * mix(uPB, uPC, 0.5) * 0.9;');
   };
-  mat.customProgramCacheKey = () => 'vmpat' + k;
+  mat.customProgramCacheKey = () => 'vmpat2' + k;
 }
 patchVmPattern(VM_MATS.poly, 1); patchVmPattern(VM_MATS.metal, 0.75);
 
