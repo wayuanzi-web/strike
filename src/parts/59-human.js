@@ -93,15 +93,16 @@ function patchHumanMat(m, rim, camo) {
   const C = m.userData.camoU = camo.map((c) => ({ value: new THREE.Color(c) }));
   m.userData.skinU = { value: new THREE.Color(pick(SKIN_TONES)) };
   m.userData.lampU = { value: new THREE.Color(0, 0, 0) };
+  m.userData.hitsU = { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }; m.userData.hitN = 0;   // 中彈血跡：綁定姿勢座標 xyz＋半徑
   m.userData.headTU = { value: mhHeadTex(0) }; m.userData.headNU = { value: mhHeadTex(0, 1) }; m.userData.blinkU = { value: 0 }; m.userData.gazeU = { value: new THREE.Vector2() }; m.userData.browU = { value: new THREE.Vector4(0.1, 0.07, 0.05, 0) };   // 寫實的頭：皮膚＋眼睛貼圖、眉毛顏色與第幾列   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
   const MH_AT = typeof MH_ATLAS !== 'undefined' ? MH_ATLAS : [640, 1344, 1088];
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; });
+    sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; }); sh.uniforms.uHits = m.userData.hitsU;
     sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU; sh.uniforms.uLampH = m.userData.lampU; sh.uniforms.uFl = LIGHT_U.uFl;
     sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH }; sh.uniforms.uHeadT = m.userData.headTU; sh.uniforms.uHeadN = m.userData.headNU; sh.uniforms.uBlink = m.userData.blinkU; sh.uniforms.uGaze = m.userData.gazeU; sh.uniforms.uBrow = m.userData.browU; sh.uniforms.uBrowT = { value: mhBrowTex() };
     sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nattribute vec2 aUvH;\nattribute vec3 aBlink;\nuniform float uBlink;\nvarying vec2 vUvH;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += aBlink * uBlink;\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM; vUvH = aUvH;')
       .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvHw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
+    sh.fragmentShader = `uniform vec4 uHits[6]; uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
 varying vec2 vUvH; varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw; varying vec2 vRM;
 ${FL_GLSL}
 // 布料凹凸：織紋（細）＋皺褶（沿著四肢的橫向褶子、關節處多）
@@ -160,6 +161,17 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     float dirt = (1.0 - smoothstep(0.05, 0.45, vRest.y)) * cw;
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.27, 0.21) * (0.8 + 0.4 * t.b), dirt * 0.55);
     diffuseColor.rgb *= 1.0 + cw * 0.12 * exp(-pow((vRest.y - 0.48) * 14.0, 2.0)) * step(abs(vRest.z), 0.12) * step(vRest.z, -0.02);
+    // 中彈：衣服上一個彈孔、周圍滲開的血（往下流得比較長，邊緣不規則）；跟著綁定姿勢座標走，所以人動血跡也跟著動
+    if (vCamo < 4.5) for (int i = 0; i < 6; i++) { vec4 h = uHits[i]; if (h.w > 0.0) {
+      // 從正面（h.z<0）或背面投影：只看 xy 距離，面要朝那一邊、在身體那一側，所以背心、彈匣袋、褲子哪一層在外面就沾在哪一層
+      float side = h.z < 0.0 ? step(vRest.z, h.z * 0.4) * step(vRN.z, 0.35) : step(h.z * 0.4, vRest.z) * step(-0.35, vRN.z);
+      vec3 dv = vec3(vRest.xy - h.xy, 0.0); float n = texture2D(uCamoT, vRest.xy * 13.0 + vRest.zz * 9.0 + h.xy * 5.0).a;
+      float dd = side < 0.5 ? 9.0 : length(vec2(dv.x, dv.y < 0.0 ? dv.y * 0.42 : dv.y * 1.2)) / h.w + (n - 0.5) * 0.55;
+      float st = 1.0 - smoothstep(0.6, 1.0, dd);
+      float core = 1.0 - smoothstep(0.0, 0.55, dd);
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.42, 0.12, 0.1) * (0.85 + 0.3 * n), st * 0.75);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.055, 0.012, 0.01), core * 0.55);
+      diffuseColor.rgb *= 1.0 - (1.0 - smoothstep(0.0045, 0.009, length(dv))) * 0.92 * side; } }
   }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x; if (vCamo > 1.5 && vCamo < 4.5) roughnessFactor *= 0.92 + 0.2 * texture2D(uCamoT, vRest.xy * 21.0 + vRest.z * 13.0).a;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRM.y;')
@@ -617,6 +629,12 @@ function humanHit(b, part, dir, dmg) {
   if (part === 'head') { H.hd.v += 16 * back * k; H.hy.v += 10 * right * k; H.sp.v += 3 * back * k; }
   else if (part === 'legs') { const side = right > 0 ? 'kL' : 'kR'; H[Math.random() < 0.5 ? 'kL' : 'kR'].v += 9 * k; H[side].v += 4 * k; H.sp.v -= 2.5 * k; }
   else { H.sp.v += 7 * back * k; H.sy.v += 9 * (right >= 0 ? 1 : -1) * k * (0.6 + Math.random() * 0.4); H.sr.v += 5 * right * k; H.hd.v += 4 * back * k; }
+  // 衣服上留彈孔與血跡（綁定姿勢座標，正面 -z）：身體打在胸腹前後、腳打在大腿；頭有頭盔不畫
+  if (b.mat && b.mat.userData.hitsU && part !== 'head') {
+    const front = back >= 0, sd = right > 0 ? -1 : 1, rr = 0.042 + Math.min(0.035, dmg * 0.0009);
+    const pt = part === 'legs' ? [sd * rand(0.07, 0.14), rand(0.5, 0.86), front ? -0.085 : 0.075] : [rand(-0.14, 0.14), rand(1.0, 1.4), front ? -0.165 : 0.14];
+    const ud = b.mat.userData; ud.hitsU.value[ud.hitN++ % 6].set(pt[0], pt[1], pt[2], rr);
+  }
   // 被打退半步（踉蹌）
   if (dir && b.alive) { const kb = (part === 'head' ? 1.2 : part === 'legs' ? 0.6 : 1.6) * k; b.kbX = dir.x * kb; b.kbZ = dir.z * kb; b.kbT = 0.25; }
 }

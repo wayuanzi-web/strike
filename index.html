@@ -617,7 +617,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261115-2137';   // 建置時換成日期時間
+const BUILD = '20261115-2211';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -4102,15 +4102,16 @@ function patchHumanMat(m, rim, camo) {
   const C = m.userData.camoU = camo.map((c) => ({ value: new THREE.Color(c) }));
   m.userData.skinU = { value: new THREE.Color(pick(SKIN_TONES)) };
   m.userData.lampU = { value: new THREE.Color(0, 0, 0) };
+  m.userData.hitsU = { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }; m.userData.hitN = 0;   // 中彈血跡：綁定姿勢座標 xyz＋半徑
   m.userData.headTU = { value: mhHeadTex(0) }; m.userData.headNU = { value: mhHeadTex(0, 1) }; m.userData.blinkU = { value: 0 }; m.userData.gazeU = { value: new THREE.Vector2() }; m.userData.browU = { value: new THREE.Vector4(0.1, 0.07, 0.05, 0) };   // 寫實的頭：皮膚＋眼睛貼圖、眉毛顏色與第幾列   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
   const MH_AT = typeof MH_ATLAS !== 'undefined' ? MH_ATLAS : [640, 1344, 1088];
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; });
+    sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; }); sh.uniforms.uHits = m.userData.hitsU;
     sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU; sh.uniforms.uLampH = m.userData.lampU; sh.uniforms.uFl = LIGHT_U.uFl;
     sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH }; sh.uniforms.uHeadT = m.userData.headTU; sh.uniforms.uHeadN = m.userData.headNU; sh.uniforms.uBlink = m.userData.blinkU; sh.uniforms.uGaze = m.userData.gazeU; sh.uniforms.uBrow = m.userData.browU; sh.uniforms.uBrowT = { value: mhBrowTex() };
     sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nattribute vec2 aUvH;\nattribute vec3 aBlink;\nuniform float uBlink;\nvarying vec2 vUvH;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += aBlink * uBlink;\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM; vUvH = aUvH;')
       .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvHw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = `uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
+    sh.fragmentShader = `uniform vec4 uHits[6]; uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
 varying vec2 vUvH; varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw; varying vec2 vRM;
 ${FL_GLSL}
 // 布料凹凸：織紋（細）＋皺褶（沿著四肢的橫向褶子、關節處多）
@@ -4169,6 +4170,17 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     float dirt = (1.0 - smoothstep(0.05, 0.45, vRest.y)) * cw;
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.27, 0.21) * (0.8 + 0.4 * t.b), dirt * 0.55);
     diffuseColor.rgb *= 1.0 + cw * 0.12 * exp(-pow((vRest.y - 0.48) * 14.0, 2.0)) * step(abs(vRest.z), 0.12) * step(vRest.z, -0.02);
+    // 中彈：衣服上一個彈孔、周圍滲開的血（往下流得比較長，邊緣不規則）；跟著綁定姿勢座標走，所以人動血跡也跟著動
+    if (vCamo < 4.5) for (int i = 0; i < 6; i++) { vec4 h = uHits[i]; if (h.w > 0.0) {
+      // 從正面（h.z<0）或背面投影：只看 xy 距離，面要朝那一邊、在身體那一側，所以背心、彈匣袋、褲子哪一層在外面就沾在哪一層
+      float side = h.z < 0.0 ? step(vRest.z, h.z * 0.4) * step(vRN.z, 0.35) : step(h.z * 0.4, vRest.z) * step(-0.35, vRN.z);
+      vec3 dv = vec3(vRest.xy - h.xy, 0.0); float n = texture2D(uCamoT, vRest.xy * 13.0 + vRest.zz * 9.0 + h.xy * 5.0).a;
+      float dd = side < 0.5 ? 9.0 : length(vec2(dv.x, dv.y < 0.0 ? dv.y * 0.42 : dv.y * 1.2)) / h.w + (n - 0.5) * 0.55;
+      float st = 1.0 - smoothstep(0.6, 1.0, dd);
+      float core = 1.0 - smoothstep(0.0, 0.55, dd);
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.42, 0.12, 0.1) * (0.85 + 0.3 * n), st * 0.75);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.055, 0.012, 0.01), core * 0.55);
+      diffuseColor.rgb *= 1.0 - (1.0 - smoothstep(0.0045, 0.009, length(dv))) * 0.92 * side; } }
   }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x; if (vCamo > 1.5 && vCamo < 4.5) roughnessFactor *= 0.92 + 0.2 * texture2D(uCamoT, vRest.xy * 21.0 + vRest.z * 13.0).a;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRM.y;')
@@ -4626,6 +4638,12 @@ function humanHit(b, part, dir, dmg) {
   if (part === 'head') { H.hd.v += 16 * back * k; H.hy.v += 10 * right * k; H.sp.v += 3 * back * k; }
   else if (part === 'legs') { const side = right > 0 ? 'kL' : 'kR'; H[Math.random() < 0.5 ? 'kL' : 'kR'].v += 9 * k; H[side].v += 4 * k; H.sp.v -= 2.5 * k; }
   else { H.sp.v += 7 * back * k; H.sy.v += 9 * (right >= 0 ? 1 : -1) * k * (0.6 + Math.random() * 0.4); H.sr.v += 5 * right * k; H.hd.v += 4 * back * k; }
+  // 衣服上留彈孔與血跡（綁定姿勢座標，正面 -z）：身體打在胸腹前後、腳打在大腿；頭有頭盔不畫
+  if (b.mat && b.mat.userData.hitsU && part !== 'head') {
+    const front = back >= 0, sd = right > 0 ? -1 : 1, rr = 0.042 + Math.min(0.035, dmg * 0.0009);
+    const pt = part === 'legs' ? [sd * rand(0.07, 0.14), rand(0.5, 0.86), front ? -0.085 : 0.075] : [rand(-0.14, 0.14), rand(1.0, 1.4), front ? -0.165 : 0.14];
+    const ud = b.mat.userData; ud.hitsU.value[ud.hitN++ % 6].set(pt[0], pt[1], pt[2], rr);
+  }
   // 被打退半步（踉蹌）
   if (dir && b.alive) { const kb = (part === 'head' ? 1.2 : part === 'legs' ? 0.6 : 1.6) * k; b.kbX = dir.x * kb; b.kbZ = dir.z * kb; b.kbT = 0.25; }
 }
@@ -4917,7 +4935,7 @@ function botSpawn(b, sx, sz, faceX = 0, faceZ = 0) {
   b.yaw = Math.atan2(-(faceX - sx), -(faceZ - sz)) + rand(-0.3, 0.3);
   if (game.mode !== 'match' && !b.dummy) { b.vest = b.helmet = true; b.armor = 100; }   // 對戰以外每次重生都是滿護甲
   b.g.visible = true; b.g.rotation.set(0, b.yaw, 0); b.g.position.copy(p);
-  b.ck = 0; b.dd = null; if (b.hs) humanInit(b); b.gunP.position.set(...HUMAN_GUN_P); b.gunP.rotation.set(0, 0, 0); b.gunP.baseX = 0;
+  b.ck = 0; b.dd = null; if (b.hs) humanInit(b); b.gunP.position.set(...HUMAN_GUN_P); b.gunP.rotation.set(0, 0, 0); b.gunP.baseX = 0; if (b.mat && b.mat.userData.hitsU) { b.mat.userData.hitsU.value.forEach((v) => v.set(0, 0, 0, 0)); b.mat.userData.hitN = 0; }
   b.lastP.copy(p); b.stuckT = 0;
   hitBoxes(p, b.phys.h, b.boxes);
 }
@@ -9191,7 +9209,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { autoQuality, renderOnce: render, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };
