@@ -3,11 +3,11 @@
    身體用圓柱、膠囊、橢球拼（不是方塊），衣服有迷彩（在著色器裡用 3D 雜訊畫，不用貼圖）。
    雙手用兩段式 IK 握在槍上；走路、蹲、瞄準上下、換彈、丟東西、中彈彈簧反應、倒地（順著子彈方向倒、膝蓋先軟、手臂甩開）都在這裡。
    外觀分：一般士兵（敵／我）、精英（黑色特戰）、魔王（高級軍官：大盤帽、深色制服、金色肩章、紅臂章、勳章）。 */
-const HB = { root: 0, hips: 1, thighL: 2, kneeL: 3, thighR: 4, kneeR: 5, spine: 6, chest: 7, neck: 8, head: 9, shL: 10, elL: 11, haL: 12, shR: 13, elR: 14, haR: 15 };
+const HB = { root: 0, hips: 1, thighL: 2, kneeL: 3, thighR: 4, kneeR: 5, spine: 6, chest: 7, neck: 8, head: 9, shL: 10, elL: 11, haL: 12, shR: 13, elR: 14, haR: 15, footL: 16, footR: 17 };
 // 骨頭的綁定位置（模型座標，腳底 y=0，面向 -z）
 const HB_POS = [[0, 0, 0], [0, 0.95, 0], [-0.1, 0.93, 0], [-0.1, 0.5, 0], [0.1, 0.93, 0], [0.1, 0.5, 0], [0, 1.08, 0], [0, 1.3, 0], [0, 1.5, 0], [0, 1.6, 0],
-  [-0.2, 1.44, 0], [-0.2, 1.13, 0], [-0.2, 0.86, 0], [0.2, 1.44, 0], [0.2, 1.13, 0], [0.2, 0.86, 0]];
-const HB_PARENT = [-1, 0, 1, 2, 1, 4, 1, 6, 7, 8, 7, 10, 11, 7, 13, 14];
+  [-0.2, 1.44, 0], [-0.2, 1.13, 0], [-0.2, 0.86, 0], [0.2, 1.44, 0], [0.2, 1.13, 0], [0.2, 0.86, 0], [-0.1, 0.09, 0.03], [0.1, 0.09, 0.03]];   // 最後兩根：腳踝（靴子的鞋面、鞋底跟著它轉，腳掌才能貼地）
+const HB_PARENT = [-1, 0, 1, 2, 1, 4, 1, 6, 7, 8, 7, 10, 11, 7, 13, 14, 3, 5];
 const ARM_A = 0.31, ARM_B = 0.27;   // 上臂、前臂長
 // 迷彩配色：底色＋兩種斑塊＋深色（每隊／每種外觀不同）
 const CAMO = {
@@ -262,13 +262,13 @@ function hLoft(rings, color, bone, closed = false, camo = 0) {
 // 戰術靴：鞋面（腳跟→腳背→鞋頭的放樣）、鞋筒、鞋口軟墊、鞋底（照鞋面的外形、腳跟加厚）、鞋頭與後跟的補強片
 const BOOT_PROF = [[0.09, 0.016, 0.05], [0.08, 0.036, 0.09], [0.055, 0.045, 0.125], [0.02, 0.049, 0.14], [-0.02, 0.05, 0.128], [-0.055, 0.052, 0.098], [-0.09, 0.053, 0.076], [-0.125, 0.05, 0.062], [-0.15, 0.04, 0.052], [-0.166, 0.02, 0.034]];   // [z, 半寬, 高]
 function bootTopY(z) { for (let i = 0; i < BOOT_PROF.length - 1; i++) { const a = BOOT_PROF[i], b = BOOT_PROF[i + 1]; if (z <= a[0] && z >= b[0]) { const t = (a[0] - z) / (a[0] - b[0]); return 0.026 + a[2] + (b[2] - a[2]) * t; } } return 0.1; }
-function hBoot(x, kn, boot, sole, trim) {
+function hBoot(x, kn, boot, sole, trim, ft = kn) {
   const up = BOOT_PROF.map(([z, w, h]) => { const r = []; for (let k = 0; k <= 10; k++) { const th = Math.PI * k / 10; r.push([x + w * Math.cos(th), 0.026 + h * Math.pow(Math.sin(th), 0.7), z]); } return r; });
   const so = BOOT_PROF.map(([z, w]) => { const W2 = w + 0.005, hh = z > 0.02 ? 0.03 : 0.024; return [[x - W2, 0, z], [x - W2, hh, z], [x + W2, hh, z], [x + W2, 0, z]]; });
   const shaft = []; for (let i = 0; i <= 4; i++) { const t = i / 4, y = 0.1 + t * 0.15, rr = 0.047 + 0.006 * t + 0.004 * Math.sin(t * Math.PI), zc = 0.03 - 0.012 * t, r = []; for (let k = 0; k < 12; k++) { const a = Math.PI * 2 * k / 12; r.push([x + rr * Math.cos(a), y, zc + rr * 1.08 * Math.sin(a)]); } shaft.push(r); }
-  return [hLoft(up, boot, kn), hLoft(so, sole, kn, true), hLoft(shaft, boot, kn, true),
+  return [hLoft(up, boot, ft), hLoft(so, sole, ft, true), hLoft(shaft, boot, kn, true),
     hTorso(0.056, 0.055, 0.02, x, 0.25, 0.018, trim, kn, 0, 1.08, 12),                                           // 鞋口軟墊
-    hEll(0.04, 0.05, 0.022, x, 0.075, 0.078, trim, kn, 0, 10, 6),   // 後跟的補強片
+    hEll(0.04, 0.05, 0.022, x, 0.075, 0.078, trim, ft, 0, 10, 6),   // 後跟的補強片
     hBox(0.03, 0.1, 0.008, x, 0.165, -0.02, trim, kn, 0, 0.12)];                                                    // 鞋舌
 }
 function hCyl(r, h, x, y, z, color, bone, rx = 0, rz = 0, seg = 10) {
@@ -398,16 +398,16 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
   const body = !elite && typeof MH_BODY !== 'undefined', nb = (...a) => { if (!body) parts.push(...a); };   // nb：有 MakeHuman 身體時就不畫的零件（程式拼的四肢、軀幹、手）
   // 腳：大腿（寬鬆的作戰褲、膝上布料堆積＋側口袋）、小腿（褲管塞進靴子的皺褶、護膝、戰術靴）
   for (const s of [-1, 1]) {
-    const x = 0.1 * s, th = s < 0 ? HB.thighL : HB.thighR, kn = s < 0 ? HB.kneeL : HB.kneeR;
+    const x = 0.1 * s, th = s < 0 ? HB.thighL : HB.thighR, kn = s < 0 ? HB.kneeL : HB.kneeR, ft = s < 0 ? HB.footL : HB.footR;
     nb(hLimb(0.094, [x, 0.92, 0], [x * 1.02, 0.52, -0.005], W, th, 1), hEll(0.082, 0.07, 0.085, x * 1.02, 0.56, -0.004, W, th, 1, 10, 6)); add(hBox(0.05, 0.13, 0.12, x + 0.075 * s, 0.7, 0, W, th, 1), hBox(0.052, 0.012, 0.125, x + 0.076 * s, 0.77, 0, strap, th));
     if (s > 0 && !boss) add(hBox(0.05, 0.16, 0.1, x + 0.085, 0.8, 0.01, strap, th), hBox(0.03, 0.12, 0.05, x + 0.11, 0.82, -0.01, '#1e2024', th));   // 右大腿槍套
     nb(hLimb(0.074, [x, 0.5, 0], [x, 0.16, 0.02], W, kn, 1)); add(hEll(0.076, 0.035, 0.08, x, 0.275, 0.014, W, kn, 1, 12, 6), hEll(0.07, 0.03, 0.074, x, 0.315, 0.01, W, kn, 1, 12, 6), lod ? hBox(0.11, 0.1, 0.05, x, 0.47, -0.07, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 0.15) : hEll(0.06, 0.068, 0.04, x, 0.47, -0.068, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 12, 8));
-    if (lod) add(hBox(0.12, 0.13, 0.25, x, 0.065, -0.035, boot, kn), hBox(0.125, 0.03, 0.27, x, 0.014, -0.04, sole, kn), hBox(0.1, 0.06, 0.06, x, 0.12, -0.13, boot, kn, 0, 0.5), hLimb(0.07, [x, 0.2, 0.02], [x, 0.12, 0.02], boot, kn, 0, 8));
-    else add(...hBoot(x, kn, boot, sole, boss ? '#1a1a1c' : us ? '#7a6446' : '#1c1916'));
+    if (lod) add(hBox(0.12, 0.13, 0.25, x, 0.065, -0.035, boot, ft), hBox(0.125, 0.03, 0.27, x, 0.014, -0.04, sole, ft), hBox(0.1, 0.06, 0.06, x, 0.12, -0.13, boot, ft, 0, 0.5), hLimb(0.07, [x, 0.2, 0.02], [x, 0.12, 0.02], boot, kn, 0, 8));
+    else add(...hBoot(x, kn, boot, sole, boss ? '#1a1a1c' : us ? '#7a6446' : '#1c1916', ft));
     if (!lod) {
       const lace = us ? '#5d4c34' : '#141210', cap = us ? '#5f5238' : '#161718';
       if (!boss) add(hEll(0.044, 0.046, 0.02, x, 0.47, -0.097, cap, kn, 0, 10, 6), hTorso(0.08, 0.078, 0.018, x, 0.505, 0.0, strap, kn, 0, 1, 10), hTorso(0.078, 0.076, 0.018, x, 0.44, 0.004, strap, kn, 0, 1, 10));   // 護膝硬殼、兩條綁帶
-      for (let k = 0; k < 6; k++) { const lz = -0.105 + k * 0.016; add(hBox(0.046, 0.004, 0.006, x, bootTopY(lz) + 0.001, lz, lace, kn, 0, 0.35, 0, k % 2 ? 0.25 : -0.25)); }   // 鞋帶（交叉）
+      for (let k = 0; k < 6; k++) { const lz = -0.105 + k * 0.016; add(hBox(0.046, 0.004, 0.006, x, bootTopY(lz) + 0.001, lz, lace, ft, 0, 0.35, 0, k % 2 ? 0.25 : -0.25)); }   // 鞋帶（交叉）
       for (let k = 0; k < 4; k++) add(hBox(0.04, 0.004, 0.006, x, 0.15 + k * 0.024, -0.026 + k * 0.001, lace, kn, 0, 0.1, 0, k % 2 ? 0.25 : -0.25));   // 鞋筒上的鞋帶
       add(hBox(0.016, 0.03, 0.006, x, 0.245, 0.078, lace, kn));   // 後面的提環
       add(hBox(0.004, 0.115, 0.004, x + 0.101 * s, 0.695, -0.02, '#c9c9c9', th, 1), hBox(0.004, 0.115, 0.004, x + 0.101 * s, 0.695, 0.02, '#c9c9c9', th, 1), hCyl(0.006, 0.004, x + 0.103 * s, 0.762, 0, '#3a372f', th, 0, Math.PI / 2, 6));   // 側口袋的褶子與扣子
@@ -684,24 +684,62 @@ function humanPose(b, dt) {
   // 急停：上身往前晃一下
   if (b.prevSp > 2.4 && sp < 0.8 && og) H.sp.v += 1.6;
   b.prevSp = lerp(b.prevSp, sp, 1 - Math.exp(-12 * dt)); if (sp < 0.8) b.prevSp = Math.min(b.prevSp, sp + 0.5);
-  const sw = Math.sin(b.walk) * mv * (0.55 + run * 0.2) * (1 - ck * 0.7) * (back ? 0.72 : 1), bob = Math.abs(Math.cos(b.walk)) * mv * 0.035;
-  const swX = sw * fwdK, swZ = sw * sideK * 0.55, ldx = Math.max(0, H.ld.x), ak = b.airK;
-  // 腳：走路擺動、膝蓋在往後擺時彎（倒退走時反過來）；蹲下：左膝跪地、右腳往前
-  const kneeW = (x) => Math.max(0, back ? x : -x) * 1.6 + 0.1 * mv;
-  B[HB.thighL].rotation.x = swX * (1 - ck) + 0.25 * ck - H.kL.x * 0.6 + stepL * 0.4 + ak * 0.5 + ldx * 0.5;
-  B[HB.thighR].rotation.x = -swX * (1 - ck) + 1.35 * ck - H.kR.x * 0.6 + stepR * 0.4 + ak * 0.25 + ldx * 0.5;
-  B[HB.kneeL].rotation.x = -(kneeW(swX) * (1 - ck) + 1.55 * ck + H.kL.x * 1.4 + stepL * 0.8 + ak * 0.95 + ldx * 1.1);
-  B[HB.kneeR].rotation.x = -(kneeW(-swX) * (1 - ck) + 1.4 * ck + H.kR.x * 1.4 + stepR * 0.8 + ak * 0.6 + ldx * 1.1);
+  // ---- 步態（照真人走路／跑步）：每隻腳分「著地期」與「擺動期」。著地期腳釘在地上、跟著身體速度往後；擺動期抬起來往前甩。
+  // 大腿、膝蓋用兩段式逆向運動算到腳踝的位置；骨盆高度由著地的腳決定（兩腳交錯時最高、兩腳張開時最低）；腳踝讓腳掌貼地、腳跟先著地、離地時腳尖推蹬。
+  const ak = b.airK;
+  const GA = 0.43, GB = 0.41, ANK = 0.09;                 // 大腿、小腿（到腳踝）長、腳踝離地高
+  const cad = sp > 0.15 ? clamp(1.55 + 0.42 * sp, 1.6, 3.3) : 1.6;   // 每秒幾步（走 1.4 m/s 約 2.1 步、跑 5.4 m/s 約 3.3 步）
+  if (og) b.gph = ((b.gph || 0) + dt * cad * 0.5 * (sp > 0.15 ? 1 : 0)) % 1;
+  const beta = lerp(0.6, 0.3, run), gfwd = (back ? -1 : 1), GS = sp / (cad * 0.5) * (1 - ck * 0.6);   // 著地期佔一步週期的比例、一個週期走多遠
+  const gaitLeg = (ph) => {                            // 回傳：腳踝相對髖關節的前後位置、腳離地多高、腳掌角度（正＝腳尖朝上）、是不是著地
+    if (ph < beta) { const t = ph / beta, z = (0.4 - t) * beta * GS;   // 著地點偏後：腳跟落地時離身體近、離地時在身後（腳跟已經抬起）
+      const pitch = (t < 0.12 ? (1 - t / 0.12) * 0.22 : 0) - (t > 0.62 ? Math.pow((t - 0.62) / 0.38, 1.3) * (0.42 + run * 0.25) : 0);   // 腳跟著地 → 放平 → 腳跟抬起
+      const heel = t > 0.62 ? Math.pow((t - 0.62) / 0.38, 1.5) * 0.085 * (1 + run * 0.6) : 0;
+      return [z * gfwd, heel, pitch, 1]; }
+    const t = (ph - beta) / (1 - beta), e = 0.5 - 0.5 * Math.cos(Math.PI * t), z = (-0.6 + e) * beta * GS * (1 + run * 0.5);   // 跑步：擺動腳往前帶得比著地距離遠一點
+    const lift = Math.sin(Math.PI * Math.pow(t, 0.75 - run * 0.2)) * (0.055 + run * 0.33) * Math.min(1, GS * 1.5);   // 跑步：腳跟往上踢（接近屁股）
+    const pitch = t < 0.3 ? -(0.55 + run * 0.3) * (1 - t / 0.3) : (t - 0.3) / 0.7 * 0.22;   // 剛離地腳尖朝下，往前甩時慢慢翹起來準備腳跟著地
+    return [z * gfwd, lift, pitch, 0];
+  };
+  const gL = gaitLeg(b.gph || 0), gR = gaitLeg(((b.gph || 0) + 0.5) % 1);
+  // 骨盆高度：著地的腳要搆得到地（膝蓋留一點彎）；兩腳都在空中（跑步騰空）時稍微高一點
+  const reach = GA + GB - 0.012 - run * 0.05;
+  const legH = (g) => ANK + g[1] + Math.sqrt(Math.max(0.01, reach * reach - g[0] * g[0]));
+  let hj = 0.93;
+  if (gL[3] || gR[3]) hj = Math.min(gL[3] ? legH(gL) : 9, gR[3] ? legH(gR) : 9); else hj = Math.min(0.93, Math.max(legH(gL), legH(gR)) + 0.02);
+  hj = 0.93 - (0.93 - hj) * 0.75;   // 真人的膝蓋、骨盆傾斜會吸收一部分，起伏約 3–5 公分
+  b.hj = b.hj === undefined ? hj : lerp(b.hj, hj, 1 - Math.exp(-30 * dt)); hj = Math.min(0.93, b.hj);
+  const ikLeg = (g) => {                               // 兩段式逆向運動：回傳 [大腿角, 膝蓋角, 腳踝角]（繞 x 軸，往前為正）
+    const dz = g[0], H = hj - (ANK + g[1]), d = clamp(Math.hypot(dz, H), 0.05, GA + GB - 0.001);
+    const thigh = Math.atan2(dz, H) + Math.acos(clamp((GA * GA + d * d - GB * GB) / (2 * GA * d), -1, 1));
+    const knee = Math.PI - Math.acos(clamp((GA * GA + GB * GB - d * d) / (2 * GA * GB), -1, 1));
+    return [thigh, -knee, g[2] - (thigh - knee)];
+  };
+  const iL = ikLeg(gL), iR = ikLeg(gR), gk = (1 - ck) * (og ? 1 : 1 - ak);
+  // 骨盆：每一步跟著前腳那側往前轉一點、擺動腳那側往下掉一點、重心移到著地的腳上（上身在下面反向扭回來，槍不會跟著晃）
+  const pw = Math.sin(2 * Math.PI * (b.gph || 0)), pmv = Math.min(1, sp / 2) * gk;
+  const pelYaw = pw * (0.07 + run * 0.04) * pmv * gfwd, pelList = -Math.cos(4 * Math.PI * (b.gph || 0)) * 0.03 * pmv * (gL[3] && !gR[3] ? 1 : !gL[3] && gR[3] ? -1 : 0);
+  const sway = (gL[3] && !gR[3] ? -1 : !gL[3] && gR[3] ? 1 : 0) * 0.018 * pmv * (1 - run);
+  const sw = pw * mv, swZ = sideK * 0.55 * (1 - ck), ldx = Math.max(0, H.ld.x);
+  const swX = sw * fwdK;
+  // 腳：步態（逆向運動）＋原本的修飾（中彈腿軟、原地轉身踏步、空中縮腳、落地一沉）；蹲下：左膝跪地、右腳往前
+  const latL = gL[0] * gfwd * swZ * 0.9, latR = gR[0] * gfwd * swZ * 0.9;   // 橫著走：腳往側邊跨（照前後位置換成左右）
+  B[HB.thighL].rotation.x = iL[0] * gk + 0.25 * ck - H.kL.x * 0.6 + stepL * 0.4 + ak * 0.5 + ldx * 0.5;
+  B[HB.thighR].rotation.x = iR[0] * gk + 1.35 * ck - H.kR.x * 0.6 + stepR * 0.4 + ak * 0.25 + ldx * 0.5;
+  B[HB.kneeL].rotation.x = iL[1] * gk - (1.55 * ck + H.kL.x * 1.4 + stepL * 0.8 + ak * 0.95 + ldx * 1.1);
+  B[HB.kneeR].rotation.x = iR[1] * gk - (1.4 * ck + H.kR.x * 1.4 + stepR * 0.8 + ak * 0.6 + ldx * 1.1);
+  B[HB.footL].rotation.x = iL[2] * gk + ck * 0.55 + ak * 0.35 + ldx * 0.6; B[HB.footR].rotation.x = iR[2] * gk - ck * 0.1 + ak * 0.25 + ldx * 0.6;   // 蹲：跪著那隻腳腳背貼地
   const stance = (1 - mv) * (1 - ck) * 0.035;   // 站著時兩腳稍微打開（比較自然）
-  B[HB.thighL].rotation.z = -0.04 - stance + swZ * (1 - ck); B[HB.thighR].rotation.z = 0.04 + stance - swZ * (1 - ck);
+  B[HB.thighL].rotation.z = -0.04 - stance + latL * 2.2 * gk + pelList; B[HB.thighR].rotation.z = 0.04 + stance + latR * 2.2 * gk + pelList;
   const legDrop = Math.max(H.kL.x, H.kR.x, 0) * 0.22;   // 打腳：身子一沉
-  B[HB.hips].position.y = 0.95 - 0.46 * ck - bob * (1 - ck) - legDrop + (og ? 0 : 0.03) - ldx * 0.22 - ak * 0.06;
+  B[HB.hips].position.y = 0.95 - 0.46 * ck - (0.93 - hj) * (1 - ck) - legDrop + (og ? 0 : 0.03) - ldx * 0.22 - ak * 0.06;
+  B[HB.hips].rotation.z = -pelList;
   // 腰：朝移動方向轉（上身轉回來對準目標）＋原地轉身時下半身落後
   const hipY = -b.hYaw + b.tLag;
-  B[HB.hips].rotation.y = sw * 0.12 * fwdK + hipY;
+  B[HB.hips].rotation.y = pelYaw + hipY;
   // 探頭：上身往旁邊歪、髖往那邊挪一點
   const la = b.leanA || 0;
-  B[HB.hips].position.x = la * 0.06;
+  B[HB.hips].position.x = la * 0.06 + sway;
   // 上身：瞄準上下分給腰和胸，持槍側身、走路反向扭、彈簧反應
   const aim = clamp(b.pitch || 0, -0.9, 0.9);
   let gx = 0, lean = 0, act = '';
@@ -710,7 +748,7 @@ function humanPose(b, dt) {
   else if (b.state === 'plant' || b.state === 'defuse') { act = 'use'; gx = -1.0; lean = 0.5; }
   else if (thr < 0.55) { act = 'throw'; const t = thr / 0.55; gx = -0.6 * Math.sin(t * Math.PI); lean = 0.25 * Math.sin(t * Math.PI); }
   const ready = act ? 0 : 1, lowReady = b.state === 'patrol' && !b.visible && sp > 0.5 ? 0.35 : 0;   // 巡邏時槍口稍微朝下
-  B[HB.spine].rotation.set(-aim * 0.35 - lean * 0.6 + H.sp.x * 0.5 + run * 0.08 * ready - back * mv * 0.06 + ldx * 0.3, -sw * 0.18 * fwdK - 0.12 + H.sy.x * 0.4 - hipY * 0.6, H.sr.x * 0.3 - la * 0.32);
+  B[HB.spine].rotation.set(-aim * 0.35 - lean * 0.6 + H.sp.x * 0.5 + run * 0.08 * ready - back * mv * 0.06 + ldx * 0.3, -pelYaw - 0.12 + H.sy.x * 0.4 - hipY * 0.6, H.sr.x * 0.3 - la * 0.32 + pelList);
   B[HB.chest].rotation.set(-aim * 0.55 - lean * 0.4 + H.sp.x * 0.5, -0.22 + H.sy.x * 0.5 - hipY * 0.4, H.sr.x * 0.3 - la * 0.22);
   B[HB.neck].rotation.set(H.hd.x * 0.4 - aim * 0.05, 0.22 + H.hy.x * 0.3, 0);
   B[HB.head].rotation.set(H.hd.x * 0.6 + aim * 0.05, 0.1 + H.hy.x * 0.5, 0);

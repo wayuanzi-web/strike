@@ -553,7 +553,8 @@ function botModel(b, dt) {
   else if (!MAP.lamps && b.hm.mat.userData.lampU.value.r) b.hm.mat.userData.lampU.value.setRGB(0, 0, 0);
   if (b.g.visible) humanPose(b, dt);   // 擬真人物的骨頭（59-human）
   // 腳步聲（離聽的人 30 公尺內聽得到，有方位）
-  if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 0.36 * RUN_SPEED / sp; if (p.distanceTo(camera.position) < 30) { sfx('step', b.team === 'A' ? 0.5 : 0.9, { pos: p, surface: surfaceAt(p) }); if (b.team !== player.team) soundCue('step', p); } } }
+  // 腳步聲的節奏跟步態一樣（59-human 的步頻）
+  if (sp > 2.6 && b.phys.onGround) { b.stepT -= dt; if (b.stepT <= 0) { b.stepT = 1 / clamp(1.55 + 0.42 * sp, 1.6, 3.3); if (p.distanceTo(camera.position) < 30) { sfx('step', b.team === 'A' ? 0.5 : 0.9, { pos: p, surface: surfaceAt(p) }); if (b.team !== player.team) soundCue('step', p); } } }
   if (b.flashT > 0) { b.flashT -= dt; b.fl.visible = true; b.fl.material.rotation = Math.random() * 6; const fs = rand(0.26, 0.38); b.fl.scale.set(fs, fs, 1); } else b.fl.visible = false;
   if ((b.litT = (b.litT || 0) - dt) <= 0) { b.litT = 0.25; b.lit = bakeRay(p.x, p.y + 0.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; b.litC = bakeRay(p.x, p.y + 1.3, p.z, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z, 60) < 0 ? 1 : 0; }
   b.litS = lerp(b.litS, b.litC === undefined ? 1 : b.litC, 1 - Math.exp(-4 * dt)); b.mat.color.setScalar(lerp(0.55, 1, b.litS));

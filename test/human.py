@@ -11,9 +11,9 @@ async def main():
           const bs = s.bots.filter((b) => b.active); bs.forEach((b, i) => { b.phys.pos.set(i === 0 ? -4 : 30 + i, 0, i === 0 ? -24 : 30); b.blindT = 99; b.yaw = -Math.PI / 2; b.state = 'hold'; b.holdT = 99; b.holdYaw = b.yaw; b.pitch = 0; });
           for (let i = 0; i < 30; i++) s.step(1/60); return bs[0].i; }"""
         bi = await ev(setup)
-        # 1 骨架蒙皮：16 根骨頭、一個網格＋槍
+        # 1 骨架蒙皮：18 根骨頭（含腳踝）、一個網格＋槍
         r = await ev("""(bi) => { const s = window.__strike, b = s.bots[bi]; return [b.hm.mesh.isSkinnedMesh, b.hm.bones.length, b.hm.mesh.geometry.attributes.skinIndex.count > 3000, b.gunM.parent && b.gunM.parent.parent === b.hm.bones[7]]; }""", bi)
-        ok('1 人物是骨架蒙皮網格（16 根骨頭），槍掛在胸骨上', r == [True, 16, True, True], r)
+        ok('1 人物是骨架蒙皮網格（18 根骨頭：16 根＋兩根腳踝），槍掛在胸骨上', r == [True, 18, True, True], r)
         # 2 雙手握槍：右手、左手骨頭的位置離槍上的握點 12 公分內
         r = await ev("""(bi) => { const s = window.__strike, b = s.bots[bi], V = s.player.body.pos.constructor; b.g.updateMatrixWorld(true);
           const hr = b.hm.bones[15].getWorldPosition(new V()), hl = b.hm.bones[12].getWorldPosition(new V());
