@@ -621,7 +621,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261116-0738';   // 建置時換成日期時間
+const BUILD = '20261116-0748';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -3507,7 +3507,7 @@ function updateSpring(dt) {
 const _o = new V3(), _d = new V3(), _hit = new V3(), _mz = new V3();
 const _pel = new Map();
 function shoot() {
-  W.ammo--; W.since = 0; W.idx = Math.min(29, W.idx + 1); W.shots++;
+  W.ammo--; W.since = 0; W.idx = Math.min(29, W.idx + 1); W.shots++; W.heat = Math.min(20, (W.heat || 0) + 1);
   const spreadDeg = currentSpread(), n = WP.pellets || 1;
   W.bloom = Math.min(WP.bloomMax, W.bloom + WP.bloomAdd);
   eyePos(_o); muzzleWorld(_mz); _pel.clear();
@@ -3576,6 +3576,33 @@ function muzzleWorld(out) {
   gunRig.updateMatrixWorld(true); camera.updateMatrixWorld();
   const m = gun.localToWorld(_v3.copy(gun.userData.muzzle)).project(vmCam);
   return out.set(m.x, m.y, 0.5).unproject(camera).sub(camera.position).normalize().multiplyScalar(1.2).add(camera.position);
+}
+
+// ---------- 槍管冒煙：連續開火後，槍口飄出細細的白煙（手上槍的場景裡） ----------
+// 每發 +1 熱度、每秒退 0.7；熱度超過 4 才開始冒，停火後慢慢變淡
+const BSMOKE = [];
+for (let i = 0; i < 14; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false, color: 0xb8b4ae })); sp.visible = false; vmScene.add(sp); BSMOKE.push({ sp, life: 0, max: 1, vx: 0, vy: 0, vz: 0, a: 0 }); }
+let bsI = 0, bsT = 0;
+const _bsP = new V3();
+function updateBarrelSmoke(dt, lookDX) {
+  W.heat = Math.max(0, (W.heat || 0) - dt * 0.7);
+  const k = clamp((W.heat - 4) / 10, 0, 1) * clamp((W.since - 0.08) / 0.3, 0, 1);
+  bsT -= dt;
+  if (k > 0.02 && bsT <= 0 && gun && gun.visible && !(WP.scope && player.adsT > 0.5) && !W.reloadT) {
+    bsT = 0.07;
+    gunRig.updateMatrixWorld(true); gun.localToWorld(_bsP.copy(gun.userData.muzzle));
+    const q = BSMOKE[bsI++ % BSMOKE.length];
+    q.sp.position.copy(_bsP); q.life = q.max = rand(0.9, 1.4); q.a = 0.5 * k; q.vx = rand(-0.01, 0.01); q.vy = rand(0.09, 0.15); q.vz = rand(-0.01, 0.01); q.sp.visible = true;
+  }
+  for (const q of BSMOKE) {
+    if (!q.sp.visible) continue;
+    q.life -= dt; if (q.life <= 0) { q.sp.visible = false; continue; }
+    const t = 1 - q.life / q.max;
+    // 往上飄、轉視角時往反方向拖（煙留在空氣裡，槍轉走了）
+    q.sp.position.x += (q.vx + Math.sin(t * 9 + q.max * 7) * 0.012) * dt - (lookDX || 0) * 0.0015;
+    q.sp.position.y += q.vy * dt; q.sp.position.z += q.vz * dt;
+    const sc = 0.018 + t * 0.07; q.sp.scale.set(sc, sc, 1); q.sp.material.opacity = q.a * Math.sin(Math.PI * Math.min(1, t * 1.6 + 0.05)) * (1 - t);
+  }
 }
 
 // ---------- 拋殼：黃銅小方塊從機匣右側彈出去（手上槍的場景裡） ----------
@@ -9469,7 +9496,7 @@ function step(dt) {
       player.yaw + (W.ry * VIEW_TRACK + player.punchY) * DEG, player.alive ? -(player.leanA || 0) * LEAN_ROLL : 0.25);
   }
   if (!killcamActive()) { camera.fov = spec ? BASE_FOV : lerp(BASE_FOV, adsFov, player.adsT); camera.updateProjectionMatrix(); }
-  updateViewmodel(dt, ldx, ldy); updateViewmodelLight(dt); updateCharm(dt);
+  updateViewmodel(dt, ldx, ldy); updateBarrelSmoke(dt, ldx); updateViewmodelLight(dt); updateCharm(dt);
   if (!player.alive) {
     const kb = bots.find((b) => b.name === player.killer);
     if (kb) { const ty = Math.atan2(-(kb.phys.pos.x - p.x), -(kb.phys.pos.z - p.z)); player.yaw += angDiff(player.yaw, ty) * (1 - Math.exp(-3 * dt)); player.pitch *= 1 - Math.min(1, 3 * dt); }
@@ -9501,7 +9528,7 @@ $('boot').hidden = true; $('menu').hidden = false; PERF.bootMs = Math.round(perf
 requestAnimationFrame(frame);
 
 // 自動測試用的把手（只有測試頁會用到）
-window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, cloth: () => clothMesh, groundCount: () => groundDetail.count, debrisStat: () => { let n = 0, lo = 9, hi = -9; for (let i = 0; i < DEBRIS; i++) if (debL[i] > 0) { n++; lo = Math.min(lo, debPos[i * 3 + 1]); hi = Math.max(hi, debPos[i * 3 + 1]); } return [n, +lo.toFixed(2), +hi.toFixed(2)]; }, sprayPicks: () => SPRAY_PICKS, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
+window.__strike = { autoQuality, renderOnce: render, humanHit, DECOR, bsmoke: () => BSMOKE.filter((q) => q.sp.visible).map((q) => [+q.sp.position.x.toFixed(2), +q.sp.position.y.toFixed(2), +q.sp.position.z.toFixed(2), +q.sp.material.opacity.toFixed(2)]), cloth: () => clothMesh, groundCount: () => groundDetail.count, debrisStat: () => { let n = 0, lo = 9, hi = -9; for (let i = 0; i < DEBRIS; i++) if (debL[i] > 0) { n++; lo = Math.min(lo, debPos[i * 3 + 1]); hi = Math.max(hi, debPos[i * 3 + 1]); } return [n, +lo.toFixed(2), +hi.toFixed(2)]; }, sprayPicks: () => SPRAY_PICKS, HAND_T, humanGeo, HUMAN_GEO, renderArmory, ARM, openArmory, closeArmory, updateArmoryPreview, CHARM, updateCharm, equipArmory, owned, CHARMS, STICKERS, PAT_U, VMODELS, setViewmodel, stickerSpots, gunRig, getGun: () => gun, lampColorAt, spatial, panOut, SND3, impactSfx, boxMat, bulletWhiz, LIGHT_U, muzzleLight, flashAt, lightAt, nightSeeDist, unitLit, audioInit, MAPS, MAP_ORDER, scene, startRound, P, pauseGame, buyOpen, VM_TINT, siteAt, RK, RKS, rankApply, rankDelta, tierOf, rankBadge, rankSeasonCheck, diffForRating, openRanked, openVeto, vetoTap, startRanked, WING, ARMS, armsKill, armsRanking, botDiff, ROUND, game, player, bots, W, S, INPUT, AIM, NAV, BOXES, renderer, camera, startGame, RAGE, startReload, startInspect, reloadOrInspect, updateLean, botLean, canSeeUnit, humanPose, vm: () => ({ rig: gunRig, gun }), getWP: () => WP, setHumanLook, smokeBlocks, smokeBullet, smokeBlast, navDistFrom, blastDist, BLAST, explodeBomb: () => explodeBomb(), newItem: (d) => newItem(d), spawnPlayer, respawnBot, step, render,
   setView(yaw, pitch) { player.yaw = yaw; player.pitch = pitch; }, traceShot, rayWorld, findPath, damageBot, PART_MUL, mapMeshes, checkWinding, DECOR, ROUND, startMatch, aliveCount, setupBots, onUnitDied, spectateTarget,
   INV, WEAPONS, NADES, BOMB, TUT, applyHand, giveOrder, teamEcoMode, stage2Of, TACTICS, PERF, perfReport, runBench, frameStats, STATS: () => STATS, renderStats, SITES, MAPS, switchMap, menuBackdrop, MAP_ORDER, getMap: () => MAP, TEAM_SPAWN, PLAYER_SPAWNS, BOT_SPAWNS, lineClear, nearestNode, buildNav, SMOKES, buyItem, autoBuy, equip, giveWeapon, throwNade, botThrow, plantBomb, giveBomb, endRound, siteAt, useAction, objectiveGoal, botArm, nadesLive, openLayoutEdit, closeLayoutEdit, ED, applyLayout, onGyro, HOLD, T, GYRO, askGyro, joyHome, lookBy, hitDamage, wearArmor, FIRES, DROPS, spawnDrop, playerDropGun, playerDropBomb, clearNades, dropGoalFor, nearDrop, MODE, startMode, endMode, rangeResult, zoneCount, dmRanking, inZone,
   levelOf, progEvent, unlock, ensureDaily, PROG, DAILY, ACH, SKINS, TEAMC, equipCosmetic, applyCosmetics, exportCode, parseCode, applyImport, KC, killcamActive, GAIN, VM_MATS, roundMvp, openProg, closeProg, today, saveStats, tutFinish, damagePlayer, backToMenu, NET, netHost, netJoin, netAccept, startDuel, netNade, lbRender, lbSubmit, lbUrl, lbAfterRange, LM, REV, indoorAmount, soundCue, CUE, applyPalette, PALETTES, hitFeedback, bakeRay, SUN_DIR, pal };
