@@ -10,7 +10,7 @@ async def main():
         await page.wait_for_timeout(2500)
         import os
         if os.environ.get("BLINK"): await ev("() => { window.__blink = %s }" % os.environ["BLINK"])
-        for nm, cx, cy, cz, ly in [('a', 0.0, 1.67, -0.36, 1.665), ('b', -0.2, 1.67, -0.33, 1.66), ('c', 0.0, 1.67, -0.36, 1.665), ('d', 0.22, 1.66, -0.32, 1.66)]:
+        for nm, cx, cy, cz, ly in [('a', 0.0, 1.67, -0.36, 1.665), ('b', -0.2, 1.67, -0.33, 1.66), ('c', 0.0, 1.67, -0.36, 1.665), ('d', 0.22, 1.66, -0.32, 1.66), ('e', 0.24, 1.66, -0.3, 1.66), ('f', -0.24, 1.66, -0.3, 1.66), ('g', 0.24, 1.66, -0.3, 1.66), ('h', -0.24, 1.66, -0.3, 1.66)]:
             url = await ev(f"""() => {{ const s = window.__strike; for (const b of s.bots) {{ b.alive = false; b.g.visible = false; }}
               const cand = s.bots.filter((x) => x.team === 'A' && !x.rageOnly); const b = cand[(window.__fi = (window.__fi || 0) + 1) % cand.length]; s.setHumanLook(b, 'grunt');
               s.player.body.pos.set(-30, 0.05, 20);

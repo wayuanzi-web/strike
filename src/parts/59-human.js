@@ -137,7 +137,7 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     else if (vCamo > 2.5) {   // 寫實的頭：皮膚、眼球用貼圖（頂點顏色只剩遮蔽）；眉毛從正面投影
       diffuseColor.rgb = base0 * headTx;
       if (vCamo < 4.5 && vRN.z < -0.05 && bq.x > 0.0 && bq.x < 1.0 && bq.y > 0.0 && bq.y < 1.0) {
-        float ba = smoothstep(0.1, 0.75, browTx) * smoothstep(-0.05, -0.3, vRN.z);
+        float ba = smoothstep(0.07, 0.6, browTx) * smoothstep(-0.05, -0.3, vRN.z);
         diffuseColor.rgb = mix(diffuseColor.rgb, uBrow.rgb * (0.75 + 0.5 * t2.a), ba * 0.82);
       }
     }
@@ -184,7 +184,7 @@ if (vCamo > 1.5 && vCamo < 4.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.
 outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human17'; return m;
+  m.customProgramCacheKey = () => 'human18'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();

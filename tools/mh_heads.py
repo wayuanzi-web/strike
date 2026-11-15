@@ -22,7 +22,7 @@ def load_obj(p):
     return np.array(V), F, G, np.array(VT), FT
 
 def load_target(name):
-    p = os.path.join(DATA, 'targets', name + '.target'); idx, d = [], []
+    p = name if name.startswith('/') else os.path.join(DATA, 'targets', name + '.target'); idx, d = [], []
     for ln in open(p):
         if ln.startswith('#') or not ln.strip(): continue
         a = ln.split(); idx.append(int(a[0])); d.append([float(a[1]), float(a[2]), float(a[3])])
@@ -46,19 +46,42 @@ VARIANTS = [
     dict(name='d', skin='pack/skins/toigo_light_skin_male_bronze/young_lightskinned_male_diffuse_Bronze', hairk=0.4, tint=(0.9, 0.86, 0.82), eth=(0.3, 0.1, 0.6), tone='#a87a5c', iris='#7b5a30', brow='#2a1c12', det={'chin/chin-prominent-incr': 0.4, 'nose/nose-scale-vert-incr': 0.3, 'head/head-rectangular': 0.3}),
 ]
 
+TG = os.path.join(SKINS, 'tg')      # 社群的寫實變形包（CC0）：cheek01、nose01
+def pack(n):
+    for root, _, fs in os.walk(TG):
+        if n + '.target' in fs: return os.path.join(root, n + '.target')
+    raise FileNotFoundError(n)
+# 每張臉的解剖配方：age＝年齡（0 青年、1 老年，骨架與軟組織跟著變）、bone＝骨骼輪廓（顴骨、下顎、眉骨、鼻骨）、soft＝軟組織（臉頰凹陷、下垂、鼻翼溝、法令紋）、
+# asym＝左右不對稱（真人的臉沒有完全對稱的）、expr＝帶一點表情肌的張力（不是面無表情的假人）
+RECIPE = {
+  'a': dict(age=0.35, bone={'cheek/l-cheek-bones-incr': 0.45, 'cheek/r-cheek-bones-incr': 0.45, 'chin/chin-width-incr': 0.45, 'chin/chin-bones-incr': 0.35, 'chin/chin-cleft-incr': 0.3, 'nose/nose-scale-horiz-decr': 0.2, 'forehead/forehead-temple-decr': 0.2},
+            soft={'elvs_sunken_cheeks_1': 0.35}, asym={'jaw-1-l': 0.5, 'nose-2-r': 0.45, 'eye-3-l': 0.4, 'brown-1-r': 0.5, 'mouth-1-l': 0.4, 'cheek-1-l': 0.3}, expr={'eyebrows-left-down': 0.3, 'eyebrows-right-down': 0.25, 'mouth-compression': 0.25}),
+  'b': dict(age=0.3, bone={'chin/chin-height-incr': 0.3, 'head/head-square': 0.3, 'forehead/forehead-nubian-incr': 0.3, 'cheek/l-cheek-bones-incr': 0.25, 'cheek/r-cheek-bones-incr': 0.25},
+            soft={'elvs_nose_widening_1': 0.25}, asym={'cheek-1-r': 0.45, 'nose-1-l': 0.45, 'eye-5-r': 0.4, 'mouth-2-r': 0.4, 'jaw-2-r': 0.4, 'brown-2-l': 0.4}, expr={'eyebrows-left-down': 0.2, 'eyebrows-right-down': 0.2}),
+  'c': dict(age=0.6, bone={'head/head-round': 0.25, 'nose/nose-hump-decr': 0.3, 'chin/chin-width-incr': 0.2},
+            soft={'elvs_jowls_1': 0.4}, bag=0.6, asym={'eye-2-l': 0.45, 'brown-2-l': 0.45, 'nose-3-r': 0.4, 'jaw-3-l': 0.4, 'mouth-2-l': 0.35}, expr={'eyebrows-left-inner-up': 0.15, 'eyebrows-right-inner-up': 0.15, 'mouth-depression': 0.2}),
+  'd': dict(age=0.05, bone={'chin/chin-prominent-incr': 0.4, 'nose/nose-scale-vert-incr': 0.3, 'head/head-rectangular': 0.3, 'cheek/l-cheek-bones-incr': 0.3, 'cheek/r-cheek-bones-incr': 0.3},
+            soft={'jujube_greek_statue_nose': 0.3}, asym={'nose-4-l': 0.4, 'eye-7-r': 0.4, 'mouth-1-r': 0.3, 'ear-2-l': 0.5, 'jaw-1-r': 0.3}, expr={'eye-left-slit': 0.15, 'eye-right-slit': 0.15}),
+}
 def shape(var):
-    V = V0.copy()
+    V = V0.copy(); R = RECIPE[var['name']]; age = R['age']
     def add(name, k):
         if k == 0: return
         try: idx, d = load_target(name)
         except FileNotFoundError: print('  （沒有這個目標，略過）', name); return
-        V[idx] += d * k
-    for eth, k in zip(('african', 'asian', 'caucasian'), var['eth']): add(f'macrodetails/{eth}-male-young', k)
-    add('macrodetails/universal-male-young-maxmuscle-averageweight', 0.6)
-    add('macrodetails/universal-male-young-averagemuscle-averageweight', 0.4)
-    for name, k in var['det'].items(): add(name, k)
+        if len(idx): V[idx] += d * k
+    for eth, k in zip(('african', 'asian', 'caucasian'), var['eth']):
+        add(f'macrodetails/{eth}-male-young', k * (1 - age)); add(f'macrodetails/{eth}-male-old', k * age)
+    for ag, k in (('young', 1 - age), ('old', age)):
+        add(f'macrodetails/universal-male-{ag}-maxmuscle-averageweight', 0.6 * k); add(f'macrodetails/universal-male-{ag}-averagemuscle-averageweight', 0.4 * k)
+    for name, k in R['bone'].items(): add(name, k)
+    for name, k in R['soft'].items(): add(pack(name), k)
+    for name, k in (('mindfront_nose_alar_crease', 0.7), ('jujube_nostril_deepen', 0.6), ('jujube_nasolabial_angle_crease', 0.5), ('jujube_nostril_rim_sharp', 0.4)): add(pack(name), k)   # 鼻翼溝、鼻孔深度、鼻唇角：預設的鼻子太「光滑」
+    for name, k in R['asym'].items(): add('asym/asym-' + name, k)
     for sd in 'lr':   # 眼睛：真人放鬆時上眼瞼會蓋到一點虹膜、有雙眼皮褶與一點眼袋
-        add(f'eyes/{sd}-eye-height2-decr', var.get('lid', 0.08)); add(f'eyes/{sd}-eye-eyefold-down', var.get('fold', 0.25)); add(f'eyes/{sd}-eye-bag-incr', 0.3)
+        add(f'eyes/{sd}-eye-height2-decr', var.get('lid', 0.08)); add(f'eyes/{sd}-eye-eyefold-down', var.get('fold', 0.25)); add(f'eyes/{sd}-eye-bag-incr', R.get('bag', 0.3))
+    for eth, k in zip(('african', 'asian', 'caucasian'), var['eth']):
+        for name, w in R['expr'].items(): add(f'expression/units/{eth}/{name}', k * w)
     return V
 
 def tri_faces(faces):
@@ -139,7 +162,8 @@ for var in VARIANTS:
     N = normals(P, T)
     TS = TRI_S[:, [0, 2, 1]]
     if (N[:, :] * (P - P.mean(0))).sum() < 0: T = TRI; TS = TRI_S; N = normals(P, T)
-    cache = f'/tmp/mh_ao_{var["name"]}.npy'
+    import hashlib
+    cache = f'/tmp/mh_ao_{var["name"]}_' + hashlib.md5(json.dumps([RECIPE[var['name']], var['eth'], var['det']], sort_keys=True).encode()).hexdigest()[:8] + '.npy'
     if os.path.exists(cache) and len(np.load(cache)) == n_base: ao = np.load(cache)
     else: ao = bake_ao(P[:n_base], N[:n_base], T[(T < n_base).all(1)]); np.save(cache, ao)
     ao = np.concatenate([ao, np.ones(len(P) - n_base)])
