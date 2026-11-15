@@ -30,6 +30,24 @@ const BOT_GUNS = (function () {
   out.carbine = mk([partBox(0.055, 0.085, 0.38, 0.16, 1.37, -0.36, G), partBox(0.032, 0.032, 0.22, 0.16, 1.39, -0.64, G), partBox(0.04, 0.14, 0.05, 0.16, 1.27, -0.38, G, 0.15), partBox(0.045, 0.07, 0.2, 0.16, 1.36, -0.07, '#2a2e33'), partBox(0.03, 0.04, 0.1, 0.16, 1.44, -0.34, '#2c3036')], -0.76);
   out.deagle = mk([partBox(0.05, 0.075, 0.24, 0.06, 1.37, -0.52, '#5c6066'), partBox(0.042, 0.11, 0.05, 0.06, 1.29, -0.44, G, 0.2)], -0.65);
   out.pistol.muzzle.x = out.deagle.muzzle.x = 0.06;
+  // 近看用的細緻版：直接拿第一人稱那把槍的零件（機匣、槍管、護木、握把、槍托、瞄具、彈匣），縮到真實尺寸、槍口對到原本的位置；
+  // 手的握點也照那把槍的握把與護木位置算（59-human 的 HAND_T），所以右手會收回到握把、槍托抵肩
+  const GRIP = { rifle: [[0.012, -0.085, 0.03], [-0.005, -0.045, -0.47]], smg: [[0.012, -0.085, 0.03], [-0.005, -0.1, -0.3]], sniper: [[0.012, -0.085, 0.03], [-0.005, -0.06, -0.4]], shotgun: [[0.012, -0.085, 0.03], [-0.005, -0.04, -0.5]],
+    carbine: [[0.012, -0.085, 0.03], [-0.005, -0.05, -0.38]], pistol: [[0.015, -0.075, 0.015], [-0.02, -0.08, 0.0]], deagle: [[0.015, -0.075, 0.015], [-0.02, -0.08, 0.0]] };
+  const K = 0.72, METAL = new THREE.Color('#2b2e33'), POLY = new THREE.Color('#34362f');
+  for (const kind in GRIP) {
+    const vm = typeof VMODELS !== 'undefined' && VMODELS[kind]; if (!vm || !vm.userData.muzzle) continue;
+    const mz = vm.userData.muzzle, bm = out[kind].muzzle, P = [], N = [], C = [], RM = [];
+    const map = (x, y, z) => [bm.x + (x - mz.x) * K, bm.y + (y - mz.y) * K, bm.z + (z - mz.z) * K];
+    for (const m of vm.children) {
+      const isMetal = m.material === VM_MATS.metal, isPoly = m.material === VM_MATS.poly; if (!isMetal && !isPoly) continue;   // 手臂、手套不要
+      const g = m.geometry, pa = g.attributes.position.array, na = g.attributes.normal.array, ca = g.attributes.color.array, base = isMetal ? METAL : POLY, o = m.position;
+      for (let i = 0; i < pa.length; i += 3) { const q = map(pa[i] + o.x, pa[i + 1] + o.y, pa[i + 2] + o.z); P.push(q[0], q[1], q[2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(ca[i] * base.r, ca[i + 1] * base.g, ca[i + 2] * base.b); RM.push(isMetal ? 0.42 : 0.7, isMetal ? 0.7 : 0); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('aRM', new THREE.Float32BufferAttribute(RM, 2)); g.computeBoundingSphere();
+    out[kind].geo = g; if (typeof HAND_T !== 'undefined') HAND_T[kind] = [map(...GRIP[kind][0]), map(...GRIP[kind][1])];
+  }
   return out;
 })();
 const BC0 = { skin: '#c08f6a', glove: '#2b2b2b', boot: '#2a2622', gun: '#1f2226', goggle: '#16191d', belt: '#2f2b25' };
