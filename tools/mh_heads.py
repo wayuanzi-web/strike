@@ -120,7 +120,17 @@ for var in VARIANTS:
     front = N[:, 2] < -0.2
     m = L['mouth']; dx, dy = (P[:, 0] - m[0]) / 0.027, (P[:, 1] - (m[1] + 0.001)) / 0.0085
     lip = np.clip(1.15 - (dx * dx + dy * dy), 0, 1) * front * (P[:, 2] < m[2] - 0.012)
-    C = C * (1 - lip[:, None] * 0.55) + lip[:, None] * 0.55 * np.array([0.86, 0.52, 0.5]) * C
+    C = C * (1 - lip[:, None] * 0.7) + lip[:, None] * 0.7 * np.array([0.9, 0.5, 0.5]) * C
+    # 真人皮膚的顏色不均勻：臉頰、鼻頭、耳朵偏紅，眼睛下方略暗，下巴和上唇有鬍渣的青灰色，法令紋一道淡淡的陰影
+    def blob(cx, cy, rx, ry): return np.clip(1 - ((np.abs(P[:, 0]) - cx) / rx) ** 2 - ((P[:, 1] - cy) / ry) ** 2, 0, 1) * front
+    eyeY0 = L['eyeL'][1]
+    red = np.clip(blob(0.045, eyeY0 - 0.045, 0.03, 0.025) * 0.5 + blob(0.0, eyeY0 - 0.05, 0.014, 0.014) * 0.6 + np.clip((np.abs(P[:, 0]) - 0.07) / 0.012, 0, 1) * np.clip(1 - np.abs(P[:, 1] - eyeY0 + 0.01) / 0.035, 0, 1) * 0.6, 0, 1)
+    C = C * (1 - red[:, None] * 0.16 * np.array([0.0, 1.0, 0.9]))
+    under = blob(0.031, eyeY0 - 0.016, 0.016, 0.008); C = C * (1 - under[:, None] * 0.13)
+    fold = np.clip(1 - np.abs((np.abs(P[:, 0]) - 0.02) - (eyeY0 - 0.045 - P[:, 1]) * 0.45) / 0.0045, 0, 1) * np.clip((eyeY0 - 0.04 - P[:, 1]) / 0.008, 0, 1) * np.clip((P[:, 1] - (m[1] - 0.004)) / 0.008, 0, 1) * front
+    C = C * (1 - fold[:, None] * 0.12)
+    beard = np.clip((m[1] + 0.02 - P[:, 1]) / 0.012, 0, 1) * np.clip((P[:, 1] - 1.545) / 0.01, 0, 1) * np.clip((-P[:, 2] - 0.0) / 0.03, 0, 1) * (1 - lip) * (1 - np.clip((np.abs(P[:, 0]) - 0.03) / 0.01, 0, 1) * np.clip((P[:, 1] - m[1] - 0.004) / 0.006, 0, 1))
+    C = C * (1 - beard[:, None] * 0.2 * np.array([1.0, 0.92, 0.85]))
     eyeY = L['eyeL'][1]
     scalp = np.clip((P[:, 1] - (eyeY + 0.062)) / 0.02, 0, 1) * np.clip((P[:, 2] + 0.07) / 0.03 + (P[:, 1] - eyeY - 0.075) / 0.02, 0, 1)
     side = np.clip((np.abs(P[:, 0]) - 0.058) / 0.01, 0, 1) * np.clip((P[:, 1] - eyeY - 0.012) / 0.01, 0, 1) * np.clip((P[:, 2] + 0.035) / 0.02, 0, 1)

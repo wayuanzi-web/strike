@@ -227,7 +227,7 @@ function mergeSkinned(parts) {
     if (raw) {   // 寫實的頭：顏色、種類、權重都是每個頂點自己的
       for (let i = 0, v = 0; i < pa.length; i += 3, v++) {
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(raw.col[i], raw.col[i + 1], raw.col[i + 2]);
-        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); RM.push(raw.kind[v] > 2 ? 0.5 : 0.12, 0);
+        SI.push(HB.head, HB.neck, 0, 0); SW.push(1 - raw.w[v], raw.w[v], 0, 0); CA.push(raw.kind[v]); RM.push(raw.kind[v] > 2 ? (Math.abs(pa[i]) < 0.035 && pa[i + 2] < -0.075 && pa[i + 1] > 1.62 ? 0.36 : 0.5) : 0.1, 0);   // 額頭、鼻子比較油亮；眼球最亮
       }
       continue;
     }
