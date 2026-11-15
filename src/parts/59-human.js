@@ -151,6 +151,12 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     diffuseColor.rgb *= 0.9 + 0.1 * t.a;   // 布料、皮膚細紋
     if (sw < 0.5 && vRM.y < 0.5) diffuseColor.rgb *= 0.86 + 0.26 * t2.b;   // 裝備用久了顏色不均（灰塵、磨損）
     // 布料：腳下越靠近地面越髒（泥土色）、膝蓋磨白
+    // 縫線：四肢和軀幹側面一條雙車線（法線剛好朝正側面的地方）、膝蓋與手肘上下的橫向接片線
+    { float sd = abs(vRN.z), side = step(0.75, abs(vRN.x)) * cw;
+      float st = (1.0 - smoothstep(0.012, 0.03, abs(sd - 0.06))) * side;
+      float ky = vRest.y; float hz = (1.0 - smoothstep(0.0015, 0.004, min(min(abs(ky - 0.585), abs(ky - 0.405)), min(abs(ky - 1.215), abs(ky - 1.05))))) * cw * step(0.04, abs(vRest.x)) * step(ky, 1.25) * (step(ky, 0.7) + step(0.15, abs(vRest.x)));
+      float stitch = 0.6 + 0.4 * step(0.5, fract(vRest.y * 260.0));
+      diffuseColor.rgb *= 1.0 - max(st * 0.22 * stitch, hz * 0.2); }
     float dirt = (1.0 - smoothstep(0.05, 0.45, vRest.y)) * cw;
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.27, 0.21) * (0.8 + 0.4 * t.b), dirt * 0.55);
     diffuseColor.rgb *= 1.0 + cw * 0.12 * exp(-pow((vRest.y - 0.48) * 14.0, 2.0)) * step(abs(vRest.z), 0.12) * step(vRest.z, -0.02);
@@ -184,7 +190,7 @@ if (vCamo > 1.5 && vCamo < 4.5) outgoingLight += diffuseColor.rgb * vec3(0.9, 0.
 outgoingLight += diffuseColor.rgb * (flashLight(vHw) * 1.6 + uLampH * (0.55 + 0.45 * max(normalize(normal).y, 0.0)));   // 槍口火光、夜間路燈
 #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'human18'; return m;
+  m.customProgramCacheKey = () => 'human19'; return m;
 }
 // ---------- 零件：每個零件記住顏色、屬於哪根骨頭、是不是迷彩布料 ----------
 const _hq = new THREE.Quaternion(), _hv1 = new V3(), _hv2 = new V3();
@@ -238,6 +244,33 @@ function hTorso(rt, rb, h, x, y, z, color, bone, camo = 0, zs = 0.62, seg = 12) 
   const g = new THREE.CylinderGeometry(rt, rb, h, seg, 1); g.scale(1, 1, zs); g.translate(x, y, z); return hp(g, color, bone, camo);
 }
 function hTor(R, r, x, y, z, color, bone, ry = 0) { const g = new THREE.TorusGeometry(R, r, 5, 10); g.rotateY(ry); g.translate(x, y, z); return hp(g, color, bone); }
+// 放樣：一圈一圈的截面（每圈點數相同）連成曲面；closed＝截面首尾相接；兩端用扇形封起來
+function hLoft(rings, color, bone, closed = false, camo = 0) {
+  const n = rings[0].length, P = [], I = [];
+  for (const r of rings) for (const q of r) P.push(q[0], q[1], q[2]);
+  const m = closed ? n : n - 1;
+  for (let i = 0; i < rings.length - 1; i++) for (let j = 0; j < m; j++) { const a = i * n + j, b = i * n + (j + 1) % n, c = a + n, d = b + n; I.push(a, c, b, b, c, d); }
+  for (const [ri, flip] of [[0, 0], [rings.length - 1, 1]]) { const r = rings[ri], c = [0, 0, 0]; for (const q of r) { c[0] += q[0] / n; c[1] += q[1] / n; c[2] += q[2] / n; }
+    const ci = P.length / 3; P.push(...c); for (let j = 0; j < m; j++) { const a = ri * n + j, b = ri * n + (j + 1) % n; I.push(ci, a, b, ci, b, a); } }   // 兩面都畫（封口的朝向不好判斷）
+  let g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  // 朝外：法線和「離中心的方向」同向，不是就整個翻面
+  const pa = g.attributes.position, na = g.attributes.normal, cc = new V3(); for (let i = 0; i < pa.count; i++) cc.add(new V3().fromBufferAttribute(pa, i)); cc.multiplyScalar(1 / pa.count);
+  let dsum = 0; for (let i = 0; i < pa.count; i++) dsum += new V3().fromBufferAttribute(pa, i).sub(cc).dot(new V3().fromBufferAttribute(na, i));
+  if (dsum < 0) { for (let i = 0; i < I.length; i += 3) { const t = I[i + 1]; I[i + 1] = I[i + 2]; I[i + 2] = t; } g.setIndex(I); g.computeVertexNormals(); }
+  return hp(g, color, bone, camo);
+}
+// 戰術靴：鞋面（腳跟→腳背→鞋頭的放樣）、鞋筒、鞋口軟墊、鞋底（照鞋面的外形、腳跟加厚）、鞋頭與後跟的補強片
+const BOOT_PROF = [[0.09, 0.016, 0.05], [0.08, 0.036, 0.09], [0.055, 0.045, 0.125], [0.02, 0.049, 0.14], [-0.02, 0.05, 0.128], [-0.055, 0.052, 0.098], [-0.09, 0.053, 0.076], [-0.125, 0.05, 0.062], [-0.15, 0.04, 0.052], [-0.166, 0.02, 0.034]];   // [z, 半寬, 高]
+function bootTopY(z) { for (let i = 0; i < BOOT_PROF.length - 1; i++) { const a = BOOT_PROF[i], b = BOOT_PROF[i + 1]; if (z <= a[0] && z >= b[0]) { const t = (a[0] - z) / (a[0] - b[0]); return 0.026 + a[2] + (b[2] - a[2]) * t; } } return 0.1; }
+function hBoot(x, kn, boot, sole, trim) {
+  const up = BOOT_PROF.map(([z, w, h]) => { const r = []; for (let k = 0; k <= 10; k++) { const th = Math.PI * k / 10; r.push([x + w * Math.cos(th), 0.026 + h * Math.pow(Math.sin(th), 0.7), z]); } return r; });
+  const so = BOOT_PROF.map(([z, w]) => { const W2 = w + 0.005, hh = z > 0.02 ? 0.03 : 0.024; return [[x - W2, 0, z], [x - W2, hh, z], [x + W2, hh, z], [x + W2, 0, z]]; });
+  const shaft = []; for (let i = 0; i <= 4; i++) { const t = i / 4, y = 0.1 + t * 0.15, rr = 0.047 + 0.006 * t + 0.004 * Math.sin(t * Math.PI), zc = 0.03 - 0.012 * t, r = []; for (let k = 0; k < 12; k++) { const a = Math.PI * 2 * k / 12; r.push([x + rr * Math.cos(a), y, zc + rr * 1.08 * Math.sin(a)]); } shaft.push(r); }
+  return [hLoft(up, boot, kn), hLoft(so, sole, kn, true), hLoft(shaft, boot, kn, true),
+    hTorso(0.056, 0.055, 0.02, x, 0.25, 0.018, trim, kn, 0, 1.08, 12),                                           // 鞋口軟墊
+    hEll(0.04, 0.05, 0.022, x, 0.075, 0.078, trim, kn, 0, 10, 6),   // 後跟的補強片
+    hBox(0.03, 0.1, 0.008, x, 0.165, -0.02, trim, kn, 0, 0.12)];                                                    // 鞋舌
+}
 function hCyl(r, h, x, y, z, color, bone, rx = 0, rz = 0, seg = 10) {
   if (HLOD) seg = 6;
   const g = new THREE.CylinderGeometry(r, r, h, seg); g.rotateX(rx); g.rotateZ(rz); g.translate(x, y, z); return hp(g, color, bone);
@@ -348,14 +381,15 @@ function humanGeo(team, look = 'grunt', lod = 0, faceI = 0) {
     const x = 0.1 * s, th = s < 0 ? HB.thighL : HB.thighR, kn = s < 0 ? HB.kneeL : HB.kneeR;
     nb(hLimb(0.094, [x, 0.92, 0], [x * 1.02, 0.52, -0.005], W, th, 1), hEll(0.082, 0.07, 0.085, x * 1.02, 0.56, -0.004, W, th, 1, 10, 6)); add(hBox(0.05, 0.13, 0.12, x + 0.075 * s, 0.7, 0, W, th, 1), hBox(0.052, 0.012, 0.125, x + 0.076 * s, 0.77, 0, strap, th));
     if (s > 0 && !boss) add(hBox(0.05, 0.16, 0.1, x + 0.085, 0.8, 0.01, strap, th), hBox(0.03, 0.12, 0.05, x + 0.11, 0.82, -0.01, '#1e2024', th));   // 右大腿槍套
-    nb(hLimb(0.074, [x, 0.5, 0], [x, 0.16, 0.02], W, kn, 1)); add(hEll(0.078, 0.05, 0.08, x, 0.2, 0.018, W, kn, 1, 10, 5), hBox(0.11, 0.1, 0.05, x, 0.47, -0.07, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 0.15),
-      hBox(0.12, 0.13, 0.25, x, 0.065, -0.035, boot, kn), hBox(0.125, 0.03, 0.27, x, 0.014, -0.04, sole, kn), hBox(0.1, 0.06, 0.06, x, 0.12, -0.13, boot, kn, 0, 0.5),
-      hLimb(0.07, [x, 0.2, 0.02], [x, 0.12, 0.02], boot, kn, 0, 8));
+    nb(hLimb(0.074, [x, 0.5, 0], [x, 0.16, 0.02], W, kn, 1)); add(hEll(0.076, 0.035, 0.08, x, 0.275, 0.014, W, kn, 1, 12, 6), hEll(0.07, 0.03, 0.074, x, 0.315, 0.01, W, kn, 1, 12, 6), hBox(0.11, 0.1, 0.05, x, 0.47, -0.07, boss ? W : us ? '#7d6e52' : '#2b2c2a', kn, boss ? 1 : 0, 0.15));
+    if (lod) add(hBox(0.12, 0.13, 0.25, x, 0.065, -0.035, boot, kn), hBox(0.125, 0.03, 0.27, x, 0.014, -0.04, sole, kn), hBox(0.1, 0.06, 0.06, x, 0.12, -0.13, boot, kn, 0, 0.5), hLimb(0.07, [x, 0.2, 0.02], [x, 0.12, 0.02], boot, kn, 0, 8));
+    else add(...hBoot(x, kn, boot, sole, boss ? '#1a1a1c' : us ? '#7a6446' : '#1c1916'));
     if (!lod) {
       const lace = us ? '#5d4c34' : '#141210', cap = us ? '#5f5238' : '#161718';
       if (!boss) add(hEll(0.044, 0.046, 0.02, x, 0.47, -0.097, cap, kn, 0, 10, 6), hTorso(0.08, 0.078, 0.018, x, 0.505, 0.0, strap, kn, 0, 1, 10), hTorso(0.078, 0.076, 0.018, x, 0.44, 0.004, strap, kn, 0, 1, 10));   // 護膝硬殼、兩條綁帶
-      for (let k = 0; k < 5; k++) add(hBox(0.05, 0.005, 0.007, x, 0.118 + k * 0.021, -0.118 + k * 0.012, lace, kn, 0, 0.5));   // 鞋帶
-      add(hEll(0.057, 0.042, 0.06, x, 0.052, -0.138, boot, kn, 0, 10, 6), hBox(0.118, 0.022, 0.075, x, 0.004, 0.05, sole, kn), hBox(0.016, 0.03, 0.006, x, 0.215, 0.09, lace, kn));   // 鞋頭、鞋跟、後面的提環
+      for (let k = 0; k < 6; k++) { const lz = -0.105 + k * 0.016; add(hBox(0.046, 0.004, 0.006, x, bootTopY(lz) + 0.001, lz, lace, kn, 0, 0.35, 0, k % 2 ? 0.25 : -0.25)); }   // 鞋帶（交叉）
+      for (let k = 0; k < 4; k++) add(hBox(0.04, 0.004, 0.006, x, 0.15 + k * 0.024, -0.026 + k * 0.001, lace, kn, 0, 0.1, 0, k % 2 ? 0.25 : -0.25));   // 鞋筒上的鞋帶
+      add(hBox(0.016, 0.03, 0.006, x, 0.245, 0.078, lace, kn));   // 後面的提環
       add(hBox(0.004, 0.115, 0.004, x + 0.101 * s, 0.695, -0.02, '#c9c9c9', th, 1), hBox(0.004, 0.115, 0.004, x + 0.101 * s, 0.695, 0.02, '#c9c9c9', th, 1), hCyl(0.006, 0.004, x + 0.103 * s, 0.762, 0, '#3a372f', th, 0, Math.PI / 2, 6));   // 側口袋的褶子與扣子
       if (s > 0 && !boss) add(hTorso(0.099, 0.098, 0.022, x, 0.84, 0, strap, th, 0, 1, 10), hTorso(0.097, 0.096, 0.022, x * 1.01, 0.745, 0, strap, th, 0, 1, 10), hBox(0.03, 0.075, 0.04, x + 0.112, 0.905, 0.012, '#101113', th, 0, 0.3), hBox(0.026, 0.03, 0.02, x + 0.1, 0.8, -0.05, '#3a3d40', th));   // 槍套的腿帶、露出來的握把、快拆扣
     }

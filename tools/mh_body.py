@@ -125,7 +125,11 @@ if (N * (P - P.mean(0))).sum() < 0: T = T[:, [0, 2, 1]]; N = normals(P, T)
 hand = GWu[:, HB['haL']] + GWu[:, HB['haR']]; leg = GWu[:, [HB['thighL'], HB['kneeL'], HB['thighR'], HB['kneeR']]].sum(1) + GWu[:, HB['hips']] * 0.6
 neckw = GWu[:, HB['neck']] + GWu[:, HB['head']]
 puff = (0.005 + 0.011 * leg) * (1 - np.clip(hand * 1.5, 0, 1)) * (1 - np.clip(neckw * 2, 0, 1)) + 0.0015 * np.clip(hand * 1.5, 0, 1)     # 衣服比皮膚厚一點；褲子比較寬鬆；手是手套
-P = P + N * puff[:, None]; N = normals(P, T)
+P = P + N * puff[:, None]
+# 小腿下段收細，塞進靴筒裡（靴筒半徑約 5 公分；不收的話小腿會穿出靴子）
+kneew = GWu[:, [HB['kneeL'], HB['kneeR']]].sum(1); k = np.clip((0.31 - P[:, 1]) / 0.05, 0, 1) * (kneew > 0.5); ax = np.where(P[:, 0] < 0, -0.1, 0.1)
+P[:, 0] = ax + (P[:, 0] - ax) * (1 - 0.5 * k); P[:, 2] = 0.02 + (P[:, 2] - 0.02) * (1 - 0.5 * k)
+N = normals(P, T)
 o = np.argsort(-GWu, 1)[:, :2]; w0 = np.take_along_axis(GWu, o, 1); w0 = w0 / w0.sum(1, keepdims=True)
 print('頂點', len(P), '三角形', len(T), '範圍', P.min(0).round(3), P.max(0).round(3))
 b64 = lambda a: base64.b64encode(a.tobytes()).decode()
