@@ -28,7 +28,7 @@ float pn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
 // 側面看（z、y），上下面用（z、x）
 vec3 patColor(out float glow) {
   glow = 0.0;
-  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : vGP.zy;
+  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : an.z > 0.7 ? vGP.xy : vGP.zy;
   if (uPat < 0.5) return vec3(1.0);
   if (uPat < 1.5) { vec2 c = floor(p * 55.0); float h = ph(c), h2 = ph(floor(p * 18.0)); float m = h2 < 0.45 ? 0.0 : h2 < 0.8 ? 1.0 : 2.0; if (h < 0.25) m = mod(m + 1.0, 3.0); return m < 0.5 ? uPA : m < 1.5 ? uPB : uPC; }
   if (uPat < 2.5) { float s = sin(p.x * 70.0 + pn(p * 9.0) * 6.0 + pn(p * 31.0) * 1.5); return mix(uPA, uPB, smoothstep(0.55, 0.7, s)) + uPC * 0.15 * pn(p * 60.0); }
@@ -46,10 +46,10 @@ vec3 patColor(out float glow) {
 const VM_DETAIL_GLSL = `
 uniform float uDet;
 vec3 vmDetail(vec3 base, out float wear, out float rough) {
-  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : vGP.zy;
+  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : an.z > 0.7 ? vGP.xy : vGP.zy;
   float edge = clamp(length(fwidth(normalize(vGN))) * 2.2 - 0.15, 0.0, 1.0);
   float n1 = pn(p * 140.0), n2 = pn(vec2(vGP.z * 30.0, (an.y > 0.7 ? vGP.x : vGP.y) * 900.0)), n3 = pn(p * 26.0);
-  float scratch = smoothstep(0.78, 0.95, n2) * smoothstep(0.35, 0.7, n3);
+  float scratch = smoothstep(0.78, 0.95, n2) * smoothstep(0.35, 0.7, n3) * (1.0 - smoothstep(0.5, 0.8, an.z));   // 刮痕順著槍身前後方向，朝前後的端面（瞄準鏡、槍口）不畫
   wear = clamp(edge * (0.55 + 0.6 * n1) + scratch * 0.5, 0.0, 1.0) * mix(0.35, 1.0, uDet);
   rough = mix(0.82 + 0.36 * n1, 1.0, 0.0) * (1.0 - wear * 0.45 * uDet) * mix(1.0, 0.9 + 0.2 * pn(p * 300.0), 1.0 - uDet);
   vec3 bare = mix(base, vec3(0.55, 0.56, 0.58), uDet);   // 金屬：磨掉陽極處理露出來的鋁色；塑膠：磨亮一點

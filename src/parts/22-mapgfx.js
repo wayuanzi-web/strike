@@ -8,13 +8,13 @@ const MAT_OF = { floor: 'floor', outer: 'concrete', pillar: 'concrete', low: 'co
   house: 'plaster', house2: 'plaster', house3: 'plaster', stone: 'concrete', cobble: 'cobble', stall: 'wood', win: 'glass', lampw: 'lamp', lampc: 'lamp', roof: 'brick', door: 'wood',
   awn1: 'plaster', awn2: 'plaster', water: 'floor', clock: 'plaster', sill: 'concrete',
   // 鐵道：碎石地、車廂、鐵軌、枕木
-  cone: 'floor', sign: 'floor', leaf: 'plaster', pot: 'brick', gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
+  cone: 'floor', sign: 'floor', leaf: 'plaster', pot: 'plaster', drum: 'container', drum2: 'container', tire: 'metal', gravel: 'gravel', car1: 'container', car2: 'container', car3: 'container', rail: 'metal', sleeper: 'wood', canopy: 'metal', yellow: 'floor' };
 const TINT = {
   floor: '#9a958c', outer: '#9b968d', pillar: '#a29d93', low: '#aca598', dock: '#a19b90', lintel: '#8f897f', trim: '#b4ada1',
   wall: '#a46a55', rust: '#b8552f', teal: '#2e7f88', olive: '#7f823c', crate: '#c3935a', shed: '#8a959a', dark: '#4a4d52', paint: '#e0b43a', hazard: '#262626',
   house: '#e6d8bd', house2: '#d9a27a', house3: '#c9d2cf', stone: '#c4b8a2', cobble: '#a49a8a', stall: '#a8774a', win: '#2c3846', lampw: '#ffe2b0', lampc: '#e4f0ff', roof: '#b0573a', door: '#6b4a32',
   awn1: '#c8423a', awn2: '#f0e8d8', water: '#4f8fa8', clock: '#f2ede2', sill: '#d8d0c0',
-  cone: '#e2582a', sign: '#e8c23a', leaf: '#4f7a34', pot: '#b0603e', gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
+  cone: '#e2582a', sign: '#e8c23a', leaf: '#47662f', pot: '#b0603e', drum: '#2f5e8a', drum2: '#a8402c', tire: '#232323', gravel: '#a89c8c', car1: '#7a3a2c', car2: '#3d5a7a', car3: '#6a6a5e', rail: '#8a8580', sleeper: '#5a4636', canopy: '#6d757c', yellow: '#e0b43a',
 };
 
 // 每張地圖都有的：依方塊顏色自動加的裝飾（貨櫃凸條、牆頂壓條、外牆壁柱、房子窗戶與屋簷、車廂細節）
@@ -72,7 +72,20 @@ function wallProps(b) {
     for (const o of BOXES) if (o !== b && o.min[0] < hi[0] + 0.1 && o.max[0] > lo[0] - 0.1 && o.min[2] < hi[2] + 0.1 && o.max[2] > lo[2] - 0.1 && o.min[1] < hi[1] && o.max[1] > 0.02) return false; return true; };
   for (let c = (ax === 2 ? -33 : -21) + 3; c < a1 - 2; c += 6) {
     const r = hash1(Math.round(c * 17 + pl * 11 + 3)), r2 = hash1(Math.round(c * 5 - pl * 13));
-    if (r < 0.35) {                                             // 棧板堆 1–4 層（1.2×0.8）
+    if (r < 0.35 && r2 < 0.5 && MAP.id !== 'dawn') {           // 油桶 2–4 個（截面用兩個交叉的方塊拼成八角形）＋鐵箍、桶蓋
+      const n = 2 + Math.floor(r2 * 6) % 3, col = r2 < 0.25 ? 'drum' : 'drum2';
+      for (let i = 0; i < n; i++) { const m = c - 0.3 + (i % 2) * 0.62, d = 0.42 + Math.floor(i / 2) * 0.62;
+        if (!free(m - 0.32, m + 0.32, d - 0.32, d + 0.32, 0.9)) continue;
+        P(m - 0.29, m + 0.29, d - 0.2, d + 0.2, 0, 0.88, col); P(m - 0.2, m + 0.2, d - 0.29, d + 0.29, 0, 0.88, col);
+        for (const h of [0.29, 0.58]) { P(m - 0.305, m + 0.305, d - 0.12, d + 0.12, h, h + 0.035, col); P(m - 0.12, m + 0.12, d - 0.305, d + 0.305, h, h + 0.035, col); }
+        P(m - 0.06, m - 0.02, d + 0.08, d + 0.12, 0.88, 0.9, 'dark'); }
+    } else if (r < 0.35 && r2 >= 0.5 && MAP.id !== 'dawn') {   // 疊起來的舊輪胎 2–4 個
+      const n = 2 + Math.floor(r2 * 7) % 3, m = c + 0.2, d = 0.5;
+      if (!free(m - 0.42, m + 0.42, d - 0.42, d + 0.42, n * 0.22)) continue;
+      for (let i = 0; i < n; i++) { const y = i * 0.22, o = (i % 2) * 0.04;
+        P(m - 0.38 + o, m + 0.38 + o, d - 0.24, d + 0.24, y, y + 0.21, 'tire'); P(m - 0.24 + o, m + 0.24 + o, d - 0.38, d + 0.38, y, y + 0.21, 'tire'); }
+      P(m - 0.14, m + 0.14, d - 0.14, d + 0.14, n * 0.22 - 0.005, n * 0.22, 'dark');
+    } else if (r < 0.35) {                                      // 棧板堆 1–4 層（1.2×0.8）
       const n = 1 + Math.floor(r2 * 4), m = c + 0.3, H = n * 0.144;
       if (!free(m - 0.62, m + 0.62, 0.15, 1.0, H)) continue;
       for (let i = 0; i < n; i++) { const y = i * 0.144;
@@ -83,6 +96,12 @@ function wallProps(b) {
       for (let i = 0, n = 2 + (r2 > 0.5 ? 1 : 0); i < n; i++) { const m = c - 0.4 + i * 0.55, d = 0.35 + (i % 2) * 0.25, e = (w, h0, h1, col) => P(m - w, m + w, d - w, d + w, h0, h1, col);
         if (!free(m - 0.2, m + 0.2, d - 0.2, d + 0.2, 0.7)) continue;
         e(0.18, 0, 0.03, 'hazard'); e(0.12, 0.03, 0.2, 'cone'); e(0.095, 0.2, 0.3, 'awn2'); e(0.075, 0.3, 0.45, 'cone'); e(0.055, 0.45, 0.52, 'awn2'); e(0.035, 0.52, 0.66, 'cone'); }
+    } else if (r < 0.66) {                                      // 油桶 2–3 個：十字疊兩個方塊看起來是圓的、桶身兩道箍、桶蓋
+      const cols = ['rust', 'teal', 'olive', 'dark'];
+      for (let i = 0, n = 2 + (r2 > 0.4 ? 1 : 0); i < n; i++) { const m = c - 0.35 + i * 0.66, d = 0.4 + (i === 2 ? 0.55 : 0), col = cols[Math.floor(r2 * 7 + i) % 4];
+        if (!free(m - 0.33, m + 0.33, d - 0.33, d + 0.33, 0.95)) continue;
+        P(m - 0.29, m + 0.29, d - 0.2, d + 0.2, 0, 0.88, col); P(m - 0.2, m + 0.2, d - 0.29, d + 0.29, 0, 0.88, col);
+        P(m - 0.25, m + 0.25, d - 0.25, d + 0.25, 0.3, 0.33, 'dark'); P(m - 0.25, m + 0.25, d - 0.25, d + 0.25, 0.86, 0.9, 'dark'); }
     } else if (r < 0.8) {                                       // 牆上的警示牌（黃底黑框）
       const m = c + (r2 - 0.5);
       P(m - 0.24, m + 0.24, 0, 0.015, 1.5, 1.95, 'hazard'); P(m - 0.21, m + 0.21, 0.015, 0.022, 1.53, 1.92, 'sign'); P(m - 0.05, m + 0.05, 0.022, 0.026, 1.6, 1.82, 'hazard'); P(m - 0.12, m + 0.12, 0.022, 0.026, 1.58, 1.61, 'hazard');
@@ -150,7 +169,12 @@ function streetProp(ax, pl, sg, c0, c1, r) {
   if (r < 0.4) {                                  // 花盆一兩個：陶盆、盆緣、一叢葉子
     for (const x of c1 - c0 > 1.4 ? [m - 0.4, m + 0.4] : [m]) { if (!free(x - 0.3, x + 0.3, 0.1, 0.65, 1)) continue;
       P(x - 0.22, x + 0.22, 0.15, 0.59, 0, 0.42, 'pot'); P(x - 0.25, x + 0.25, 0.12, 0.62, 0.42, 0.47, 'pot');
-      P(x - 0.2, x + 0.2, 0.17, 0.57, 0.47, 0.78, 'leaf'); P(x - 0.13, x + 0.13, 0.24, 0.5, 0.78, 0.95, 'leaf'); P(x - 0.27, x - 0.1, 0.22, 0.4, 0.55, 0.72, 'leaf'); P(x + 0.1, x + 0.27, 0.36, 0.54, 0.55, 0.7, 'leaf'); }
+      // 葉叢：大小不一、互相錯開的小塊，輪廓不要是一個方塊
+      const lr = hash1(Math.round(x * 37 + pl * 3));
+      P(x - 0.17, x + 0.17, 0.2, 0.54, 0.47, 0.7, 'leaf'); P(x - 0.11, x + 0.09, 0.27, 0.46, 0.7, 0.88 + lr * 0.12, 'leaf');
+      P(x - 0.29, x - 0.08, 0.2, 0.38, 0.52, 0.68, 'leaf'); P(x + 0.08, x + 0.3, 0.36, 0.56, 0.5, 0.66, 'leaf');
+      P(x - 0.05, x + 0.2, 0.15, 0.32, 0.6, 0.8, 'leaf'); P(x - 0.22, x - 0.02, 0.42, 0.6, 0.58, 0.82, 'leaf');
+      P(x + 0.04, x + 0.16, 0.4, 0.52, 0.8, 0.96, 'leaf'); }
   } else if (r < 0.65 && c1 - c0 > 1.7) {        // 長椅：座板三片、椅背兩片、鐵腳
     if (!free(m - 0.85, m + 0.85, 0.05, 0.6, 1)) return;
     for (const d of [0.25, 0.38, 0.51]) P(m - 0.8, m + 0.8, d - 0.055, d + 0.055, 0.42, 0.46, 'stall');
