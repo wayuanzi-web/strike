@@ -379,6 +379,7 @@ const VM_POS = {
 VM_POS.flash = VM_POS.smoke = VM_POS.molotov = VM_POS.he; VM_POS.carbine = VM_POS.rifle; VM_POS.deagle = VM_POS.pistol;
 function viewmodelLand(v) { VM.landV -= Math.min(0.5, v * 0.04); }
 function updateViewmodel(dt, lookDX, lookDY) {
+  VM_HI.value = S.quality === 'eco' ? 0 : 1;
   const sp = playerSpeed(), og = player.body.onGround, moving = og ? Math.min(1, sp / RUN_SPEED) : 0;
   // 擺動跟腳步同步：每一步（0.34×跑速/速度 秒）槍沉一次，左右兩步畫一個 8 字
   if (moving > 0.05) VM.bobT += dt * Math.PI * sp / (0.34 * RUN_SPEED);

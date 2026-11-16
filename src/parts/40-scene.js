@@ -254,26 +254,32 @@ const VM_TINT = { metal: new THREE.Color(1, 1, 1), poly: new THREE.Color(1, 1, 1
 // 環境反射用一張程式畫的天空／地面漸層（啟動時算一次）。這個場景只有槍和手，多出來的運算很少。
 const VM_ENV = (function () {
   try {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const c = cv.getContext('2d');
-    const g = c.createLinearGradient(0, 0, 0, 128);
-    g.addColorStop(0, '#9fb3c8'); g.addColorStop(0.42, '#e8e2d6'); g.addColorStop(0.5, '#fff4dc'); g.addColorStop(0.56, '#8a8070'); g.addColorStop(1, '#2e2b27');
-    c.fillStyle = g; c.fillRect(0, 0, 256, 128);
-    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(150, 26, 40, 14);   // 一塊亮的天光（金屬上的長條反光）
+    // 棚拍式的環境：上半部天光漸層＋幾條長形柔光箱、窗格，地平線一條亮帶，下半部暗地面。
+    // 金屬上會出現清楚的長條反光、邊緣亮線，轉動時反光會滑過去。
+    const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#8ea6c0'); g.addColorStop(0.38, '#d9dde0'); g.addColorStop(0.49, '#fff6e4'); g.addColorStop(0.52, '#a89c88'); g.addColorStop(0.62, '#4a453e'); g.addColorStop(1, '#1c1a18');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    const box = (x, y, w, h, a) => { const gg = c.createLinearGradient(0, y, 0, y + h); gg.addColorStop(0, `rgba(255,255,255,${a * 0.6})`); gg.addColorStop(0.5, `rgba(255,255,255,${a})`); gg.addColorStop(1, `rgba(255,255,255,${a * 0.6})`); c.fillStyle = gg; c.fillRect(x, y, w, h); };
+    box(70, 40, 150, 16, 1); box(300, 30, 110, 12, 0.95); box(20, 88, 60, 8, 0.7); box(420, 80, 70, 9, 0.75);   // 長形柔光箱
+    c.fillStyle = 'rgba(255,250,235,.85)'; for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) c.fillRect(230 + k * 20, 70 + j * 22, 16, 18);   // 窗格
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(0, 124, W, 3);   // 地平線亮帶
+    c.fillStyle = 'rgba(0,0,0,.25)'; for (let k = 0; k < 12; k++) c.fillRect(k * 43 + 10, 140, 20, 116);   // 地面的暗塊（反光有明暗變化）
     const t = new THREE.CanvasTexture(cv); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromEquirectangular(t); pm.dispose(); t.dispose(); return rt.texture;
   } catch (e) { return null; }
 })();
 const VM_BASE = { metal: new THREE.Color('#40454b'), poly: new THREE.Color('#2a2a28'), cloth: new THREE.Color('#9da392') };   // 機匣是陽極處理的深灰、護木握把是更深的霧面塑膠
 const VM_MATS = {
-  metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.4, envMap: VM_ENV, envMapIntensity: 0.9 }),
-  poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.62, envMap: VM_ENV, envMapIntensity: 0.6 }),
+  metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.5, roughness: 0.3, envMap: VM_ENV, envMapIntensity: 1.1 }),
+  poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.08, roughness: 0.55, envMap: VM_ENV, envMapIntensity: 0.75 }),
   cloth: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.95, envMap: VM_ENV, envMapIntensity: 0.35 }),
 };
 const VM_HEMI = new THREE.HemisphereLight(0xe2ebf4, 0x4b463e, 0.8); vmScene.add(VM_HEMI);
 const VM_SUN = new THREE.DirectionalLight(0xfff0d8, 1.7); VM_SUN.position.set(-0.6, 1.0, 0.55); vmScene.add(VM_SUN);
 const VM_FILL = new THREE.DirectionalLight(0xcfe0ff, 0.5); VM_FILL.position.set(0.8, 0.2, -0.4); vmScene.add(VM_FILL);
 const VM_GLOW = new THREE.DirectionalLight(0xffb070, 0); VM_GLOW.position.set(0, 1, 0); vmScene.add(VM_GLOW);   // 路燈、槍口火光、爆炸照到手上的槍
-const VM_ENVI = { metal: 0.9, poly: 0.6, cloth: 0.35 };
+const VM_ENVI = { metal: 1.0, poly: 0.75, cloth: 0.35 };
 window.VM_READY = true; applyVmTheme();
 // 步槍：通用突擊步槍外形（不是任何一把真槍）。槍身朝 -z，原點在握把附近
 // ---------- 手上的槍：每種武器一組模型，換槍時換掉 gunRig 裡的那組 ----------

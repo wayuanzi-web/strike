@@ -621,7 +621,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261116-0748';   // 建置時換成日期時間
+const BUILD = '20261116-1354';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -2402,26 +2402,32 @@ const VM_TINT = { metal: new THREE.Color(1, 1, 1), poly: new THREE.Color(1, 1, 1
 // 環境反射用一張程式畫的天空／地面漸層（啟動時算一次）。這個場景只有槍和手，多出來的運算很少。
 const VM_ENV = (function () {
   try {
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const c = cv.getContext('2d');
-    const g = c.createLinearGradient(0, 0, 0, 128);
-    g.addColorStop(0, '#9fb3c8'); g.addColorStop(0.42, '#e8e2d6'); g.addColorStop(0.5, '#fff4dc'); g.addColorStop(0.56, '#8a8070'); g.addColorStop(1, '#2e2b27');
-    c.fillStyle = g; c.fillRect(0, 0, 256, 128);
-    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(150, 26, 40, 14);   // 一塊亮的天光（金屬上的長條反光）
+    // 棚拍式的環境：上半部天光漸層＋幾條長形柔光箱、窗格，地平線一條亮帶，下半部暗地面。
+    // 金屬上會出現清楚的長條反光、邊緣亮線，轉動時反光會滑過去。
+    const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#8ea6c0'); g.addColorStop(0.38, '#d9dde0'); g.addColorStop(0.49, '#fff6e4'); g.addColorStop(0.52, '#a89c88'); g.addColorStop(0.62, '#4a453e'); g.addColorStop(1, '#1c1a18');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    const box = (x, y, w, h, a) => { const gg = c.createLinearGradient(0, y, 0, y + h); gg.addColorStop(0, `rgba(255,255,255,${a * 0.6})`); gg.addColorStop(0.5, `rgba(255,255,255,${a})`); gg.addColorStop(1, `rgba(255,255,255,${a * 0.6})`); c.fillStyle = gg; c.fillRect(x, y, w, h); };
+    box(70, 40, 150, 16, 1); box(300, 30, 110, 12, 0.95); box(20, 88, 60, 8, 0.7); box(420, 80, 70, 9, 0.75);   // 長形柔光箱
+    c.fillStyle = 'rgba(255,250,235,.85)'; for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) c.fillRect(230 + k * 20, 70 + j * 22, 16, 18);   // 窗格
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(0, 124, W, 3);   // 地平線亮帶
+    c.fillStyle = 'rgba(0,0,0,.25)'; for (let k = 0; k < 12; k++) c.fillRect(k * 43 + 10, 140, 20, 116);   // 地面的暗塊（反光有明暗變化）
     const t = new THREE.CanvasTexture(cv); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromEquirectangular(t); pm.dispose(); t.dispose(); return rt.texture;
   } catch (e) { return null; }
 })();
 const VM_BASE = { metal: new THREE.Color('#40454b'), poly: new THREE.Color('#2a2a28'), cloth: new THREE.Color('#9da392') };   // 機匣是陽極處理的深灰、護木握把是更深的霧面塑膠
 const VM_MATS = {
-  metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.4, envMap: VM_ENV, envMapIntensity: 0.9 }),
-  poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.62, envMap: VM_ENV, envMapIntensity: 0.6 }),
+  metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.5, roughness: 0.3, envMap: VM_ENV, envMapIntensity: 1.1 }),
+  poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.08, roughness: 0.55, envMap: VM_ENV, envMapIntensity: 0.75 }),
   cloth: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.95, envMap: VM_ENV, envMapIntensity: 0.35 }),
 };
 const VM_HEMI = new THREE.HemisphereLight(0xe2ebf4, 0x4b463e, 0.8); vmScene.add(VM_HEMI);
 const VM_SUN = new THREE.DirectionalLight(0xfff0d8, 1.7); VM_SUN.position.set(-0.6, 1.0, 0.55); vmScene.add(VM_SUN);
 const VM_FILL = new THREE.DirectionalLight(0xcfe0ff, 0.5); VM_FILL.position.set(0.8, 0.2, -0.4); vmScene.add(VM_FILL);
 const VM_GLOW = new THREE.DirectionalLight(0xffb070, 0); VM_GLOW.position.set(0, 1, 0); vmScene.add(VM_GLOW);   // 路燈、槍口火光、爆炸照到手上的槍
-const VM_ENVI = { metal: 0.9, poly: 0.6, cloth: 0.35 };
+const VM_ENVI = { metal: 1.0, poly: 0.75, cloth: 0.35 };
 window.VM_READY = true; applyVmTheme();
 // 步槍：通用突擊步槍外形（不是任何一把真槍）。槍身朝 -z，原點在握把附近
 // ---------- 手上的槍：每種武器一組模型，換槍時換掉 gunRig 裡的那組 ----------
@@ -3640,6 +3646,7 @@ const VM_POS = {
 VM_POS.flash = VM_POS.smoke = VM_POS.molotov = VM_POS.he; VM_POS.carbine = VM_POS.rifle; VM_POS.deagle = VM_POS.pistol;
 function viewmodelLand(v) { VM.landV -= Math.min(0.5, v * 0.04); }
 function updateViewmodel(dt, lookDX, lookDY) {
+  VM_HI.value = S.quality === 'eco' ? 0 : 1;
   const sp = playerSpeed(), og = player.body.onGround, moving = og ? Math.min(1, sp / RUN_SPEED) : 0;
   // 擺動跟腳步同步：每一步（0.34×跑速/速度 秒）槍沉一次，左右兩步畫一個 8 字
   if (moving > 0.05) VM.bobT += dt * Math.PI * sp / (0.34 * RUN_SPEED);
@@ -8343,31 +8350,64 @@ vec3 patColor(out float glow) {
   glow = l1 + l2 * 0.7; return mix(uPA, mix(uPB, uPC, l2), clamp(glow, 0.0, 1.0));
 }`;
 // 手上的槍的表面細節：邊角磨損（倒角的地方法線變化快 → 露出金屬底色）、沿槍身的細刮痕、粗糙度不均；塑膠是霧面顆粒與手摸的亮面
+// 省電畫質關掉刮痕和細凹凸（每個像素少算二十幾次雜訊）
+const VM_HI = { value: 1 };
 const VM_DETAIL_GLSL = `
-uniform float uDet;
+uniform float uDet; uniform float uHi;
+// 細刮痕：一組平行細線（角度 a、密度 d），用雜訊切成一段一段，回傳 0–1
+float scr(vec2 p, float a, float d, float seed) {
+  vec2 q = vec2(cos(a) * p.x + sin(a) * p.y, -sin(a) * p.x + cos(a) * p.y);
+  float row = floor(q.y * d), f = fract(q.y * d), h = ph(vec2(row, seed));
+  float fw = fwidth(q.y * d), w = 0.035 + 0.03 * h;
+  // 線的邊緣照螢幕上一個像素的寬度柔化；線比像素細時改成變淡（不會斷成一點一點）
+  float line = (1.0 - smoothstep(w, w + fw * 1.2, abs(f - 0.5 - (h - 0.5) * 0.4))) * min(1.0, w * 2.0 / max(fw, 1e-4));
+  float seg = smoothstep(0.5, 0.68, pn(vec2(q.x * (1.2 + h * 2.5) + h * 40.0, row * 0.37 + seed)));   // 一道一道長的刮痕
+  // 線太密（比一個像素還細）就淡掉，免得變成閃爍的雜訊
+  float aa = 1.0 - smoothstep(0.35, 0.7, fw);
+  return line * seg * step(0.8, h) * aa;
+}
+// 表面高度（凹凸）：金屬是順著槍身的細拉絲紋＋刮痕凹下去；塑膠是握把的細顆粒（壓花）
+float vmHeight(vec2 p, vec3 an, out float scratch) {
+  scratch = max(scr(p, 0.12, 160.0, 1.7), scr(p, -0.5, 120.0, 5.3) * 0.85);
+  scratch = max(scratch, scr(p, 1.2, 90.0, 9.1) * 0.6) * (1.0 - smoothstep(0.5, 0.8, an.z));
+  float fa = 1.0 - smoothstep(0.3, 0.8, fwidth(p.y * 500.0)), fb = 1.0 - smoothstep(0.3, 0.8, fwidth(p.x * 500.0));
+  float brushed = (pn(vec2(p.x * 6.0, p.y * 500.0)) * 0.6 + pn(vec2(p.x * 3.0, p.y * 240.0)) * 0.4) * fa;
+  float stip = pn(p * 500.0) * 0.7 * fb + pn(p * 220.0) * 0.15;
+  return uDet > 0.5 ? brushed * 0.25 - scratch * 0.9 : stip;
+}
 vec3 vmDetail(vec3 base, out float wear, out float rough) {
   vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : an.z > 0.7 ? vGP.xy : vGP.zy;
   float edge = clamp(length(fwidth(normalize(vGN))) * 2.2 - 0.15, 0.0, 1.0);
-  float n1 = pn(p * 140.0), n2 = pn(vec2(vGP.z * 30.0, (an.y > 0.7 ? vGP.x : vGP.y) * 900.0)), n3 = pn(p * 26.0);
-  float scratch = smoothstep(0.78, 0.95, n2) * smoothstep(0.35, 0.7, n3) * (1.0 - smoothstep(0.5, 0.8, an.z));   // 刮痕順著槍身前後方向，朝前後的端面（瞄準鏡、槍口）不畫
-  wear = clamp(edge * (0.55 + 0.6 * n1) + scratch * 0.5, 0.0, 1.0) * mix(0.35, 1.0, uDet);
-  rough = mix(0.82 + 0.36 * n1, 1.0, 0.0) * (1.0 - wear * 0.45 * uDet) * mix(1.0, 0.9 + 0.2 * pn(p * 300.0), 1.0 - uDet);
-  vec3 bare = mix(base, vec3(0.55, 0.56, 0.58), uDet);   // 金屬：磨掉陽極處理露出來的鋁色；塑膠：磨亮一點
-  return mix(base * (0.92 + 0.12 * n3), mix(base * 1.35, bare, 0.75), wear * (uDet > 0.5 ? 0.65 : 0.3));
+  float n1 = pn(p * 140.0), n3 = pn(p * 26.0), smudge = pn(p * 9.0 + 3.1);
+  float scratch = 0.0; if (uHi > 0.5) vmHeight(p, an, scratch);
+  wear = clamp(edge * (0.6 + 0.6 * n1) + scratch * 0.8, 0.0, 1.0) * mix(0.35, 1.0, uDet);
+  // 粗糙度：大片手摸的油亮（smudge）、細雜訊；磨掉的地方更光滑
+  rough = (0.85 + 0.2 * n1) * mix(0.82, 1.12, smudge) * (1.0 - wear * 0.55 * uDet) * mix(1.0, 0.9 + 0.2 * pn(p * 300.0), 1.0 - uDet);
+  vec3 bare = mix(base, vec3(0.5, 0.51, 0.53), uDet);   // 金屬：磨掉陽極處理露出來的鋁色；塑膠：磨亮一點
+  return mix(base * (0.95 + 0.07 * n3), mix(base * 1.35, bare, 0.75), wear * (uDet > 0.5 ? 0.7 : 0.3));
+}
+// 用螢幕上的高度變化擾動法線（不用切線、不用貼圖）
+vec3 vmBump(vec3 nrm, float strength, vec3 vp) {
+  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : an.z > 0.7 ? vGP.xy : vGP.zy;
+  float sc; float h = vmHeight(p, an, sc) * strength;
+  vec3 sx = dFdx(-vp), sy = dFdy(-vp), r1 = cross(sy, nrm), r2 = cross(nrm, sx);
+  float det = dot(sx, r1); vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+  return normalize(abs(det) * nrm - grad);
 }`;
 function patchVmPattern(mat, k) {
   mat.userData.patK = { value: k };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, PAT_U); sh.uniforms.uPK = mat.userData.patK;
     sh.vertexShader = 'varying vec3 vGP; varying vec3 vGN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGP = position; vGN = normal;');
-    sh.uniforms.uDet = { value: k < 0.9 ? 1 : 0 };
+    sh.uniforms.uDet = { value: k < 0.9 ? 1 : 0 }; sh.uniforms.uHi = VM_HI;
     sh.fragmentShader = PAT_GLSL + VM_DETAIL_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', '#include <color_fragment>\nfloat pGlow; vec3 pCol = patColor(pGlow); diffuseColor.rgb *= mix(vec3(1.0), pCol, uPK);\nfloat vmWear, vmRough; diffuseColor.rgb = vmDetail(diffuseColor.rgb, vmWear, vmRough);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * vmRough, 0.08, 1.0);')
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.9, vmWear * uDet);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 1.0, vmWear * uDet);')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nif (uHi > 0.5) normal = vmBump(normal, uDet > 0.5 ? 0.00035 : 0.00025, vViewPosition);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += pGlow * uPK * mix(uPB, uPC, 0.5) * 0.9;');
   };
-  mat.customProgramCacheKey = () => 'vmpat2' + k;
+  mat.customProgramCacheKey = () => 'vmpat3' + k;
 }
 patchVmPattern(VM_MATS.poly, 1); patchVmPattern(VM_MATS.metal, 0.75);
 

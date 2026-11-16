@@ -43,31 +43,64 @@ vec3 patColor(out float glow) {
   glow = l1 + l2 * 0.7; return mix(uPA, mix(uPB, uPC, l2), clamp(glow, 0.0, 1.0));
 }`;
 // 手上的槍的表面細節：邊角磨損（倒角的地方法線變化快 → 露出金屬底色）、沿槍身的細刮痕、粗糙度不均；塑膠是霧面顆粒與手摸的亮面
+// 省電畫質關掉刮痕和細凹凸（每個像素少算二十幾次雜訊）
+const VM_HI = { value: 1 };
 const VM_DETAIL_GLSL = `
-uniform float uDet;
+uniform float uDet; uniform float uHi;
+// 細刮痕：一組平行細線（角度 a、密度 d），用雜訊切成一段一段，回傳 0–1
+float scr(vec2 p, float a, float d, float seed) {
+  vec2 q = vec2(cos(a) * p.x + sin(a) * p.y, -sin(a) * p.x + cos(a) * p.y);
+  float row = floor(q.y * d), f = fract(q.y * d), h = ph(vec2(row, seed));
+  float fw = fwidth(q.y * d), w = 0.035 + 0.03 * h;
+  // 線的邊緣照螢幕上一個像素的寬度柔化；線比像素細時改成變淡（不會斷成一點一點）
+  float line = (1.0 - smoothstep(w, w + fw * 1.2, abs(f - 0.5 - (h - 0.5) * 0.4))) * min(1.0, w * 2.0 / max(fw, 1e-4));
+  float seg = smoothstep(0.5, 0.68, pn(vec2(q.x * (1.2 + h * 2.5) + h * 40.0, row * 0.37 + seed)));   // 一道一道長的刮痕
+  // 線太密（比一個像素還細）就淡掉，免得變成閃爍的雜訊
+  float aa = 1.0 - smoothstep(0.35, 0.7, fw);
+  return line * seg * step(0.8, h) * aa;
+}
+// 表面高度（凹凸）：金屬是順著槍身的細拉絲紋＋刮痕凹下去；塑膠是握把的細顆粒（壓花）
+float vmHeight(vec2 p, vec3 an, out float scratch) {
+  scratch = max(scr(p, 0.12, 160.0, 1.7), scr(p, -0.5, 120.0, 5.3) * 0.85);
+  scratch = max(scratch, scr(p, 1.2, 90.0, 9.1) * 0.6) * (1.0 - smoothstep(0.5, 0.8, an.z));
+  float fa = 1.0 - smoothstep(0.3, 0.8, fwidth(p.y * 500.0)), fb = 1.0 - smoothstep(0.3, 0.8, fwidth(p.x * 500.0));
+  float brushed = (pn(vec2(p.x * 6.0, p.y * 500.0)) * 0.6 + pn(vec2(p.x * 3.0, p.y * 240.0)) * 0.4) * fa;
+  float stip = pn(p * 500.0) * 0.7 * fb + pn(p * 220.0) * 0.15;
+  return uDet > 0.5 ? brushed * 0.25 - scratch * 0.9 : stip;
+}
 vec3 vmDetail(vec3 base, out float wear, out float rough) {
   vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : an.z > 0.7 ? vGP.xy : vGP.zy;
   float edge = clamp(length(fwidth(normalize(vGN))) * 2.2 - 0.15, 0.0, 1.0);
-  float n1 = pn(p * 140.0), n2 = pn(vec2(vGP.z * 30.0, (an.y > 0.7 ? vGP.x : vGP.y) * 900.0)), n3 = pn(p * 26.0);
-  float scratch = smoothstep(0.78, 0.95, n2) * smoothstep(0.35, 0.7, n3) * (1.0 - smoothstep(0.5, 0.8, an.z));   // 刮痕順著槍身前後方向，朝前後的端面（瞄準鏡、槍口）不畫
-  wear = clamp(edge * (0.55 + 0.6 * n1) + scratch * 0.5, 0.0, 1.0) * mix(0.35, 1.0, uDet);
-  rough = mix(0.82 + 0.36 * n1, 1.0, 0.0) * (1.0 - wear * 0.45 * uDet) * mix(1.0, 0.9 + 0.2 * pn(p * 300.0), 1.0 - uDet);
-  vec3 bare = mix(base, vec3(0.55, 0.56, 0.58), uDet);   // 金屬：磨掉陽極處理露出來的鋁色；塑膠：磨亮一點
-  return mix(base * (0.92 + 0.12 * n3), mix(base * 1.35, bare, 0.75), wear * (uDet > 0.5 ? 0.65 : 0.3));
+  float n1 = pn(p * 140.0), n3 = pn(p * 26.0), smudge = pn(p * 9.0 + 3.1);
+  float scratch = 0.0; if (uHi > 0.5) vmHeight(p, an, scratch);
+  wear = clamp(edge * (0.6 + 0.6 * n1) + scratch * 0.8, 0.0, 1.0) * mix(0.35, 1.0, uDet);
+  // 粗糙度：大片手摸的油亮（smudge）、細雜訊；磨掉的地方更光滑
+  rough = (0.85 + 0.2 * n1) * mix(0.82, 1.12, smudge) * (1.0 - wear * 0.55 * uDet) * mix(1.0, 0.9 + 0.2 * pn(p * 300.0), 1.0 - uDet);
+  vec3 bare = mix(base, vec3(0.5, 0.51, 0.53), uDet);   // 金屬：磨掉陽極處理露出來的鋁色；塑膠：磨亮一點
+  return mix(base * (0.95 + 0.07 * n3), mix(base * 1.35, bare, 0.75), wear * (uDet > 0.5 ? 0.7 : 0.3));
+}
+// 用螢幕上的高度變化擾動法線（不用切線、不用貼圖）
+vec3 vmBump(vec3 nrm, float strength, vec3 vp) {
+  vec3 an = abs(normalize(vGN)); vec2 p = an.y > 0.7 ? vGP.zx : an.z > 0.7 ? vGP.xy : vGP.zy;
+  float sc; float h = vmHeight(p, an, sc) * strength;
+  vec3 sx = dFdx(-vp), sy = dFdy(-vp), r1 = cross(sy, nrm), r2 = cross(nrm, sx);
+  float det = dot(sx, r1); vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+  return normalize(abs(det) * nrm - grad);
 }`;
 function patchVmPattern(mat, k) {
   mat.userData.patK = { value: k };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, PAT_U); sh.uniforms.uPK = mat.userData.patK;
     sh.vertexShader = 'varying vec3 vGP; varying vec3 vGN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGP = position; vGN = normal;');
-    sh.uniforms.uDet = { value: k < 0.9 ? 1 : 0 };
+    sh.uniforms.uDet = { value: k < 0.9 ? 1 : 0 }; sh.uniforms.uHi = VM_HI;
     sh.fragmentShader = PAT_GLSL + VM_DETAIL_GLSL + '\n' + sh.fragmentShader
       .replace('#include <color_fragment>', '#include <color_fragment>\nfloat pGlow; vec3 pCol = patColor(pGlow); diffuseColor.rgb *= mix(vec3(1.0), pCol, uPK);\nfloat vmWear, vmRough; diffuseColor.rgb = vmDetail(diffuseColor.rgb, vmWear, vmRough);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * vmRough, 0.08, 1.0);')
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.9, vmWear * uDet);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 1.0, vmWear * uDet);')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nif (uHi > 0.5) normal = vmBump(normal, uDet > 0.5 ? 0.00035 : 0.00025, vViewPosition);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += pGlow * uPK * mix(uPB, uPC, 0.5) * 0.9;');
   };
-  mat.customProgramCacheKey = () => 'vmpat2' + k;
+  mat.customProgramCacheKey = () => 'vmpat3' + k;
 }
 patchVmPattern(VM_MATS.poly, 1); patchVmPattern(VM_MATS.metal, 0.75);
 
