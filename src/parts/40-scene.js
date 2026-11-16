@@ -255,6 +255,19 @@ function partRBar(w, h, len, x, y, z, color, r = 0.01) {
   const g = new THREE.ExtrudeGeometry(s, { depth: len - bv * 2, bevelEnabled: true, bevelThickness: bv, bevelSize: bv * 0.7, bevelSegments: 2, curveSegments: 2 });
   g.translate(x, y, z - (len - bv * 2) / 2); g.userData.color = color; return g;
 }
+// 扳機護弓＋扳機：一圈有圓角的環（中間挖空）和一片彎的扳機，側面輪廓擠出。L 是護弓長、yb 是底、z 是中心
+function partGuard(L, yb, z, color) {
+  const h = Math.max(0.026, L * 0.5), z0 = z - L / 2, z1 = z + L / 2, yt = yb + h, t = 0.0045;
+  const mk = (pts) => { const q = roundPoly(pts, 0.008, 4), s = new THREE.Shape(); s.moveTo(q[0][0], q[0][1]); for (const p of q.slice(1)) s.lineTo(p[0], p[1]); return s; };
+  const outer = mk([[z1, yt], [z0, yt], [z0 - 0.004, yb + 0.008], [z0 + 0.006, yb], [z1, yb]]);
+  const hole = mk([[z1 - t, yt + 0.001], [z0 + t, yt + 0.001], [z0 + t, yb + t + 0.006], [z0 + t + 0.006, yb + t], [z1 - t, yb + t]]);
+  outer.holes.push(new THREE.Path(hole.getPoints()));
+  // 扳機：從上面往下彎的一片（往後彎）
+  const tz = z0 + L * 0.42, blade = [...bez([tz, yt], [tz - 0.002, yt - h * 0.45], [tz + 0.008, yb + t + 0.006], 6), [tz + 0.008, yb + t + 0.006], [tz + 0.012, yb + t + 0.008], ...bez([tz + 0.004, yb + t + 0.012], [tz + 0.002, yt - h * 0.4], [tz + 0.004, yt], 6)];
+  const tr = new THREE.Shape(); tr.moveTo(blade[0][0], blade[0][1]); for (const p of blade.slice(1)) tr.lineTo(p[0], p[1]);
+  const g = new THREE.ExtrudeGeometry([outer, tr], { depth: 0.006, bevelEnabled: true, bevelThickness: 0.0015, bevelSize: 0.001, bevelSegments: 2, curveSegments: 2 });
+  g.translate(0, 0, -0.003); g.rotateY(-Math.PI / 2); g.userData.color = color; return g;
+}
 function mergeParts(parts) {
   const P = [], N = [], C = [], c = new THREE.Color();
   for (const p0 of parts) {
@@ -345,6 +358,8 @@ function vmAssemble(metal, poly, cloth, left, magParts, magPos, muzzle) {
   if (poly.length) g.add(new THREE.Mesh(mergeParts(poly), VM_MATS.poly));
   if (cloth.length) g.add(new THREE.Mesh(mergeParts(cloth), VM_MATS.cloth));
   const la = new THREE.Mesh(mergeParts(left.length ? left : [partBox(0.001, 0.001, 0.001, 0, 0, 0, GLOVE)]), VM_MATS.cloth); g.add(la); g.userData.leftArm = la;
+  // 槍口的膛孔：黑色小圓片（從前面看得到槍管是空心的）
+  if (muzzle) { const b = partCyl(0.0055, 0.004, muzzle.x, muzzle.y, muzzle.z + 0.003, '#030303', 12); g.add(new THREE.Mesh(mergeParts([b]), VM_MATS.poly)); }
   const mag = new THREE.Mesh(mergeParts(magParts), VM_MATS.metal); mag.position.copy(magPos); g.add(mag); g.userData.mag = mag; g.userData.magY = magPos.y;
   g.userData.muzzle = muzzle; g.visible = false; gunRig.add(g);
   return g;
@@ -361,13 +376,16 @@ const VMODELS = {};
       partBox(0.008, 0.024, 0.075, 0.017, 0.018, -0.83, K), partBox(0.008, 0.024, 0.075, -0.017, 0.018, -0.83, K),
       partBox(0.016, 0.05, 0.02, 0, 0.055, -0.56, M), partBox(0.008, 0.045, 0.012, 0, 0.0675, -0.56, D),
       partBox(0.04, 0.012, 0.05, 0, 0.066, -0.06, M), partBox(0.005, 0.03, 0.025, -0.014, 0.075, -0.06, D), partBox(0.005, 0.03, 0.025, 0.014, 0.075, -0.06, D),
-      partBox(0.012, 0.012, 0.05, 0.04, 0.035, -0.04, D), partBox(0.006, 0.006, 0.07, 0, -0.052, 0.0, M), partBox(0.006, 0.03, 0.006, 0, -0.038, 0.035, M),
+      partBox(0.012, 0.012, 0.05, 0.04, 0.035, -0.04, D), partGuard(0.075, -0.056, 0.0, M),
       partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.15, '#15171a'),
     ];
     for (let k = 0; k < 10; k++) metal.push(partBox(0.034, 0.006, 0.012, 0, 0.074, -0.29 + k * 0.032, D));
     metal.push(partBox(0.0655, 0.0025, 0.4, 0, 0.012, -0.11, '#1e2023'),   // 上下機匣的接縫
-      partProfile([[0.06, -0.02], [-0.03, -0.02], [-0.036, -0.05], [0.066, -0.05]], 0.07, 0, M, 0.004),   // 彈匣井（往下張開）
-      partBox(0.004, 0.02, 0.03, 0.034, 0.03, -0.0, D), partCyl(0.004, 0.008, 0.035, -0.01, 0.03, '#15171a', 8));   // 前進助推、彈匣卡榫
+      partProfile([[-0.152, -0.02], [-0.288, -0.02], [-0.294, -0.048], [-0.146, -0.048]], 0.07, 0, M, 0.004),   // 彈匣井（包住彈匣上端、往下張開）
+      partBox(0.004, 0.02, 0.03, 0.034, 0.03, -0.0, D), partCyl(0.004, 0.008, 0.035, -0.01, 0.03, '#15171a', 8),
+      partCylR(0.0045, 0.0045, 0.07, 0, -0.004, -0.17, D, 0, Math.PI / 2, 10), partCylR(0.0045, 0.0045, 0.07, 0, 0.0, 0.07, D, 0, Math.PI / 2, 10),   // 分解銷（貫穿下機匣，兩邊露出圓頭）
+      partBox(0.004, 0.008, 0.026, -0.0345, -0.002, 0.03, D, 0.4), partCylR(0.006, 0.006, 0.004, -0.034, -0.002, 0.03, D, 0, Math.PI / 2, 10),   // 快慢機
+      partBox(0.004, 0.022, 0.012, -0.0345, 0.0, -0.075, D));   // 槍機卡榫   // 前進助推、彈匣卡榫
     metal.push(partCyl(0.0125, 0.24, 0, 0.018, -0.68, M, 12), partBox(0.012, 0.008, 0.02, 0.016, 0.026, -0.84, '#0d0e10'), partBox(0.012, 0.008, 0.02, -0.016, 0.026, -0.84, '#0d0e10'),
       partBox(0.012, 0.01, 0.03, 0.033, 0.024, -0.15, '#b08a3a'), partBox(0.05, 0.012, 0.016, 0, 0.068, 0.105, D), partBox(0.016, 0.01, 0.02, 0.026, 0.068, 0.105, D),
       partCyl(0.009, 0.03, 0.036, 0.03, -0.03, D, 8), partBox(0.004, 0.02, 0.02, 0.0, -0.03, 0.31, D));
@@ -391,7 +409,7 @@ const VMODELS = {};
     const metal = [
       partRBar(0.058, 0.07, 0.34, 0, 0.018, -0.1, M, 0.014), partCyl(0.012, 0.16, 0, 0.022, -0.34, M, 12), partCyl(0.022, 0.06, 0, 0.022, -0.44, D, 10), partBox(0.012, 0.01, 0.03, 0.031, 0.03, -0.08, '#b08a3a'),
       partBox(0.026, 0.01, 0.26, 0, 0.058, -0.1, D), partBox(0.012, 0.04, 0.014, 0, 0.068, -0.24, D), partBox(0.03, 0.02, 0.03, 0, 0.068, 0.04, D),
-      partBox(0.012, 0.012, 0.04, 0.035, 0.03, -0.12, D), partBox(0.006, 0.006, 0.06, 0, -0.04, 0.0, M),
+      partBox(0.012, 0.012, 0.04, 0.035, 0.03, -0.12, D), partGuard(0.065, -0.044, 0.0, M),
       partBox(0.012, 0.012, 0.2, 0.02, 0.0, 0.17, D), partBox(0.012, 0.012, 0.2, -0.02, 0.0, 0.17, D), partBox(0.05, 0.08, 0.015, 0, -0.02, 0.27, D),
     ];
     const poly = [
@@ -410,7 +428,7 @@ const VMODELS = {};
       partCyl(0.031, 0.02, 0, 0.11, 0.068, '#151617', 20), partCyl(0.022, 0.002, 0, 0.11, 0.0785, '#2a5560', 20), partCyl(0.008, 0.001, 0.007, 0.117, 0.0795, '#8fb6c0', 10),
       partBox(0.02, 0.05, 0.03, 0, 0.068, -0.22, D), partBox(0.02, 0.05, 0.03, 0, 0.068, -0.02, D),
       partBox(0.06, 0.012, 0.012, 0.05, 0.03, 0.02, D), partCyl(0.012, 0.02, 0.085, 0.03, 0.02, D, 6),
-      partBox(0.006, 0.006, 0.07, 0, -0.052, 0.0, M),
+      partGuard(0.07500000000000001, -0.055999999999999994, 0.0, M),
     ];
     const poly = [
       partProfile([[-0.02, -0.04], [-0.48, -0.03], [-0.48, 0.03], [-0.02, 0.04]], 0.07, 0, P),
@@ -425,7 +443,7 @@ const VMODELS = {};
   {
     const metal = [
       partRBar(0.06, 0.08, 0.3, 0, 0.015, -0.08, M, 0.016), partCyl(0.019, 0.62, 0, 0.032, -0.53, M, 12), partCyl(0.015, 0.5, 0, -0.012, -0.48, D, 10), partBox(0.016, 0.022, 0.04, 0.032, 0.02, -0.06, '#0d0e10'), partCyl(0.009, 0.02, 0.034, 0.02, -0.06, '#b33322', 8),
-      partBox(0.012, 0.015, 0.015, 0, 0.056, -0.82, D), partBox(0.006, 0.006, 0.07, 0, -0.045, 0.02, M), partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.1, '#15171a'),
+      partBox(0.012, 0.015, 0.015, 0, 0.056, -0.82, D), partGuard(0.07500000000000001, -0.049, 0.02, M), partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.1, '#15171a'),
     ];
     const poly = [
       partProfile([[0.04, -0.02], [0.0, -0.02], [0.035, -0.145], [0.078, -0.145]], 0.048, 0, P),
@@ -443,7 +461,7 @@ const VMODELS = {};
     const metal = [
       partRBar(0.034, 0.042, 0.21, 0, 0.035, -0.09, M, 0.008), partRBar(0.03, 0.03, 0.17, 0, 0.0, -0.08, D, 0.006),
       partBox(0.008, 0.012, 0.01, 0, 0.061, -0.19, D), partBox(0.024, 0.012, 0.012, 0, 0.061, 0.0, D),
-      partBox(0.006, 0.006, 0.05, 0, -0.03, -0.04, M), partCyl(0.009, 0.02, 0, 0.035, -0.2, '#15171a', 10), partBox(0.003, 0.008, 0.004, -0.008, 0.063, 0.0, '#e8e2c8'), partBox(0.003, 0.008, 0.004, 0.008, 0.063, 0.0, '#e8e2c8'), partBox(0.003, 0.006, 0.004, 0, 0.065, -0.19, '#e8e2c8'),
+      partGuard(0.055, -0.034, -0.04, M), partCyl(0.009, 0.02, 0, 0.035, -0.2, '#15171a', 10), partBox(0.003, 0.008, 0.004, -0.008, 0.063, 0.0, '#e8e2c8'), partBox(0.003, 0.008, 0.004, 0.008, 0.063, 0.0, '#e8e2c8'), partBox(0.003, 0.006, 0.004, 0, 0.065, -0.19, '#e8e2c8'),
     ];
     for (let k = 0; k < 4; k++) metal.push(partBox(0.036, 0.03, 0.004, 0, 0.038, 0.0 - k * 0.01, D));
     const poly = [partProfile([[0.025, -0.012], [-0.02, -0.012], [0.005, -0.12], [0.05, -0.12]], 0.032, 0, P)];
@@ -455,7 +473,7 @@ const VMODELS = {};
     const metal = [
       partRBar(0.058, 0.072, 0.36, 0, 0.018, -0.12, M, 0.012), partCyl(0.018, 0.06, 0, 0.02, -0.68, D, 10),
       partBox(0.03, 0.012, 0.42, 0, 0.06, -0.16, D), partBox(0.012, 0.05, 0.014, 0, 0.07, -0.46, D), partBox(0.03, 0.026, 0.03, 0, 0.076, 0.0, D),
-      partCyl(0.012, 0.2, 0, 0.012, 0.16, D, 14), partProfile([[0.25, 0.035], [0.25, -0.05], [0.31, -0.06], [0.315, 0.04]], 0.05, 0, K, 0.012), partBox(0.006, 0.006, 0.06, 0, -0.045, 0.0, M),
+      partCyl(0.012, 0.2, 0, 0.012, 0.16, D, 14), partProfile([[0.25, 0.035], [0.25, -0.05], [0.31, -0.06], [0.315, 0.04]], 0.05, 0, K, 0.012), partGuard(0.065, -0.049, 0.0, M),
       partBox(0.03, 0.03, 0.06, 0.033, 0.02, -0.14, '#15171a'),
     ];
     for (let k = 0; k < 8; k++) metal.push(partBox(0.034, 0.006, 0.012, 0, 0.068, -0.3 + k * 0.035, D));
@@ -471,7 +489,7 @@ const VMODELS = {};
     const metal = [
       partRBar(0.044, 0.052, 0.26, 0, 0.042, -0.1, M, 0.01), partRBar(0.038, 0.036, 0.21, 0, 0.0, -0.09, D, 0.007),
       partBox(0.01, 0.014, 0.012, 0, 0.074, -0.22, D), partBox(0.03, 0.014, 0.014, 0, 0.074, 0.02, D),
-      partBox(0.006, 0.006, 0.055, 0, -0.032, -0.04, M), partCyl(0.011, 0.02, 0, 0.042, -0.235, '#15171a'),
+      partGuard(0.06, -0.036000000000000004, -0.04, M), partCyl(0.011, 0.02, 0, 0.042, -0.235, '#15171a'),
     ];
     for (let k = 0; k < 5; k++) metal.push(partBox(0.046, 0.034, 0.004, 0, 0.044, 0.01 - k * 0.011, D));
     const poly = [partProfile([[0.03, -0.014], [-0.024, -0.014], [0.006, -0.135], [0.058, -0.135]], 0.04, 0, P)];
