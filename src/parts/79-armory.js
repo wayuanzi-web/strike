@@ -226,20 +226,21 @@ function stickerSpots(g) {
   const box = new THREE.Box3(); for (const m of parts) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox); }
   const spots = []; let anchor = null;
   const cy = (box.min.y + box.max.y) / 2, len = box.max.z - box.min.z;
-  const tryAt = (z, ys) => {
+  const tryAt = (z, ys, flat = false) => {
     for (const y of ys) {
       _ray.set(new V3(box.min.x - 0.2, y, z), new V3(1, 0, 0)); _ray.far = 1;
       g.updateMatrixWorld(true);
       // 用槍自己的座標打（暫時把槍放在原點）
       const hit = parts.map((m) => { const r = _ray.intersectObject(m, false)[0]; return r; }).filter(Boolean).sort((a, b) => a.distance - b.distance)[0];
-      if (hit) return { p: hit.point.clone(), n: hit.face ? hit.face.normal.clone() : new V3(-1, 0, 0) };
+      if (hit) { const n = hit.face ? hit.face.normal.clone() : new V3(-1, 0, 0); if (flat && n.x > -0.85) continue;   // 打到圓角（斜面）就換下一個高度
+        return { p: hit.point.clone(), n }; }
     }
     return null;
   };
   // 暫時把槍的位置歸零，射線才是在槍的座標裡
   const par = g.parent, pos = g.position.clone(), rot = g.rotation.clone(), sc = g.scale.clone(); if (par) par.remove(g); g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.scale.set(1, 1, 1); g.updateMatrixWorld(true);
   // 貼紙：機匣側面（護木後面、手不會擋到），只貼在朝左的平面上
-  for (const f of [0.6, 0.7, 0.5, 0.78, 0.42, 0.55, 0.65, 0.74, 0.46, 0.84]) { if (spots.length >= 3) break; const s = tryAt(box.min.z + len * f, [cy + 0.006, cy + 0.016, cy - 0.006, cy + 0.026, cy - 0.016, cy + 0.036]); if (s && s.n.x < -0.85 && spots.every((q) => Math.abs(q.p.z - s.p.z) > 0.03)) spots.push(s); }
+  for (const f of [0.6, 0.7, 0.5, 0.78, 0.42, 0.55, 0.65, 0.74, 0.46, 0.84]) { if (spots.length >= 3) break; const s = tryAt(box.min.z + len * f, [cy + 0.006, cy + 0.016, cy - 0.006, cy + 0.026, cy - 0.016, cy + 0.036], true); if (s && s.n.x < -0.85 && spots.every((q) => Math.abs(q.p.z - s.p.z) > 0.03)) spots.push(s); }
   spots.sort((a, b) => a.p.z - b.p.z);
   // 掛飾吊點：機匣左上方（偏後），掛在看得到的那一側
   const an = tryAt(box.min.z + len * 0.6, [box.max.y - 0.012, box.max.y - 0.024, cy + 0.02, cy]); if (an) anchor = an.p.clone().add(new V3(-0.006, 0, 0));
