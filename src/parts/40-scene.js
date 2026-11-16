@@ -204,19 +204,33 @@ function boxMesh(w, h, d, color, x, y, z, parent, mat) {
 }
 // 把很多小零件合成一個幾何（每個零件可以帶自己的顏色），減少繪製次數
 let VM_BEV = false;   // 建手上的槍時：大零件用有倒角的方塊（邊緣接得到光，像加工過的金屬）
-function bevelBox(w, h, d, r) {
-  const g = new THREE.BoxGeometry(w, h, d, 2, 2, 2), p = g.attributes.position, v = new V3(), c = new V3(), hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+function bevelBox(w, h, d, r, seg = 2) {
+  const g = new THREE.BoxGeometry(w, h, d, seg, seg, seg), p = g.attributes.position, v = new V3(), c = new V3(), hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i);
     c.set(Math.max(-hx, Math.min(hx, v.x)), Math.max(-hy, Math.min(hy, v.y)), Math.max(-hz, Math.min(hz, v.z)));
     const dd = v.clone().sub(c); if (dd.lengthSq() > 1e-12) { dd.normalize(); v.copy(c).addScaledVector(dd, r); }
     p.setXYZ(i, v.x, v.y, v.z);
   }
-  g.computeVertexNormals(); return g;
+  g.computeVertexNormals();
+  if (seg >= 4) smoothSeams(g);
+  return g;
+}
+// 同一個位置的頂點（方塊六個面在邊上各有一份）法線取平均，圓角才會是平滑的，不會一格一格
+function smoothSeams(g) {
+  const p = g.attributes.position, n = g.attributes.normal, m = new Map(), key = (i) => `${p.getX(i).toFixed(5)},${p.getY(i).toFixed(5)},${p.getZ(i).toFixed(5)}`;
+  for (let i = 0; i < p.count; i++) { const k = key(i), a = m.get(k) || [0, 0, 0]; a[0] += n.getX(i); a[1] += n.getY(i); a[2] += n.getZ(i); m.set(k, a); }
+  for (let i = 0; i < p.count; i++) { const a = m.get(key(i)), l = Math.hypot(a[0], a[1], a[2]) || 1; n.setXYZ(i, a[0] / l, a[1] / l, a[2] / l); }
 }
 function partBox(w, h, d, x, y, z, color, rx = 0, ry = 0, rz = 0) {
   const mn = Math.min(w, h, d), mx = Math.max(w, h, d);
   const g = VM_BEV && mn >= 0.012 && mx >= 0.03 ? bevelBox(w, h, d, Math.min(0.004, mn * 0.25)) : new THREE.BoxGeometry(w, h, d);
+  g.applyMatrix4(new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new V3(1, 1, 1)));
+  g.userData.color = color; return g;
+}
+// 軟的圓角塊（手套、手指）：圓角大到接近膠囊
+function partSoft(w, h, d, x, y, z, color, rx = 0, ry = 0, rz = 0, k = 0.42) {
+  const g = VM_BEV ? bevelBox(w, h, d, Math.min(w, h, d) * k, 4) : new THREE.BoxGeometry(w, h, d);
   g.applyMatrix4(new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new V3(1, 1, 1)));
   g.userData.color = color; return g;
 }
@@ -309,6 +323,11 @@ const VM_ENV = (function () {
   } catch (e) { return null; }
 })();
 const VM_BASE = { metal: new THREE.Color('#40454b'), poly: new THREE.Color('#2a2a28'), cloth: new THREE.Color('#9da392') };   // 機匣是陽極處理的深灰、護木握把是更深的霧面塑膠
+// 瞄準鏡鏡片：很光滑、有鍍膜，看的角度不同顏色從綠轉紫
+const VM_LENS = new THREE.MeshStandardMaterial({ color: 0x0c1418, metalness: 0.1, roughness: 0.04, envMap: VM_ENV, envMapIntensity: 1.6 });
+VM_LENS.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  float fr = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.0);
+  totalEmissiveRadiance += mix(vec3(0.05, 0.22, 0.12), vec3(0.22, 0.06, 0.26), fr) * (0.35 + fr);`); };
 const VM_MATS = {
   metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.5, roughness: 0.3, envMap: VM_ENV, envMapIntensity: 1.1 }),
   poly: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.08, roughness: 0.55, envMap: VM_ENV, envMapIntensity: 0.75 }),
@@ -327,7 +346,7 @@ const GLOVE = '#5a5d5e', SLEEVE = '#8a907c', CUFF = '#6a7062';
 // 右手（握握把）：位置是手套中心；左手：位置是手套中心，可以是單獨的物件（換彈時會動）
 // 斜放的圓柱（袖子、手指）：r1 前端、r2 後端，沿 z 長 len，再轉 rx／ry
 function partCylR(r1, r2, len, x, y, z, color, rx = 0, ry = 0, seg = 10) {
-  const g = new THREE.CylinderGeometry(r1, r2, len, seg); g.rotateX(Math.PI / 2);
+  const g = new THREE.CylinderGeometry(r1, r2, len, VM_BEV && r1 >= 0.03 ? Math.max(seg, 24) : seg); g.rotateX(Math.PI / 2);   // 袖子、袖口這種粗的圓柱：段數加多
   g.applyMatrix4(new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0)), new V3(1, 1, 1)));
   g.userData.color = color; return g;
 }
@@ -337,10 +356,13 @@ function vmRightArm(x, y, z) {
   const ox = x - 0.012, oy = y + 0.085, oz = z - 0.03;
   return [partCylR(0.045, 0.055, 0.34, 0.035 + ox, -0.14 + oy, 0.23 + oz, SLEEVE, 0.35), partCylR(0.05, 0.05, 0.05, 0.035 + ox, -0.105 + oy, 0.075 + oz, CUFF, 0.35),
     partBox(0.004, 0.06, 0.2, 0.08 + ox, -0.15 + oy, 0.26 + oz, '#7a806c', 0.35), partBox(0.004, 0.05, 0.16, -0.01 + ox, -0.15 + oy, 0.25 + oz, '#7a806c', 0.35),
-    partBox(0.065, 0.075, 0.09, 0.016 + ox, -0.085 + oy, 0.035 + oz, GLOVE, -0.3), partBox(0.05, 0.02, 0.03, 0.02 + ox, -0.05 + oy, 0.06 + oz, KNUCK, -0.3),
-    partBox(0.05, 0.085, 0.022, -0.004 + ox, -0.095 + oy, -0.012 + oz, GLOVE_K, 0.25), partBox(0.052, 0.012, 0.024, -0.004 + ox, -0.06 + oy, -0.014 + oz, KNUCK, 0.25),
-    partBox(0.018, 0.018, 0.06, 0.012 + ox, -0.036 + oy, -0.03 + oz, GLOVE),   // 食指沿著機匣（不在扳機上）
-    partBox(0.018, 0.02, 0.055, -0.03 + ox, -0.045 + oy, 0.0 + oz, GLOVE, 0, 0.35)];   // 拇指
+    partSoft(0.065, 0.075, 0.09, 0.016 + ox, -0.085 + oy, 0.035 + oz, GLOVE, -0.3, 0, 0, 0.3), partSoft(0.05, 0.02, 0.03, 0.02 + ox, -0.05 + oy, 0.06 + oz, KNUCK, -0.3),
+    // 中指、無名指、小指一根一根包住握把（越下面越短），指節上有護片
+    ...[0, 1, 2].map((i) => partSoft(0.05 - i * 0.004, 0.024, 0.024, -0.004 + ox, -0.072 - i * 0.026 + oy, -0.012 + i * 0.006 + oz, GLOVE_K, 0.25)),
+    ...[0, 1, 2].map((i) => partSoft(0.012, 0.018, 0.02, 0.02 + ox, -0.072 - i * 0.026 + oy, -0.0 + i * 0.006 + oz, KNUCK, 0.25)),
+    partSoft(0.052, 0.012, 0.024, -0.004 + ox, -0.058 + oy, -0.014 + oz, KNUCK, 0.25),
+    partSoft(0.018, 0.018, 0.034, 0.012 + ox, -0.036 + oy, -0.012 + oz, GLOVE), partSoft(0.016, 0.016, 0.03, 0.012 + ox, -0.036 + oy, -0.044 + oz, GLOVE),   // 食指兩節沿著機匣（不在扳機上）
+    partSoft(0.018, 0.02, 0.055, -0.03 + ox, -0.045 + oy, 0.0 + oz, GLOVE, 0, 0.35)];   // 拇指
 }
 // 左手（握護木）：袖子、手背、手指從上方包住護木、拇指在右側；左手腕戴錶
 function vmLeftArm(x, y, z) {
@@ -348,9 +370,12 @@ function vmLeftArm(x, y, z) {
   return [partCylR(0.045, 0.055, 0.38, -0.08 + ox, -0.12 + oy, -0.32 + oz, SLEEVE, 0.35, 0.55), partCylR(0.05, 0.05, 0.05, -0.04 + ox, -0.07 + oy, -0.43 + oz, CUFF, 0.35, 0.55),
     partBox(0.004, 0.05, 0.2, -0.13 + ox, -0.14 + oy, -0.28 + oz, '#7a806c', 0.35, 0.55),
     partBox(0.07, 0.028, 0.032, -0.05 + ox, -0.075 + oy, -0.405 + oz, '#202224', 0.35, 0.55), partBox(0.034, 0.008, 0.034, -0.05 + ox, -0.06 + oy, -0.41 + oz, '#6f7a80', 0.35, 0.55),   // 手錶
-    partBox(0.08, 0.05, 0.1, -0.005 + ox, -0.045 + oy, -0.47 + oz, GLOVE), partBox(0.03, 0.06, 0.09, 0.035 + ox, -0.01 + oy, -0.47 + oz, GLOVE),
-    partBox(0.07, 0.016, 0.085, 0.0 + ox, 0.012 + oy, -0.475 + oz, GLOVE_K), partBox(0.02, 0.05, 0.08, -0.04 + ox, -0.01 + oy, -0.47 + oz, KNUCK),   // 手指從上面包住
-    partBox(0.016, 0.02, 0.06, 0.045 + ox, -0.035 + oy, -0.45 + oz, GLOVE, 0, -0.2)];   // 拇指
+    partSoft(0.08, 0.05, 0.1, -0.005 + ox, -0.045 + oy, -0.47 + oz, GLOVE, 0, 0, 0, 0.3), partSoft(0.03, 0.06, 0.09, 0.035 + ox, -0.01 + oy, -0.47 + oz, GLOVE),
+    // 四根手指從上面包住護木：一根一根分開、指尖在右側往下彎
+    ...[0, 1, 2, 3].map((i) => partSoft(0.07, 0.018, 0.019, 0.0 + ox, 0.012 + oy, -0.505 + i * 0.021 + oz, GLOVE_K, 0, 0, -0.06)),
+    ...[0, 1, 2, 3].map((i) => partSoft(0.016, 0.03, 0.018, 0.04 + ox, -0.004 + oy, -0.505 + i * 0.021 + oz, GLOVE_K)),
+    partSoft(0.02, 0.05, 0.08, -0.04 + ox, -0.01 + oy, -0.47 + oz, KNUCK),
+    partSoft(0.016, 0.02, 0.06, 0.045 + ox, -0.035 + oy, -0.45 + oz, GLOVE, 0, -0.2)];   // 拇指
 }
 function vmAssemble(metal, poly, cloth, left, magParts, magPos, muzzle) {
   const g = new THREE.Group();
@@ -422,10 +447,10 @@ const VMODELS = {};
   // 狙擊槍「鷲」：長槍管、瞄準鏡、拉機柄、厚槍托
   {
     const metal = [
-      partRBar(0.06, 0.07, 0.42, 0, 0.018, -0.12, M, 0.022), partCyl(0.014, 0.6, 0, 0.022, -0.62, M, 12), partCyl(0.02, 0.07, 0, 0.022, -0.95, D, 10), partCyl(0.024, 0.006, 0, 0.11, -0.335, '#20262c', 14), partBox(0.012, 0.03, 0.012, 0, 0.145, -0.13, D), partBox(0.03, 0.012, 0.012, 0.035, 0.11, -0.13, D),
+      partRBar(0.06, 0.07, 0.42, 0, 0.018, -0.12, M, 0.022), partCyl(0.014, 0.6, 0, 0.022, -0.62, M, 12), partCyl(0.02, 0.07, 0, 0.022, -0.95, D, 10),  partBox(0.012, 0.03, 0.012, 0, 0.145, -0.13, D), partBox(0.03, 0.012, 0.012, 0.035, 0.11, -0.13, D),
       partCyl(0.026, 0.3, 0, 0.11, -0.13, '#5a5f66', 10), partCyl(0.034, 0.07, 0, 0.11, -0.3, '#5a5f66', 10), partCyl(0.03, 0.06, 0, 0.11, 0.03, '#5a5f66', 10),
       // 目鏡：橡膠眼罩一圈（往後凸）＋藍綠鍍膜的鏡片（凹在裡面）
-      partCyl(0.031, 0.02, 0, 0.11, 0.068, '#151617', 20), partCyl(0.022, 0.002, 0, 0.11, 0.0785, '#2a5560', 20), partCyl(0.008, 0.001, 0.007, 0.117, 0.0795, '#8fb6c0', 10),
+      partCyl(0.031, 0.02, 0, 0.11, 0.068, '#151617', 20),  partCyl(0.008, 0.001, 0.007, 0.117, 0.0795, '#8fb6c0', 10),
       partBox(0.02, 0.05, 0.03, 0, 0.068, -0.22, D), partBox(0.02, 0.05, 0.03, 0, 0.068, -0.02, D),
       partBox(0.06, 0.012, 0.012, 0.05, 0.03, 0.02, D), partCyl(0.012, 0.02, 0.085, 0.03, 0.02, D, 6),
       partGuard(0.07500000000000001, -0.055999999999999994, 0.0, M),
@@ -438,6 +463,8 @@ const VMODELS = {};
     ];
     VMODELS.sniper = vmAssemble(metal, poly, vmRightArm(0.012, -0.085, 0.03), vmLeftArm(-0.005, -0.06, -0.4),
       [partBox(0.04, 0.06, 0.08, 0, 0, 0, M)], new V3(0, -0.05, -0.12), new V3(0, 0.022, -0.99));
+    // 物鏡、目鏡：鍍膜鏡片（另外一個材質，角度不同顏色會變）
+    VMODELS.sniper.add(new THREE.Mesh(mergeParts([partCyl(0.029, 0.003, 0, 0.11, -0.3365, '#ffffff', 24), partCyl(0.022, 0.002, 0, 0.11, 0.0785, '#ffffff', 20)]), VM_LENS));
   }
   // 霰彈槍「犀」：粗槍管＋下方彈倉管、泵動護木（左手握著，開槍後會拉）
   {
