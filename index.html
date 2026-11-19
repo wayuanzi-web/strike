@@ -621,7 +621,7 @@ try { const raw = localStorage.getItem('strike.settings'); if (raw) Object.assig
 function buzz(ms) { try { if (S.vibrate && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iPhone 不支援震動 */ } }
 function saveSettings() { try { localStorage.setItem('strike.settings', JSON.stringify(S)); } catch (e) { /* 存不了也照玩 */ } }
 // 畫質：渲染解析度上限（設計筆記：預設 1.5 倍，省電 1 倍）
-const BUILD = '20261119-1409';   // 建置時換成日期時間
+const BUILD = '20261119-1429';   // 建置時換成日期時間
 const QUALITY = { eco: 1.0, std: 1.25, high: 1.5 };
 // 自動：手機從「標準」開始、電腦從「清晰」開始，太卡就自動往下降（見 90-main 的 autoQuality）
 
@@ -4600,18 +4600,21 @@ const FACE_MH = (function () {
 function patchHumanMat(m, rim, camo) {
   const U = m.userData.rimU = { value: new THREE.Color().setRGB(...rim.split(',').map(Number)) };
   const C = m.userData.camoU = camo.map((c) => ({ value: new THREE.Color(c) }));
+  // 迷彩樣式：x＝斑塊密度（每公尺）、y＝邊緣柔和度、z＝細碎打散的強度、w＝對比（1＝原色）
+  // OCP（我方）：小斑塊、柔邊、碎、低對比；林地（敵方）：大斑塊、邊緣較清楚；特戰、軍官幾乎素色
+  m.userData.camoK = { value: camo === CAMO.A ? new THREE.Vector4(3.7, 0.07, 0.42, 0.8) : camo === CAMO.B ? new THREE.Vector4(2.6, 0.035, 0.3, 0.8) : new THREE.Vector4(2.9, 0.03, 0.22, 0.9) };
   m.userData.skinU = { value: new THREE.Color(pick(SKIN_TONES)) };
   m.userData.lampU = { value: new THREE.Color(0, 0, 0) };
   m.userData.hitsU = { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) }; m.userData.hitN = 0;   // 中彈血跡：綁定姿勢座標 xyz＋半徑
   m.userData.headTU = { value: mhHeadTex(0) }; m.userData.headNU = { value: mhHeadTex(0, 1) }; m.userData.blinkU = { value: 0 }; m.userData.gazeU = { value: new THREE.Vector2() }; m.userData.browU = { value: new THREE.Vector4(0.1, 0.07, 0.05, 0) };   // 寫實的頭：皮膚＋眼睛貼圖、眉毛顏色與第幾列   // 夜裡被路燈照到的顏色（腳下光照貼圖的值）
   const MH_AT = typeof MH_ATLAS !== 'undefined' ? MH_ATLAS : [640, 1344, 1088];
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; }); sh.uniforms.uHits = m.userData.hitsU;
+    sh.uniforms.uRim = U; C.forEach((u, i) => { sh.uniforms['uC' + i] = u; }); sh.uniforms.uHits = m.userData.hitsU; sh.uniforms.uCamoK = m.userData.camoK;
     sh.uniforms.uCamoT = { value: CAMO_TEX }; sh.uniforms.uSkin = m.userData.skinU; sh.uniforms.uLampH = m.userData.lampU; sh.uniforms.uFl = LIGHT_U.uFl;
     sh.uniforms.uFaceT = { value: FACE_TEX }; sh.uniforms.uFaceM = { value: FACE_MH }; sh.uniforms.uHeadT = m.userData.headTU; sh.uniforms.uHeadN = m.userData.headNU; sh.uniforms.uBlink = m.userData.blinkU; sh.uniforms.uGaze = m.userData.gazeU; sh.uniforms.uBrow = m.userData.browU; sh.uniforms.uBrowT = { value: mhBrowTex() };
     sh.vertexShader = 'attribute float aCamo;\nattribute vec2 aRM;\nattribute vec2 aUvH;\nattribute vec3 aBlink;\nuniform float uBlink;\nvarying vec2 vUvH;\nvarying float vCamo;\nvarying vec3 vRest;\nvarying vec3 vRN;\nvarying vec3 vHw;\nvarying vec2 vRM;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += aBlink * uBlink;\nvCamo = aCamo; vRest = position; vRN = normal; vRM = aRM; vUvH = aUvH;')
       .replace('#include <skinning_vertex>', '#include <skinning_vertex>\nvHw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = `uniform vec4 uHits[6]; uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
+    sh.fragmentShader = `uniform vec4 uHits[6]; uniform vec4 uCamoK; uniform vec3 uRim; uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform sampler2D uCamoT; uniform vec3 uSkin; uniform vec3 uLampH; uniform sampler2D uFaceT; uniform sampler2D uFaceM; uniform sampler2D uHeadT; uniform sampler2D uHeadN; uniform vec2 uGaze; uniform sampler2D uBrowT; uniform vec4 uBrow;
 varying vec2 vUvH; varying float vCamo; varying vec3 vRest; varying vec3 vRN; varying vec3 vHw; varying vec2 vRM;
 ${FL_GLSL}
 // 布料凹凸：織紋（細）＋皺褶（沿著四肢的橫向褶子、關節處多）
@@ -4634,11 +4637,26 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
     vec3 headTx = texture2D(uHeadT, vUvH + step(4.5, vCamo) * step(vCamo, 5.5) * uGaze / vec2(${MH_AT[0]}.0, ${MH_AT[1]}.0)).rgb; vec2 bq = vec2(vRest.x / 0.14 + 0.5, (1.72 - vRest.y) / 0.035);   // 貼圖在條件式外面取樣（不然手機上會取到錯的解析度層）
     float browTx = texture2D(uBrowT, vec2(clamp(bq.x, 0.0, 1.0), (uBrow.a + clamp(bq.y, 0.0, 1.0)) * 0.25)).r;
     vec3 w = abs(vRN); w /= (w.x + w.y + w.z + 1e-4);
-    vec4 t = texture2D(uCamoT, vRest.zy * 2.9) * w.x + texture2D(uCamoT, vRest.xz * 2.9) * w.y + texture2D(uCamoT, vRest.xy * 2.9) * w.z;
-    vec3 q2 = vRest * 8.3 + 0.37; vec4 t2 = texture2D(uCamoT, q2.zy) * w.x + texture2D(uCamoT, q2.xz) * w.y + texture2D(uCamoT, q2.xy) * w.z;   // 第二層：把斑塊邊緣打碎、加小碎點
-    float ca = t.r + (t2.g - 0.5) * 0.22, cb = t.g + (t2.b - 0.5) * 0.22, cc = t.b + (t2.r - 0.5) * 0.3;
-    vec3 cam = uC0; cam = mix(cam, uC1, smoothstep(0.52, 0.535, ca)); cam = mix(cam, uC2, smoothstep(0.6, 0.615, cb)); cam = mix(cam, uC3, smoothstep(0.66, 0.675, cc) * 0.9);
+    vec3 q1 = vRest * uCamoK.x; vec4 t = texture2D(uCamoT, q1.zy) * w.x + texture2D(uCamoT, q1.xz) * w.y + texture2D(uCamoT, q1.xy) * w.z;
+    vec3 q2 = vRest * uCamoK.x * 2.9 + 0.37; vec4 t2 = texture2D(uCamoT, q2.zy) * w.x + texture2D(uCamoT, q2.xz) * w.y + texture2D(uCamoT, q2.xy) * w.z;   // 第二層：把斑塊邊緣打碎、加小碎點
+    // 縱向拉長的第三層（OCP 那種往下的細枝形），只加在打散裡
+    vec3 q3 = vRest * vec3(uCamoK.x * 4.0, uCamoK.x * 1.6, uCamoK.x * 4.0) + 0.71; float t3 = texture2D(uCamoT, q3.zy).g * w.x + texture2D(uCamoT, q3.xy).g * (w.y + w.z);
+    float bk = uCamoK.z, sf = uCamoK.y;
+    float ca = t.r + (t2.g - 0.5) * bk + (t3 - 0.5) * bk * 0.5, cb = t.g + (t2.b - 0.5) * bk, cc = t.b + (t2.r - 0.5) * bk * 1.3;
+    vec3 cam = uC0; cam = mix(cam, uC1, smoothstep(0.52 - sf, 0.52 + sf, ca)); cam = mix(cam, uC2, smoothstep(0.6 - sf, 0.6 + sf, cb)); cam = mix(cam, uC3, smoothstep(0.67 - sf * 0.6, 0.67 + sf * 0.6, cc) * 0.85);
+    cam = mix((uC0 + uC1 + uC2) / 3.0, cam, uCamoK.w);   // 拉低對比：實物在陽光下斑塊沒那麼跳
     cam *= 0.93 + 0.14 * t2.a;
+    // 布料的穿舊感：膝蓋、手肘、袖口、褲管下緣顏色淡一點、髒一點
+    float wearY = exp(-pow((vRest.y - 0.5) * 12.0, 2.0)) + exp(-pow((vRest.y - 1.13) * 12.0, 2.0)) * 0.7 + smoothstep(0.3, 0.12, vRest.y) * 0.8;
+    cam = mix(cam, cam * vec3(1.08, 1.05, 0.98) + 0.02, wearY * 0.35 * (0.6 + 0.4 * t2.a));
+    // 衣服的接觸陰影（綁定姿勢座標）：背心下緣、腋下、胯下、膝蓋後面、手肘內側，布料擠在一起的地方比較暗
+    float ax = abs(vRest.x);
+    float ao = 0.22 * exp(-pow((vRest.y - 1.02) * 22.0, 2.0)) * step(ax, 0.16)
+             + 0.3 * exp(-(pow(ax - 0.165, 2.0) + pow(vRest.y - 1.34, 2.0)) * 650.0)
+             + 0.28 * exp(-(pow(ax * 1.6, 2.0) + pow(vRest.y - 0.86, 2.0)) * 500.0)
+             + 0.25 * exp(-pow((vRest.y - 0.49) * 16.0, 2.0)) * smoothstep(0.0, 0.05, vRest.z)
+             + 0.2 * exp(-pow((vRest.y - 1.13) * 16.0, 2.0)) * smoothstep(0.15, 0.19, ax) * smoothstep(0.0, -0.04, vRest.z);
+    cam *= 1.0 - clamp(ao, 0.0, 0.4);
     float cw = clamp(vCamo, 0.0, 1.0) * (1.0 - step(1.5, vCamo)), sw = step(1.5, vCamo);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * cam * 1.25, cw);
     diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uSkin * (0.94 + 0.12 * t.a), sw);   // 皮膚：每人膚色不同，帶一點斑駁
@@ -5354,8 +5372,8 @@ const BOT_FLASH_MAT = new THREE.SpriteMaterial({ map: flashTex, blending: THREE.
 const BOT_MUZZLE = new V3(0.16, 1.37, -0.84);
 // 敵人「赤狼」：沙褐背心、橄欖褲、鏽橘布條；隊友「曉隊」：石板藍、青色布條（原創配色）
 const PALETTE = {
-  B: { vest: '#33382c', plate: '#2a2e25', shirt: '#4a5240', pants: '#3f4634', helmet: '#2f332a', band: '#ff6a2a', pack: '#2e3228', pouch: '#3a3f32', rim: '1.0, 0.75, 0.5' },   // 敵方：深綠
-  A: { vest: '#7f6c4e', plate: '#6f5e44', shirt: '#8f8b6e', pants: '#8f8b6e', helmet: '#8f8b6e', band: '#2fd8e0', pack: '#75644a', pouch: '#857252', rim: '0.55, 0.8, 1.0' },   // 我方：美軍 OCP＋狼棕色裝備
+  B: { vest: '#33382c', plate: '#2a2e25', shirt: '#4a5240', pants: '#3f4634', helmet: '#2f332a', band: '#d8642f', pack: '#2e3228', pouch: '#3a3f32', rim: '1.0, 0.75, 0.5' },   // 敵方：深綠
+  A: { vest: '#7f6c4e', plate: '#6f5e44', shirt: '#8f8b6e', pants: '#8f8b6e', helmet: '#8f8b6e', band: '#45b4bb', pack: '#75644a', pouch: '#857252', rim: '0.55, 0.8, 1.0' },   // 我方：美軍 OCP＋狼棕色裝備
 };
 // 機器人手上的槍：每種一個幾何（全部機器人共用），換槍只換幾何；muzzle 是槍口位置
 const BOT_GUNS = (function () {

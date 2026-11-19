@@ -15,8 +15,8 @@ const BOT_FLASH_MAT = new THREE.SpriteMaterial({ map: flashTex, blending: THREE.
 const BOT_MUZZLE = new V3(0.16, 1.37, -0.84);
 // 敵人「赤狼」：沙褐背心、橄欖褲、鏽橘布條；隊友「曉隊」：石板藍、青色布條（原創配色）
 const PALETTE = {
-  B: { vest: '#33382c', plate: '#2a2e25', shirt: '#4a5240', pants: '#3f4634', helmet: '#2f332a', band: '#ff6a2a', pack: '#2e3228', pouch: '#3a3f32', rim: '1.0, 0.75, 0.5' },   // 敵方：深綠
-  A: { vest: '#7f6c4e', plate: '#6f5e44', shirt: '#8f8b6e', pants: '#8f8b6e', helmet: '#8f8b6e', band: '#2fd8e0', pack: '#75644a', pouch: '#857252', rim: '0.55, 0.8, 1.0' },   // 我方：美軍 OCP＋狼棕色裝備
+  B: { vest: '#33382c', plate: '#2a2e25', shirt: '#4a5240', pants: '#3f4634', helmet: '#2f332a', band: '#d8642f', pack: '#2e3228', pouch: '#3a3f32', rim: '1.0, 0.75, 0.5' },   // 敵方：深綠
+  A: { vest: '#7f6c4e', plate: '#6f5e44', shirt: '#8f8b6e', pants: '#8f8b6e', helmet: '#8f8b6e', band: '#45b4bb', pack: '#75644a', pouch: '#857252', rim: '0.55, 0.8, 1.0' },   // 我方：美軍 OCP＋狼棕色裝備
 };
 // 機器人手上的槍：每種一個幾何（全部機器人共用），換槍只換幾何；muzzle 是槍口位置
 const BOT_GUNS = (function () {
