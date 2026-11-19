@@ -116,6 +116,20 @@ float clothH(vec3 p, vec3 n) {
   float fold = sin(p.y * 95.0 + texture2D(uCamoT, p.xz * 1.3).r * 9.0) * (0.35 + jt);
   return weave * 0.6 + fold * 0.5;
 }
+// 背心的 MOLLE 織帶：橫向一條一條（2.5 公分寬、間隔 2.5 公分），每 3.8 公分一道直的車縫（bartack），邊緣一排細針腳
+// 回傳 x＝高度（織帶凸起）、y＝間隙（底布露出來的地方，比較暗）、z＝車縫／針腳（暗線）
+float vestM(float c) { return step(1.1, c) * step(c, 1.4) + step(c, -0.2); }
+// 板架（前後板、彈匣袋那些方塊）：軀幹前後、外層、尼龍材質
+float plateM(float c, vec2 rm, vec3 p) { return step(abs(c), 0.05) * step(0.7, rm.x) * step(rm.y, 0.5) * step(abs(p.x), 0.18) * step(0.14, abs(p.z)) * step(0.98, p.y) * step(p.y, 1.42); }
+vec3 molle(vec3 p, vec3 n) {
+  float side = step(0.62, abs(n.x)); float hx = mix(p.x, p.z, side);
+  float rows = step(1.0, p.y) * step(p.y, 1.41) * step(abs(n.y), 0.6) * (1.0 - step(0.06, abs(p.x)) * step(abs(p.x), 0.12) * step(1.36, p.y));
+  float fy = fract(p.y / 0.05 + 0.25), strip = smoothstep(0.02, 0.06, fy) * (1.0 - smoothstep(0.46, 0.5, fy));
+  float edge = (1.0 - smoothstep(0.0, 0.035, abs(fy - 0.08))) + (1.0 - smoothstep(0.0, 0.035, abs(fy - 0.44)));
+  float dash = step(0.45, fract(hx * 260.0));
+  float bt = (1.0 - smoothstep(0.002, 0.0045, abs(fract(hx / 0.038) - 0.5) * 0.038)) * strip;
+  return vec3(strip * rows, (1.0 - strip) * rows, clamp(edge * dash * 0.7 + bt, 0.0, 1.0) * rows);
+}
 vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
   vec3 dpx = dFdx(vp), dpy = dFdy(vp); float dhx = dFdx(h), dhy = dFdy(h);
   vec3 r1 = cross(dpy, n), r2 = cross(n, dpx); float det = dot(dpx, r1);
@@ -176,6 +190,8 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       float ky = vRest.y; float hz = (1.0 - smoothstep(0.0015, 0.004, min(min(abs(ky - 0.585), abs(ky - 0.405)), min(abs(ky - 1.215), abs(ky - 1.05))))) * cw * step(0.04, abs(vRest.x)) * step(ky, 1.25) * (step(ky, 0.7) + step(0.15, abs(vRest.x)));
       float stitch = 0.6 + 0.4 * step(0.5, fract(vRest.y * 260.0));
       diffuseColor.rgb *= 1.0 - max(st * 0.22 * stitch, hz * 0.2); }
+    if (vestM(vCamo) + plateM(vCamo, vRM, vRest) > 0.5) { vec3 mo = molle(vRest, vRN); mo *= 1.0 - smoothstep(0.12, 0.25, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b)));   // 隊伍色塊、名牌不畫織帶
+      diffuseColor.rgb *= (1.0 - mo.y * 0.32) * (1.0 - mo.z * 0.28) * (1.0 + mo.x * 0.05); }
     float dirt = (1.0 - smoothstep(0.05, 0.45, vRest.y)) * cw;
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.27, 0.21) * (0.8 + 0.4 * t.b), dirt * 0.55);
     diffuseColor.rgb *= 1.0 + cw * 0.12 * exp(-pow((vRest.y - 0.48) * 14.0, 2.0)) * step(abs(vRest.z), 0.12) * step(vRest.z, -0.02);
@@ -193,6 +209,8 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
   }`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x; if (vCamo > 1.5 && vCamo < 4.5) roughnessFactor *= 0.92 + 0.2 * texture2D(uCamoT, vRest.xy * 21.0 + vRest.z * 13.0).a;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRM.y;')
+      // 人物的光：環境光（天光）弱一點、直射陽光強一點，明暗對比拉開，自身陰影（頭盔、手臂、背心投下來的）才看得出來
+      .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= 0.74; reflectedLight.indirectSpecular *= 0.85; reflectedLight.directDiffuse *= 1.28; reflectedLight.directSpecular *= 1.2;')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   { vec2 nuv = vec2(vUvH.x, vUvH.y * ${(MH_AT[1] / MH_AT[2]).toFixed(5)}); vec3 mapN = texture2D(uHeadN, nuv).xyz * 2.0 - 1.0;   // 寫實的頭：毛孔、鬍渣、皺紋的法線貼圖（沒有切線，用螢幕微分算）
     if (vCamo > 2.5 && vCamo < 4.5 && nuv.y < 0.995) {
@@ -201,6 +219,7 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       float dt2 = max(dot(Tn, Tn), dot(Bn, Bn)), sc = dt2 == 0.0 ? 0.0 : inversesqrt(dt2);
       normal = normalize(Tn * (mapN.x * sc * 0.8) + Bn * (mapN.y * sc * 0.8) + normal * mapN.z);
     } }
+  if (vestM(vCamo) + plateM(vCamo, vRM, vRest) > 0.5) { vec3 mo = molle(vRest, vRN); normal = bumpN(normal, -vViewPosition, mo.x - mo.z * 0.3, 0.0022); }
   { float cwN = clamp(vCamo, 0.0, 1.0) * (1.0 - step(1.5, vCamo)); if (cwN > 0.5 || vRM.x > 0.85) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0016);
     else if (vCamo > 1.5 && vCamo < 4.5) { vec3 aw = abs(vRN); aw /= (aw.x + aw.y + aw.z + 1e-4); vec3 sp = vRest * 34.0;
       float ph = texture2D(uCamoT, sp.zy).a * aw.x + texture2D(uCamoT, sp.xz).a * aw.y + texture2D(uCamoT, sp.xy).a * aw.z;
@@ -208,7 +227,10 @@ vec3 bumpN(vec3 n, vec3 vp, float h, float k) {
       ph += hmN * texture2D(uCamoT, vRest.xy * 47.0 + vRest.zz * 31.0).a * 4.0;   // 髮根的顆粒
       normal = bumpN(normal, -vViewPosition, ph, vCamo > 2.5 ? 0.00005 : 0.00016); }   // 皮膚毛孔
     else if (vRM.x > 0.7 && vRM.y < 0.5) normal = bumpN(normal, -vViewPosition, clothH(vRest, vRN), 0.0009); }   // 尼龍裝備的織紋`)
-      .replace('#include <opaque_fragment>', `outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26 * smoothstep(1.5, 5.0, -vViewPosition.z);   // 邊緣光：貼近看時淡掉（近看才不會每個邊都一圈白）
+      .replace('#include <opaque_fragment>', `{ float clm = (1.0 - step(1.5, vCamo)) * step(-0.9, vCamo) * step(0.6, vRM.x) * (1.0 - step(0.5, vRM.y));   // 布、尼龍（不含金屬、皮膚、臉）
+  float nv = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
+  outgoingLight += (reflectedLight.indirectDiffuse * 1.3 + reflectedLight.directDiffuse * 0.35) * pow(nv, 3.0) * clm; }   // 跟著環境光走：夜裡就不會亮
+outgoingLight += uRim * pow(1.0 - abs(dot(normalize(normal), vec3(0.0, 0.0, 1.0))), 3.0) * 0.26 * smoothstep(1.5, 5.0, -vViewPosition.z);   // 邊緣光：貼近看時淡掉（近看才不會每個邊都一圈白）
 if (vCamo > 4.5 && vCamo < 5.5) { vec3 eR = reflect(-normalize(vViewPosition), normalize(normal));   // 眼球：角膜上的反光點（一大一小），眼睛才有神
   outgoingLight += vec3(1.0, 0.97, 0.92) * (min(pow(max(dot(eR, normalize(vec3(0.22, 0.1, 0.97))), 0.0), 150.0) * 3.0, 1.1) + pow(max(dot(eR, normalize(vec3(-0.4, 0.15, 0.9))), 0.0), 60.0) * 0.3); }
 #if NUM_DIR_LIGHTS > 0
@@ -384,7 +406,7 @@ function mergeSkinned(parts) {
         const k = bd.kind[v]; if (k === 2 && !vs) continue;
         const ao = 1 - Math.max(0, -na[i + 1]) * 0.22, cl = k === 1 ? gc : k === 2 ? vc : null, cam = k === 0 || (k === 2 && vs[1]) ? 1 : 0;
         P.push(pa[i], pa[i + 1], pa[i + 2]); N.push(na[i], na[i + 1], na[i + 2]); C.push(cl ? cl.r * ao : ao, cl ? cl.g * ao : ao, cl ? cl.b * ao : ao);
-        SI.push(bd.si[v * 2], bd.si[v * 2 + 1], 0, 0); SW.push(bd.sw[v], 1 - bd.sw[v], 0, 0); CA.push(cam); RM.push(k === 1 ? grm[0] : cam ? 0.93 : 0.82, k === 1 ? grm[1] : 0); UVH.push(0, 0); BLK.push(0, 0, 0);
+        SI.push(bd.si[v * 2], bd.si[v * 2 + 1], 0, 0); SW.push(bd.sw[v], 1 - bd.sw[v], 0, 0); CA.push(k === 2 ? (vs[1] ? 1.25 : -0.5) : cam); RM.push(k === 1 ? grm[0] : cam ? 0.93 : 0.82, k === 1 ? grm[1] : 0); UVH.push(0, 0); BLK.push(0, 0, 0);
       }
       continue;
     }
@@ -666,16 +688,23 @@ function humanDie(b, part, dir) {
 }
 const DEATH_GRAV = 9.0;
 // 每格：擺骨頭
-const HUM_LOD = { last: 1e9, n: 0 };
+const HUM_LOD = { last: 1e9, n: 0, sh: 0 };
 function humanPose(b, dt) {
   const B = b.hm.bones, H = b.hs || (humanInit(b), b.hs), p = b.phys.pos;
   const d2 = camera ? p.distanceToSquared(camera.position) : 0, near = d2 < 45 * 45;
   // 遠近換模型：22 公尺外用簡化版（三角形少一半多）
   // 細緻版很重（近處每人約 4 萬個三角形）：省電或自動畫質已經降到底時，縮短距離；同時最多幾個人用細緻版（6 公尺內一定用）
-  if (b.i <= HUM_LOD.last) HUM_LOD.n = 0; HUM_LOD.last = b.i;
+  if (b.i <= HUM_LOD.last) { HUM_LOD.n = 0; HUM_LOD.sh = 0; } HUM_LOD.last = b.i;
   const eco = S.quality === 'eco', slow = S.quality === 'auto' && game.autoPR < 1.05, LD = eco ? 10 : slow ? 14 : 22, cap = eco ? 2 : slow ? 3 : 6;
   let lod = d2 > LD * LD ? 1 : 0; if (!lod) { if (HUM_LOD.n >= cap && d2 > 36) lod = 1; else HUM_LOD.n++; }
   if (b.hm.lod !== lod) { b.hm.lod = lod; b.hm.mesh.geometry = humanGeo(b.baseTeam, b.hm.look, lod, b.hm.face); }
+  // 自身陰影：每幀最多 4 個人、16 公尺內、細緻版才畫進陰影圖；其他人只接收（不投）
+  if (CHAR_SHADOW) {
+    const cast = !lod && d2 < 256 && HUM_LOD.sh < 4 && b.g.visible !== false;
+    if (cast) HUM_LOD.sh++;
+    if (b.hm.mesh.castShadow !== cast) b.hm.mesh.castShadow = cast;
+    if (!b.hm.mesh.receiveShadow) b.hm.mesh.receiveShadow = true;
+  }
   if (!lod) {   // 眨眼（每 2.5–6 秒一次、約 0.17 秒）、眼球小幅掃視；倒地後半閉
     const E = b.hm.eye || (b.hm.eye = { t: 1 + Math.random() * 4, b: -1, g: 0.5, gx: 0, gy: 0 }), U = b.hm.mat.userData;
     if (!b.alive) U.blinkU.value += (0.8 - U.blinkU.value) * Math.min(1, dt * 4);

@@ -14,7 +14,28 @@ scene.add(camera);
 
 // 燈光、霧、天空、遠景都跟著地圖的主題（破曉冷暖對比、正午白光、黃昏橘紫）
 const hemiLight = new THREE.HemisphereLight('#c4d0ea', '#8a6e56', 1.45); scene.add(hemiLight);
-const sunLight = new THREE.DirectionalLight('#ffc792', 2.5); scene.add(sunLight);
+const sunLight = new THREE.DirectionalLight('#ffc792', 2.5); scene.add(sunLight); scene.add(sunLight.target);
+// 人物的自身陰影（頭盔投在臉上、手臂投在身上、背心投在衣服上）：只有人物會畫進陰影圖，地圖的陰影已經烘在光照貼圖裡。
+// 陰影範圍跟著鏡頭前方 14×14 公尺；省電畫質不開。
+const CHAR_SHADOW = S.quality !== 'eco';
+if (CHAR_SHADOW) {
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false;
+  sunLight.castShadow = true; sunLight.shadow.mapSize.set(1024, 1024);
+  const sc = sunLight.shadow.camera; sc.left = -7; sc.right = 7; sc.top = 7; sc.bottom = -7; sc.near = 1; sc.far = 70; sc.updateProjectionMatrix();
+  sunLight.shadow.bias = -0.0004; sunLight.shadow.normalBias = 0.025; sunLight.shadow.radius = 1.5;
+}
+const _shF = new V3();
+let _shWas = true;
+function updateCharShadow() {
+  if (!CHAR_SHADOW) return;
+  // 附近沒有人在投影就不重畫陰影圖（省一整個繪製流程）；最後一個人走掉時多畫一次把舊影子清掉
+  const any = typeof HUM_LOD !== 'undefined' && HUM_LOD.sh > 0; renderer.shadowMap.needsUpdate = any || _shWas; _shWas = any;
+  camera.getWorldDirection(_shF); _shF.y = 0; if (_shF.lengthSq() < 1e-6) _shF.set(0, 0, -1); _shF.normalize();
+  // 陰影範圍的中心：鏡頭前方 5 公尺；對齊到 2 公分的格子，鏡頭小動時陰影邊緣不會閃
+  const fx = Math.round((camera.position.x + _shF.x * 5) / 0.02) * 0.02, fz = Math.round((camera.position.z + _shF.z * 5) / 0.02) * 0.02, fy = Math.round(camera.position.y * 50) / 50 - 0.6;
+  sunLight.target.position.set(fx, fy, fz); sunLight.position.set(fx + SUN_DIR.x * 30, fy + SUN_DIR.y * 30, fz + SUN_DIR.z * 30);
+  sunLight.target.updateMatrixWorld(); sunLight.updateMatrixWorld();
+}
 const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const mapMeshes = [];
 let skyline = null, sky = null;
