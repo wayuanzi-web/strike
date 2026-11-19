@@ -199,7 +199,7 @@ function step(dt) {
     camera.position.set(Math.sin(game.menuT) * 30, 12, Math.cos(game.menuT) * 30);
     camera.lookAt(0, 1, 0);
     for (const b of bots) updateBot(b, dt);
-    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateBlobShadows(); updateMuzzleLight(dt);
+    updateNades(dt); updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateAmbient(dt); updateBlobShadows(); updateMuzzleLight(dt);
     return;
   }
   if ((game.state === 'pause' && game.mode !== 'duel') || game.state === 'over') return;   // 好友對戰暫停時遊戲照跑（不然對方會以為斷線）
@@ -233,7 +233,7 @@ function step(dt) {
   if (!game.freezeBots) for (const b of bots) updateBot(b, dt);
   updateNades(dt); updateDrops(dt); kcRecord();
   if (game.mode !== 'match' && game.mode !== 'tutorial') updatePlayerUse(dt);   // 撿槍（對戰模式在 updateBomb 裡）
-  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateBlobShadows(); updateMuzzleLight(dt);
+  updateTracers(dt); updatePuffs(dt); updateSparks(dt); updateDebris(dt); updateAmbient(dt); updateBlobShadows(); updateMuzzleLight(dt);
   // 攝影機：眼睛位置＋後座力（畫面只跟 45%，子彈落點靠準星的後座點顯示）＋每發小跳＋受擊抖動
   const p = player.body.pos;
   const spec = !player.alive && game.mode === 'match' && player.deadT > 2 ? spectateTarget() : null;
